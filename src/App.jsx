@@ -6,7 +6,7 @@ export default function App() {
     <div className="app">
       <header>
         <h1>GitHub Visual — Interactive demo</h1>
-        <p>Click actions to see files move through working/stage/commit/push.</p>
+        <p>Click tbfrvo see files move through working/stage/commit/push.</p>
       </header>
       <main>
         <Flow />
