@@ -15,7 +15,7 @@ export default function Flow() {
 
   function modify() {
     const id = Math.random()
-    const file = { id, name: `new-file-${String(id).slice(2,6)}.js`, status: 'working' }
+    const file = { id, name: `new-file-${String(id).slice(2, 6)}.js`, status: 'working' }
     setFiles(f => [file, ...f])
     addLog(`Edited ${file.name} (working directory)`)
   }
@@ -61,10 +61,10 @@ export default function Flow() {
       </div>
 
       <div className="boards">
-        <Board title="Working Directory" files={groups.working} color="#fef3c7" />
-        <Board title="Staging Area" files={groups.staged} color="#dbeafe" />
-        <Board title="Local Repo" files={groups.committed} color="#e6fffa" />
-        <Board title="Remote" files={groups.pushed} color="#ffe4e6" />
+        <Board title="Working Directory" files={groups.working} className="board-working" />
+        <Board title="Staging Area" files={groups.staged} className="board-staged" />
+        <Board title="Local Repo" files={groups.committed} className="board-committed" />
+        <Board title="Remote" files={groups.pushed} className="board-pushed" />
       </div>
 
       <aside className="log">
@@ -79,9 +79,9 @@ export default function Flow() {
   )
 }
 
-function Board({ title, files, color }) {
+function Board({ title, files, className }) {
   return (
-    <div className="board" style={{ background: color }}>
+    <div className={`board ${className}`}>
       <h4>{title}</h4>
       <div className="fileList">
         {files.length === 0 && <div className="empty">—</div>}
