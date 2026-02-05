@@ -1,5 +1,6 @@
 import React from 'react'
 import Flow from './components/Flow.jsx'
+import ContactInfo from './components/ContactInfo.jsx'
 
 export default function App() {
   return (
@@ -8,9 +9,12 @@ export default function App() {
         <h1>GitHub Visual — Interactive demo</h1>
         <p>Click actions to see files move through working/stage/commit/push.</p>
       </header>
+
       <main>
         <Flow />
       </main>
+
+      <ContactInfo />
     </div>
   )
 }
