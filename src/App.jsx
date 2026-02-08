@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import Flow from './components/Flow.jsx'
 import Intro from './components/Intro.jsx'
 import Sidebar from './components/Sidebar.jsx'
+import ContactInfo from './components/ContactInfo.jsx'
 
 export default function App() {
   const [showIntro, setShowIntro] = useState(false) // Only for overlay mode (legacy/initial load)
@@ -67,6 +68,16 @@ export default function App() {
           </main>
         </>
       )}
+      <header>
+        <h1>GitHub Visual — Interactive demo</h1>
+        <p>Click actions to see files move through working/stage/commit/push.</p>
+      </header>
+
+      <main>
+        <Flow />
+      </main>
+
+      <ContactInfo />
     </div>
   )
 }
