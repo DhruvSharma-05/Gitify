@@ -3,6 +3,7 @@ import Flow from './components/Flow.jsx'
 import Intro from './components/Intro.jsx'
 import Sidebar from './components/Sidebar.jsx'
 import ContactInfo from './components/ContactInfo.jsx'
+import BranchingLesson from './components/BranchingLesson.jsx'
 
 export default function App() {
   const [showIntro, setShowIntro] = useState(false) // Only for overlay mode (legacy/initial load)
@@ -46,6 +47,9 @@ export default function App() {
       {currentLesson === 0 ? (
         /* Lesson 0: Intro (Tutorial) - Render directly as the view */
         <Intro onComplete={handleIntroComplete} />
+      ) : currentLesson === 2 ? (
+        /* Lesson 2: Branching & Merging */
+        <BranchingLesson />
       ) : (
         /* Lesson 1: Main App */
         <>
@@ -68,14 +72,7 @@ export default function App() {
           </main>
         </>
       )}
-      <header>
-        <h1>GitHub Visual — Interactive demo</h1>
-        <p>Click actions to see files move through working/stage/commit/push.</p>
-      </header>
 
-      <main>
-        <Flow />
-      </main>
 
       <ContactInfo />
     </div>

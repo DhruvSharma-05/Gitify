@@ -4,7 +4,7 @@ export default function ContactInfo() {
   return (
     <section className="contact-info">
       <h2>Contact</h2>
-      <p className="lead">I'd love to hear from you — reach out any time.</p>
+      <p className="lead">I'd love to hear from you — reach out any time But only  between 10 pm to 09:59 pm.</p>
 
       <div className="contacts">
         <div className="contact-card">
