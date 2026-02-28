@@ -4,12 +4,12 @@ export default function ContactInfo() {
   return (
     <section className="contact-info">
       <h2>Contact</h2>
-      <p className="lead">I'd love to hear from you — reach out any time.</p>
+      <p className="lead">I'd love to hear from you - reach out any time.</p>
 
       <div className="contacts">
         <div className="contact-card">
           <h3>Email</h3>
-          <a href="ashutosh@revclerx.com">hello@example.com</a>
+          <a href="mailto:ashutosh@revclerx.com">ashutosh@revclerx.com</a>
         </div>
 
         <div className="contact-card">
