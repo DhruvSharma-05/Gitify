@@ -3,6 +3,7 @@ import Flow from './components/Flow.jsx'
 import Intro from './components/Intro.jsx'
 import Sidebar from './components/Sidebar.jsx'
 import ContactInfo from './components/ContactInfo.jsx'
+import BranchingLesson from './components/BranchingLesson.jsx'
 
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -33,6 +34,8 @@ export default function App() {
 
       {currentLesson === 0 ? (
         <Intro onComplete={handleIntroComplete} />
+      ) : currentLesson === 2 ? (
+        <BranchingLesson />
       ) : (
         <>
           <header>
@@ -52,9 +55,10 @@ export default function App() {
           <main>
             <Flow />
           </main>
-          <ContactInfo />
         </>
       )}
+
+      <ContactInfo />
     </div>
   )
 }
