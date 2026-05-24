@@ -147,7 +147,7 @@ export default function HistoryLesson() {
                   <span className="node-dot"></span>
                   <strong>{commit.hash}</strong>
                   <em>{commit.message}</em>
-                  <small><Avatar name={commit.author} /> {commit.author} · {commit.time}</small>
+                  <small><Avatar name={commit.author} /> {commit.author} - {commit.time}</small>
                 </button>
               ))}
             </div>
