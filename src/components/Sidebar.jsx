@@ -4,7 +4,8 @@ const lessons = [
   { id: 0, title: 'Lesson 0: Git Basics', description: 'Interactive Tutorial' },
   { id: 1, title: 'Lesson 1: Visual Playground', description: 'Main Application' },
   { id: 2, title: 'Lesson 2: Advanced Branching', description: 'Three levels of nested branching' },
-  { id: 3, title: 'Lesson 3: Merge Conflicts', description: 'Resolve competing edits safely' }
+  { id: 3, title: 'Lesson 3: Merge Conflicts', description: 'Resolve competing edits safely' },
+  { id: 4, title: 'Lesson 4: Git History & Time Travel', description: 'Inspect, jump, revert, and reset' }
 ]
 
 export default function Sidebar({ isOpen, onClose, currentLesson, onSelectLesson }) {
