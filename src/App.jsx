@@ -4,6 +4,7 @@ import Intro from './components/Intro.jsx'
 import Sidebar from './components/Sidebar.jsx'
 import ContactInfo from './components/ContactInfo.jsx'
 import BranchingLesson from './components/BranchingLesson.jsx'
+import MergeConflictsLesson from './components/MergeConflictsLesson.jsx'
 
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -36,6 +37,8 @@ export default function App() {
         <Intro onComplete={handleIntroComplete} />
       ) : currentLesson === 2 ? (
         <BranchingLesson />
+      ) : currentLesson === 3 ? (
+        <MergeConflictsLesson />
       ) : (
         <>
           <header>
