@@ -7,6 +7,7 @@ import BranchingLesson from './components/BranchingLesson.jsx'
 import MergeConflictsLesson from './components/MergeConflictsLesson.jsx'
 import HistoryLesson from './components/HistoryLesson.jsx'
 import RemoteCollaborationLesson from './components/RemoteCollaborationLesson.jsx'
+import RebaseLesson from './components/RebaseLesson.jsx'
 
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -45,6 +46,8 @@ export default function App() {
         <HistoryLesson />
       ) : currentLesson === 6 ? (
         <RemoteCollaborationLesson />
+      ) : currentLesson === 7 ? (
+        <RebaseLesson />
       ) : (
         <>
           <header>
