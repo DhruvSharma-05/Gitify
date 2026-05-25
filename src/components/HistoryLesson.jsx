@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import PretextCanvas from './PretextCanvas.jsx'
 
 const baseCommits = [
   {
@@ -127,6 +128,7 @@ export default function HistoryLesson() {
         <h1>Git History & Time Travel</h1>
         <p>Every commit is a snapshot. Inspect it, jump to it, undo it, or rewrite it with care.</p>
       </header>
+      <PretextCanvas scene="historyLog" height={220} />
 
       <main className="history-layout">
         <section className="history-panel timeline-panel">

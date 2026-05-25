@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import PretextCanvas from './PretextCanvas.jsx'
 
 const stashSeed = [
   { id: 0, name: 'stash@{0}', label: 'wip: payment form cleanup', files: ['Checkout.jsx', 'styles.css'] },
@@ -88,6 +89,7 @@ export default function StashCherryPickLesson() {
         <h1>Stash & Cherry-Pick</h1>
         <p>Save work-in-progress without committing, then transplant individual commits across branches.</p>
       </header>
+      <PretextCanvas scene="stashPick" height={220} />
 
       <main className="stash-layout">
         <section className="stash-panel workspace-panel">

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import PretextCanvas from './PretextCanvas.jsx'
 
 const resolutionText = {
   ours: '  theme: "dark"',
@@ -67,6 +68,7 @@ export default function MergeConflictsLesson() {
         <h1>Merge Conflicts</h1>
         <p>When two branches edit the same part of the same file, Git asks you to choose what survives.</p>
       </header>
+      <PretextCanvas scene="conflictDiff" height={220} />
 
       <main className="merge-layout">
         <section className="merge-panel setup-panel">

@@ -145,6 +145,25 @@ header p {
   font-size: 1.1rem;
 }
 
+.pretext-canvas-wrap {
+  width: 100%;
+  margin: 0 0 20px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(1, 4, 9, 0.28);
+  box-shadow: var(--glass-shadow);
+}
+
+.pretext-canvas-wrap canvas {
+  display: block;
+  width: 100%;
+}
+
+.hero-visual .pretext-canvas-wrap {
+  margin-bottom: 18px;
+}
+
 /* Controls */
 .controls {
   display: flex;
