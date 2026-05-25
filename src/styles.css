@@ -675,6 +675,27 @@ header p {
   display: flex;
   flex-direction: column;
   flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* Custom premium scrollbar for sidebar menu */
+.lesson-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.lesson-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.01);
+  border-radius: 4px;
+}
+
+.lesson-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+}
+
+.lesson-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .lesson-item {
@@ -820,12 +841,12 @@ header p {
 
 /* Hero Section */
 .intro-hero {
-  min-height: 100vh;
+  min-height: 80vh;
   display: grid;
   grid-template-columns: 1fr 1fr;
   align-items: center;
   gap: 60px;
-  padding: 80px 40px;
+  padding: 60px 40px;
   position: relative;
   overflow: hidden;
 }
@@ -1014,19 +1035,49 @@ header p {
 
 /* Section Styles */
 .intro-section {
-  min-height: 100vh;
+  min-height: 60vh;
   display: flex;
   align-items: center;
-  padding: 60px 40px;
+  padding: 40px 40px;
   position: relative;
-  opacity: 0;
-  transform: translateY(40px);
-  transition: all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.intro-section.visible {
+/* Global entrance states for children inside sections */
+.intro-section .section-text h2,
+.intro-section .section-text p,
+.intro-section .section-text .highlight-box,
+.intro-section .section-text .code-hint,
+.intro-section .section-visual {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Staggered visible triggers */
+.intro-section.visible .section-text h2 {
   opacity: 1;
   transform: translateY(0);
+  transition-delay: 0.1s;
+}
+
+.intro-section.visible .section-text p {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.22s;
+}
+
+.intro-section.visible .section-text .highlight-box,
+.intro-section.visible .section-text .code-hint {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.34s;
+}
+
+.intro-section.visible .section-visual {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.45s;
 }
 
 @media (max-width: 768px) {
@@ -1572,15 +1623,15 @@ header p {
 
 .center-flow h2 {
   text-align: center;
-  margin-bottom: 60px;
+  margin-bottom: 24px;
 }
 
 .complete-diagram {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
-  margin-bottom: 40px;
+  gap: 16px;
+  margin-bottom: 24px;
 }
 
 .diagram-item {
@@ -1593,28 +1644,27 @@ header p {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   min-width: 200px;
-  transition: all 0.4s ease;
   opacity: 0;
-  animation: slideInUp 0.6s ease forwards;
+  transform: translateY(24px);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+              background 0.3s ease,
+              border-color 0.3s ease;
 }
 
 .diagram-1 {
-  animation-delay: 0.1s;
   border-left: 4px solid rgba(139, 148, 158, 0.5);
 }
 
 .diagram-2 {
-  animation-delay: 0.2s;
   border-left: 4px solid rgba(201, 209, 217, 0.5);
 }
 
 .diagram-3 {
-  animation-delay: 0.3s;
   border-left: 4px solid rgba(240, 246, 252, 0.42);
 }
 
 .diagram-4 {
-  animation-delay: 0.4s;
   border-left: 4px solid rgba(139, 148, 158, 0.5);
 }
 
@@ -1642,19 +1692,71 @@ header p {
 .diagram-arrow {
   font-size: 2rem;
   color: rgba(255, 255, 255, 0.2);
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Bounce animation applied only to the inner text so it doesn't conflict with entrance translations */
+.arrow-bounce {
+  display: inline-block;
   animation: bounce 1.5s ease-in-out infinite;
 }
 
 @keyframes bounce {
-
-  0%,
-  100% {
+  0%, 100% {
     transform: translateY(0);
   }
-
   50% {
-    transform: translateY(8px);
+    transform: translateY(6px);
   }
+}
+
+/* Staggered visible triggers for Complete Flow diagram items */
+.intro-section.visible .diagram-1 {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.1s;
+}
+
+.intro-section.visible .arrow-1 {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.25s;
+}
+
+.intro-section.visible .diagram-2 {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.4s;
+}
+
+.intro-section.visible .arrow-2 {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.55s;
+}
+
+.intro-section.visible .diagram-3 {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.7s;
+}
+
+.intro-section.visible .arrow-3 {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.85s;
+}
+
+.intro-section.visible .diagram-4 {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 1.0s;
 }
 
 .completion-message {
@@ -1678,11 +1780,11 @@ header p {
 
 /* CTA Section */
 .intro-cta-section {
-  min-height: 60vh;
+  min-height: 40vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 60px 40px;
+  padding: 40px 20px;
   text-align: center;
   background: linear-gradient(135deg, rgba(201, 209, 217, 0.08), rgba(110, 118, 129, 0.08));
   border-top: 1px solid rgba(255, 255, 255, 0.1);
@@ -3245,5 +3347,294 @@ header p {
     flex-direction: column;
   }
 }
+
+/* ========== LANDING PAGE ENHANCEMENT ========== */
+
+.mock-terminal {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+  padding: 20px;
+  font-family: 'Fira Code', monospace;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  z-index: 5;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.terminal-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 8px;
+}
+
+.terminal-bar .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.dot.red { background: #ff5f56; }
+.dot.yellow { background: #ffbd2e; }
+.dot.green { background: #27c93f; }
+.terminal-title {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  margin-left: auto;
+}
+
+.terminal-body code {
+  display: block;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  margin-bottom: 4px;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+.terminal-body .cmd { color: #58a6ff; }
+.terminal-body .terminal-line { color: #c9d1d9; }
+.terminal-body .hash { color: #d2a8ff; }
+
+/* Gitify Logo Navbar Styles */
+.intro-navbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 20px 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 10;
+}
+
+.intro-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  margin-left: 28px; /* Shifts the logo right to prevent overlap with the menu-btn icon */
+}
+
+.logo-icon-svg {
+  width: 32px;
+  height: 32px;
+  filter: drop-shadow(0 0 8px rgba(129, 140, 248, 0.4));
+  transition: transform 0.3s ease;
+}
+
+.intro-logo:hover .logo-icon-svg {
+  transform: rotate(5deg) scale(1.05);
+}
+
+.logo-text {
+  font-family: 'Outfit', 'Inter', sans-serif;
+  font-weight: 900;
+  font-size: 1.5rem;
+  letter-spacing: -0.03em;
+  color: #fff;
+}
+
+/* Hero Section Enhancements */
+.intro-hero {
+  background-image: radial-gradient(circle at 80% 20%, rgba(56, 189, 248, 0.08) 0%, transparent 50%),
+                    radial-gradient(circle at 20% 80%, rgba(192, 132, 252, 0.06) 0%, transparent 50%),
+                    linear-gradient(rgba(255, 255, 255, 0.005) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(255, 255, 255, 0.005) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 48px 48px, 48px 48px;
+}
+
+/* Terminal Graph Tree Layout */
+.terminal-graph-layout {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  margin-top: 16px;
+}
+
+.graph-sidebar {
+  width: 45px;
+  flex-shrink: 0;
+}
+
+.git-graph-svg {
+  width: 100%;
+  height: 288px;
+  overflow: visible;
+}
+
+.commit-details {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.hero-commit-row {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-family: 'Fira Code', monospace;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.015);
+  flex-wrap: nowrap !important;
+}
+
+.hero-commit-row .hash {
+  color: #d2a8ff;
+  font-weight: 500;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.hero-commit-row .author-name {
+  color: #8b949e;
+  margin-right: 8px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.hero-commit-row .desc {
+  color: #c9d1d9;
+  white-space: nowrap !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+  flex-shrink: 1;
+}
+
+/* Commit Badges */
+.branch-pill {
+  background: rgba(236, 72, 153, 0.15);
+  border: 1px solid rgba(236, 72, 153, 0.3);
+  color: #ec4899;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.7rem;
+  margin-right: 6px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.merge-pill {
+  background: rgba(52, 211, 153, 0.15);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  color: #34d399;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.7rem;
+  margin-right: 6px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+/* Glowing Titles & CTA */
+.gradient-text {
+  text-shadow: 0 0 30px rgba(56, 189, 248, 0.3);
+}
+
+.hero-title {
+  font-family: 'Outfit', 'Inter', sans-serif;
+  font-size: 3.8rem;
+  letter-spacing: -0.02em;
+}
+
+.hero-cta {
+  background: linear-gradient(135deg, rgba(33, 38, 45, 0.8) 0%, rgba(48, 54, 61, 0.8) 100%);
+  backdrop-filter: blur(12px);
+  border-color: rgba(56, 189, 248, 0.3);
+  box-shadow: 0 8px 30px rgba(56, 189, 248, 0.15);
+}
+
+.hero-cta:hover {
+  border-color: rgba(56, 189, 248, 0.6);
+  box-shadow: 0 12px 40px rgba(56, 189, 248, 0.3);
+}
+
+/* Features Grid Section */
+.intro-features-grid {
+  padding: 80px 40px 120px;
+  max-width: 1200px;
+  margin: 0 auto;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.section-title-centered {
+  text-align: center;
+  margin-bottom: 60px;
+}
+
+.features-kicker {
+  color: #58a6ff;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 2px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.section-title-centered h2 {
+  font-size: 2.5rem;
+  font-weight: 800;
+  margin: 0;
+  color: #fff;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 30px;
+}
+
+.feature-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  padding: 35px 30px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.feature-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-6px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+}
+
+.feature-icon {
+  font-size: 2.2rem;
+  margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.feature-card h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 0 12px 0;
+  color: #fff;
+}
+
+.feature-card p {
+  color: var(--text-muted);
+  line-height: 1.6;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
 
 

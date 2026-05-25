@@ -44,9 +44,9 @@ export default function App() {
         <MergeConflictsLesson />
       ) : currentLesson === 4 ? (
         <HistoryLesson />
-      ) : currentLesson === 6 ? (
+      ) : currentLesson === 5 ? (
         <RemoteCollaborationLesson />
-      ) : currentLesson === 7 ? (
+      ) : currentLesson === 6 ? (
         <RebaseLesson />
       ) : (
         <>

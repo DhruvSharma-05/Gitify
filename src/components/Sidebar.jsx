@@ -6,8 +6,8 @@ const lessons = [
   { id: 2, title: 'Lesson 2: Advanced Branching', description: 'Three levels of nested branching' },
   { id: 3, title: 'Lesson 3: Merge Conflicts', description: 'Resolve competing edits safely' },
   { id: 4, title: 'Lesson 4: Git History & Time Travel', description: 'Inspect, jump, revert, and reset' },
-  { id: 6, title: 'Lesson 6: Remote Collaboration', description: 'Fetch, pull, PRs, forks, and push recovery' },
-  { id: 7, title: 'Lesson 7: Rebase & Clean History', description: 'Rewrite commits into a clean story' }
+  { id: 5, title: 'Lesson 5: Remote Collaboration', description: 'Fetch, pull, PRs, forks, and push recovery' },
+  { id: 6, title: 'Lesson 6: Rebase & Clean History', description: 'Rewrite commits into a clean story' }
 ]
 
 export default function Sidebar({ isOpen, onClose, currentLesson, onSelectLesson }) {
