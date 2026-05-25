@@ -9,10 +9,9 @@ Gitify is a local React + Vite teaching app for learning Git and GitHub visually
 - Lesson 2: Advanced Branching - shows main, feature, and bugfix branches across nested branch levels.
 - Lesson 3: Merge Conflicts - teaches conflict markers, resolution choices, `git add`, and merge commits.
 - Lesson 4: Git History & Time Travel - explores `git log`, diffs, detached HEAD, `git revert`, and `git reset`.
+- Lesson 5: Stash & Cherry-Pick - saves uncommitted work with stash and moves individual commits across branches.
 - Lesson 6: Remote Collaboration - explains fetch vs pull, upstream tracking, pull requests, forks, clones, and rejected pushes.
 - Lesson 7: Rebase & Clean History - compares merge and rebase, includes interactive rebase actions, and explains safe force pushing.
-
-Lesson 5 is not implemented yet.
 
 ## Commands Covered
 
@@ -32,6 +31,14 @@ git revert
 git reset --soft
 git reset --mixed
 git reset --hard
+git stash
+git stash push -m
+git stash list
+git stash apply
+git stash pop
+git cherry-pick <hash>
+git cherry-pick <start>..<end>
+git cherry-pick --continue
 git fetch
 git pull
 git remote -v
@@ -92,6 +99,7 @@ npm.cmd run preview
 - `src/components/BranchingLesson.jsx` - Lesson 2.
 - `src/components/MergeConflictsLesson.jsx` - Lesson 3.
 - `src/components/HistoryLesson.jsx` - Lesson 4.
+- `src/components/StashCherryPickLesson.jsx` - Lesson 5.
 - `src/components/RemoteCollaborationLesson.jsx` - Lesson 6.
 - `src/components/RebaseLesson.jsx` - Lesson 7.
 - `src/components/Sidebar.jsx` - lesson navigation.
