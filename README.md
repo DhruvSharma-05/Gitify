@@ -1,22 +1,33 @@
-# Gitify - GitHub Visual Learning App
+# Gitify 🚀 - GitHub Visual Learning App
 
-Gitify is a local React + Vite teaching app for learning Git and GitHub visually. It turns common Git workflows into interactive lessons so learners can see files, commits, branches, conflicts, remotes, and rebases move instead of only reading commands.
+Gitify is an interactive React + Vite web application designed to teach Git and GitHub concepts visually. It translates complex, abstract command-line workflows into intuitive, animated simulations so learners can *see* files, commits, branches, conflicts, remotes, and rebases in action.
 
-## Lessons
+---
 
-- Lesson 0: Git Basics - introduces version control and the edit -> stage -> commit -> push flow.
-- Lesson 1: Visual Playground - lets users click `git add`, `git commit`, and `git push` to move files through the workflow.
-- Lesson 2: Advanced Branching - shows main, feature, and bugfix branches across nested branch levels.
-- Lesson 3: Merge Conflicts - teaches conflict markers, resolution choices, `git add`, and merge commits.
-- Lesson 4: Git History & Time Travel - explores `git log`, diffs, detached HEAD, `git revert`, and `git reset`.
-- Lesson 6: Remote Collaboration - explains fetch vs pull, upstream tracking, pull requests, forks, clones, and rejected pushes.
-- Lesson 7: Rebase & Clean History - compares merge and rebase, includes interactive rebase actions, and explains safe force pushing.
+## 🌟 Key Features
 
-Lesson 5 is not implemented yet.
+- **Interactive Animations**: Watch files, commits, and branches move dynamically across environments.
+- **Micro-Animations & Visual Cues**: Visual indicators guide users through staging, committing, and pushing.
+- **Harmonious Sleek Styling**: A premium dark-mode interface built on a modern design system.
+- **Real-world Scenarios**: Simulates collaboration, branch merging, remote push conflicts, and history rewrites.
 
-## Commands Covered
+---
 
-The app introduces these commands through interactive scenarios:
+## 📚 Lessons
+
+- **Lesson 0: Git Basics** ➔ Introduces version control and the core `edit` ➔ `stage` ➔ `commit` ➔ `push` flow.
+- **Lesson 1: Visual Playground** ➔ A sandbox allowing learners to click actions and visually track files through the workflow.
+- **Lesson 2: Advanced Branching** ➔ Shows main, feature, and bugfix branches across three nested branch levels.
+- **Lesson 3: Merge Conflicts** ➔ Teaches conflict markers, manual resolution choices, staging, and final merge commits.
+- **Lesson 4: Git History & Time Travel** ➔ Explores `git log`, diffs, detached HEAD, `git revert`, and soft/mixed/hard resets.
+- **Lesson 5: Remote Collaboration** ➔ Explains fetch vs. pull, upstream tracking, PR review workflows, forks, clones, and push conflicts.
+- **Lesson 6: Rebase & Clean History** ➔ Compares merge vs. rebase, features interactive rebasing, and explains safe force-pushing.
+
+---
+
+## 🛠️ Commands Covered
+
+The app introduces these commands through guided interactive scenarios:
 
 ```text
 git add
@@ -42,68 +53,69 @@ git rebase --abort
 git push --force-with-lease
 ```
 
-## Quick Start
+---
 
-Prerequisites:
+## 🚀 Quick Start
 
-- Node.js 16 or newer
-- npm
+### Prerequisites
+- **Node.js** (v16 or newer)
+- **npm**
 
-Install dependencies:
-
+### Installation
+Clone the repository and install all dependencies:
 ```powershell
-npm.cmd install
+npm install
+```
+*Note: If Windows PowerShell blocks execution due to policy settings, you can use `npm.cmd install` instead.*
+
+### Run Development Server
+Start the local server with hot-reload enabled:
+```powershell
+npm run dev
+```
+Navigate to the printed address (typically `http://localhost:5173/`).
+
+### Production Build
+To build and preview the optimized production application:
+```powershell
+# Build the application
+npm run build
+
+# Preview the build locally
+npm run preview
 ```
 
-If PowerShell blocks `npm` with an execution policy error, use `npm.cmd` as shown above.
+---
 
-Run the dev server:
-
-```powershell
-npm.cmd run dev
-```
-
-Open the URL printed by Vite, usually:
+## 📁 Project Structure
 
 ```text
-http://localhost:5173/
+├── index.html                                # Vite entry HTML document
+├── package.json                              # Project scripts and dependencies
+├── src/
+│   ├── main.jsx                              # React mounting point
+│   ├── App.jsx                               # Top-level lesson router & shell
+│   ├── styles.css                            # Modern styling system
+│   └── components/
+│       ├── Sidebar.jsx                       # Navigation sidebar
+│       ├── Intro.jsx                         # Lesson 0 (Git Basics)
+│       ├── Flow.jsx                          # Lesson 1 (Visual Playground)
+│       ├── BranchingLesson.jsx               # Lesson 2 (Advanced Branching)
+│       ├── MergeConflictsLesson.jsx          # Lesson 3 (Merge Conflicts)
+│       ├── HistoryLesson.jsx                 # Lesson 4 (History & Time Travel)
+│       ├── RemoteCollaborationLesson.jsx     # Lesson 5 (Remote Collaboration)
+│       └── RebaseLesson.jsx                  # Lesson 6 (Rebase & Clean History)
 ```
 
-Build for production:
+---
 
-```powershell
-npm.cmd run build
-```
+## 💡 Development Notes
 
-Preview the production build:
+- **Adding Lessons**: Create a new component inside `src/components/`, then register it within `src/App.jsx` and `src/components/Sidebar.jsx`.
+- **Styling**: Make use of `src/styles.css` for maintaining consistent visual cues and responsive spacing.
 
-```powershell
-npm.cmd run preview
-```
+---
 
-## Project Structure
+## 📄 License
 
-- `index.html` - Vite entry HTML.
-- `package.json` - scripts and dependencies.
-- `src/main.jsx` - React entry point.
-- `src/App.jsx` - top-level lesson router.
-- `src/components/Intro.jsx` - Lesson 0.
-- `src/components/Flow.jsx` - Lesson 1 playground.
-- `src/components/BranchingLesson.jsx` - Lesson 2.
-- `src/components/MergeConflictsLesson.jsx` - Lesson 3.
-- `src/components/HistoryLesson.jsx` - Lesson 4.
-- `src/components/RemoteCollaborationLesson.jsx` - Lesson 6.
-- `src/components/RebaseLesson.jsx` - Lesson 7.
-- `src/components/Sidebar.jsx` - lesson navigation.
-- `src/styles.css` - shared styling and lesson-specific UI.
-
-## Development Notes
-
-- Add new lessons as components under `src/components`.
-- Register new lessons in `src/App.jsx` and `src/components/Sidebar.jsx`.
-- Keep interactions local to each lesson component when possible.
-- Use `src/styles.css` for the current shared styling approach.
-
-## License
-
-MIT
+This project is licensed under the [MIT License](LICENSE).

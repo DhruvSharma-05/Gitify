@@ -44,7 +44,7 @@ export default function RemoteCollaborationLesson() {
   return (
     <div className="remote-lesson">
       <header className="lesson-header">
-        <span className="lesson-kicker">Lesson 6</span>
+        <span className="lesson-kicker">Lesson 5</span>
         <h1>Remote Collaboration</h1>
         <p>Git is local. GitHub is shared. Teamwork means syncing, reviewing, and pushing without stepping on each other.</p>
       </header>

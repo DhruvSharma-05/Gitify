@@ -90,7 +90,7 @@ export default function RebaseLesson() {
   return (
     <div className="rebase-lesson">
       <header className="lesson-header">
-        <span className="lesson-kicker">Lesson 7</span>
+        <span className="lesson-kicker">Lesson 6</span>
         <h1>Rebase & Clean History</h1>
         <p>Merge preserves what happened. Rebase rewrites the story so it reads cleanly.</p>
       </header>
