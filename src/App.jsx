@@ -6,6 +6,7 @@ import ContactInfo from './components/ContactInfo.jsx'
 import BranchingLesson from './components/BranchingLesson.jsx'
 import MergeConflictsLesson from './components/MergeConflictsLesson.jsx'
 import HistoryLesson from './components/HistoryLesson.jsx'
+import StashCherryPickLesson from './components/StashCherryPickLesson.jsx'
 import RemoteCollaborationLesson from './components/RemoteCollaborationLesson.jsx'
 import RebaseLesson from './components/RebaseLesson.jsx'
 
@@ -45,8 +46,10 @@ export default function App() {
       ) : currentLesson === 4 ? (
         <HistoryLesson />
       ) : currentLesson === 5 ? (
-        <RemoteCollaborationLesson />
+        <StashCherryPickLesson />
       ) : currentLesson === 6 ? (
+        <RemoteCollaborationLesson />
+      ) : currentLesson === 7 ? (
         <RebaseLesson />
       ) : (
         <>

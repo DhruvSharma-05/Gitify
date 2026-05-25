@@ -1,33 +1,26 @@
-# Gitify 🚀 - GitHub Visual Learning App
+# Gitify - GitHub Visual Learning App
 
-Gitify is an interactive React + Vite web application designed to teach Git and GitHub concepts visually. It translates complex, abstract command-line workflows into intuitive, animated simulations so learners can *see* files, commits, branches, conflicts, remotes, and rebases in action.
+Gitify is an interactive React + Vite web application designed to teach Git and GitHub concepts visually. It translates command-line workflows into animated simulations so learners can see files, commits, branches, conflicts, remotes, stashes, cherry-picks, and rebases in action.
 
----
+## Key Features
 
-## 🌟 Key Features
+- Interactive animations for files, commits, branches, and remotes.
+- Visual cues for staging, committing, pushing, merging, stashing, and rebasing.
+- Real-world scenarios for conflicts, remote teamwork, history repair, and clean history.
+- Local Vite app that is easy to run for lessons, demos, and classroom use.
 
-- **Interactive Animations**: Watch files, commits, and branches move dynamically across environments.
-- **Micro-Animations & Visual Cues**: Visual indicators guide users through staging, committing, and pushing.
-- **Harmonious Sleek Styling**: A premium dark-mode interface built on a modern design system.
-- **Real-world Scenarios**: Simulates collaboration, branch merging, remote push conflicts, and history rewrites.
+## Lessons
 
----
+- Lesson 0: Git Basics - introduces version control and the edit -> stage -> commit -> push flow.
+- Lesson 1: Visual Playground - lets users click `git add`, `git commit`, and `git push` to move files through the workflow.
+- Lesson 2: Advanced Branching - shows main, feature, and bugfix branches across nested branch levels.
+- Lesson 3: Merge Conflicts - teaches conflict markers, resolution choices, `git add`, and merge commits.
+- Lesson 4: Git History & Time Travel - explores `git log`, diffs, detached HEAD, `git revert`, and `git reset`.
+- Lesson 5: Stash & Cherry-Pick - saves uncommitted work with stash and moves individual commits across branches.
+- Lesson 6: Remote Collaboration - explains fetch vs pull, upstream tracking, pull requests, forks, clones, and rejected pushes.
+- Lesson 7: Rebase & Clean History - compares merge and rebase, includes interactive rebase actions, and explains safe force pushing.
 
-## 📚 Lessons
-
-- **Lesson 0: Git Basics** ➔ Introduces version control and the core `edit` ➔ `stage` ➔ `commit` ➔ `push` flow.
-- **Lesson 1: Visual Playground** ➔ A sandbox allowing learners to click actions and visually track files through the workflow.
-- **Lesson 2: Advanced Branching** ➔ Shows main, feature, and bugfix branches across three nested branch levels.
-- **Lesson 3: Merge Conflicts** ➔ Teaches conflict markers, manual resolution choices, staging, and final merge commits.
-- **Lesson 4: Git History & Time Travel** ➔ Explores `git log`, diffs, detached HEAD, `git revert`, and soft/mixed/hard resets.
-- **Lesson 5: Remote Collaboration** ➔ Explains fetch vs. pull, upstream tracking, PR review workflows, forks, clones, and push conflicts.
-- **Lesson 6: Rebase & Clean History** ➔ Compares merge vs. rebase, features interactive rebasing, and explains safe force-pushing.
-
----
-
-## 🛠️ Commands Covered
-
-The app introduces these commands through guided interactive scenarios:
+## Commands Covered
 
 ```text
 git add
@@ -43,6 +36,14 @@ git revert
 git reset --soft
 git reset --mixed
 git reset --hard
+git stash
+git stash push -m
+git stash list
+git stash apply
+git stash pop
+git cherry-pick <hash>
+git cherry-pick <start>..<end>
+git cherry-pick --continue
 git fetch
 git pull
 git remote -v
@@ -53,69 +54,73 @@ git rebase --abort
 git push --force-with-lease
 ```
 
----
+## Quick Start
 
-## 🚀 Quick Start
+Prerequisites:
 
-### Prerequisites
-- **Node.js** (v16 or newer)
-- **npm**
+- Node.js 16 or newer
+- npm
 
-### Installation
-Clone the repository and install all dependencies:
+Install dependencies:
+
 ```powershell
-npm install
-```
-*Note: If Windows PowerShell blocks execution due to policy settings, you can use `npm.cmd install` instead.*
-
-### Run Development Server
-Start the local server with hot-reload enabled:
-```powershell
-npm run dev
-```
-Navigate to the printed address (typically `http://localhost:5173/`).
-
-### Production Build
-To build and preview the optimized production application:
-```powershell
-# Build the application
-npm run build
-
-# Preview the build locally
-npm run preview
+npm.cmd install
 ```
 
----
+If PowerShell blocks `npm` with an execution policy error, use `npm.cmd` as shown above.
 
-## 📁 Project Structure
+Run the dev server:
+
+```powershell
+npm.cmd run dev
+```
+
+Open the URL printed by Vite, usually:
 
 ```text
-├── index.html                                # Vite entry HTML document
-├── package.json                              # Project scripts and dependencies
-├── src/
-│   ├── main.jsx                              # React mounting point
-│   ├── App.jsx                               # Top-level lesson router & shell
-│   ├── styles.css                            # Modern styling system
-│   └── components/
-│       ├── Sidebar.jsx                       # Navigation sidebar
-│       ├── Intro.jsx                         # Lesson 0 (Git Basics)
-│       ├── Flow.jsx                          # Lesson 1 (Visual Playground)
-│       ├── BranchingLesson.jsx               # Lesson 2 (Advanced Branching)
-│       ├── MergeConflictsLesson.jsx          # Lesson 3 (Merge Conflicts)
-│       ├── HistoryLesson.jsx                 # Lesson 4 (History & Time Travel)
-│       ├── RemoteCollaborationLesson.jsx     # Lesson 5 (Remote Collaboration)
-│       └── RebaseLesson.jsx                  # Lesson 6 (Rebase & Clean History)
+http://localhost:5173/
 ```
 
----
+Build for production:
 
-## 💡 Development Notes
+```powershell
+npm.cmd run build
+```
 
-- **Adding Lessons**: Create a new component inside `src/components/`, then register it within `src/App.jsx` and `src/components/Sidebar.jsx`.
-- **Styling**: Make use of `src/styles.css` for maintaining consistent visual cues and responsive spacing.
+Preview the production build:
 
----
+```powershell
+npm.cmd run preview
+```
 
-## 📄 License
+## Project Structure
 
-This project is licensed under the [MIT License](LICENSE).
+```text
+index.html
+package.json
+src/
+  main.jsx
+  App.jsx
+  styles.css
+  components/
+    Sidebar.jsx
+    Intro.jsx
+    Flow.jsx
+    BranchingLesson.jsx
+    MergeConflictsLesson.jsx
+    HistoryLesson.jsx
+    StashCherryPickLesson.jsx
+    RemoteCollaborationLesson.jsx
+    RebaseLesson.jsx
+```
+
+## Development Notes
+
+- Add new lessons as components under `src/components`.
+- Register new lessons in `src/App.jsx` and `src/components/Sidebar.jsx`.
+- Keep interactions local to each lesson component when possible.
+- Use `src/styles.css` for the current shared styling approach.
+
+## License
+
+MIT
