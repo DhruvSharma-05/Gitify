@@ -10,9 +10,13 @@ import StashCherryPickLesson from './components/StashCherryPickLesson.jsx'
 import RemoteCollaborationLesson from './components/RemoteCollaborationLesson.jsx'
 import RebaseLesson from './components/RebaseLesson.jsx'
 
+const lessonOrder = [0, 1, 2, 3, 4, 5, 6, 7]
+
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [currentLesson, setCurrentLesson] = useState(0)
+  const currentLessonIndex = lessonOrder.indexOf(currentLesson)
+  const nextLesson = lessonOrder[currentLessonIndex + 1]
 
   const handleLessonSelect = (lessonId) => {
     setCurrentLesson(lessonId)
@@ -20,6 +24,12 @@ export default function App() {
 
   const handleIntroComplete = () => {
     setCurrentLesson(1)
+  }
+
+  const handleNextLesson = () => {
+    if (nextLesson === undefined) return
+    setCurrentLesson(nextLesson)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   return (
@@ -71,6 +81,15 @@ export default function App() {
             <Flow />
           </main>
         </>
+      )}
+
+      {nextLesson !== undefined && (
+        <nav className="lesson-next-nav" aria-label="Lesson navigation">
+          <button className="lesson-next-btn" onClick={handleNextLesson}>
+            Next lesson
+            <span>Lesson {nextLesson}</span>
+          </button>
+        </nav>
       )}
 
       <ContactInfo />
