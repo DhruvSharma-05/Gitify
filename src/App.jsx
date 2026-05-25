@@ -4,6 +4,11 @@ import Intro from './components/Intro.jsx'
 import Sidebar from './components/Sidebar.jsx'
 import ContactInfo from './components/ContactInfo.jsx'
 import BranchingLesson from './components/BranchingLesson.jsx'
+import MergeConflictsLesson from './components/MergeConflictsLesson.jsx'
+import HistoryLesson from './components/HistoryLesson.jsx'
+import StashCherryPickLesson from './components/StashCherryPickLesson.jsx'
+import RemoteCollaborationLesson from './components/RemoteCollaborationLesson.jsx'
+import RebaseLesson from './components/RebaseLesson.jsx'
 
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -36,6 +41,16 @@ export default function App() {
         <Intro onComplete={handleIntroComplete} />
       ) : currentLesson === 2 ? (
         <BranchingLesson />
+      ) : currentLesson === 3 ? (
+        <MergeConflictsLesson />
+      ) : currentLesson === 4 ? (
+        <HistoryLesson />
+      ) : currentLesson === 5 ? (
+        <StashCherryPickLesson />
+      ) : currentLesson === 6 ? (
+        <RemoteCollaborationLesson />
+      ) : currentLesson === 7 ? (
+        <RebaseLesson />
       ) : (
         <>
           <header>

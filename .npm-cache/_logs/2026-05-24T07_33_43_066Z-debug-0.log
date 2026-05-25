@@ -1,0 +1,99 @@
+0 verbose cli C:\Program Files\nodejs\node.exe C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js
+1 info using npm@11.6.2
+2 info using node@v24.12.0
+3 silly config load:file:C:\Program Files\nodejs\node_modules\npm\npmrc
+4 silly config load:file:C:\Users\Homework\Desktop\Gitify\.npmrc
+5 silly config load:file:C:\Users\Homework\.npmrc
+6 silly config load:file:C:\Users\Homework\AppData\Roaming\npm\etc\npmrc
+7 verbose title npm install
+8 verbose argv "install" "--cache" ".npm-cache" "--loglevel" "verbose"
+9 verbose logfile logs-max:10 dir:C:\Users\Homework\Desktop\Gitify\.npm-cache\_logs\2026-05-24T07_33_43_066Z-
+10 verbose logfile C:\Users\Homework\Desktop\Gitify\.npm-cache\_logs\2026-05-24T07_33_43_066Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+13 http fetch GET https://registry.npmjs.org/npm attempt 1 failed with EACCES
+14 silly idealTree buildDeps
+15 silly reify moves {}
+16 silly audit bulk request {
+16 silly audit   '@esbuild/aix-ppc64': [ '0.19.12' ],
+16 silly audit   '@esbuild/android-arm': [ '0.19.12' ],
+16 silly audit   '@esbuild/android-arm64': [ '0.19.12' ],
+16 silly audit   '@esbuild/android-x64': [ '0.19.12' ],
+16 silly audit   '@esbuild/darwin-arm64': [ '0.19.12' ],
+16 silly audit   '@esbuild/darwin-x64': [ '0.19.12' ],
+16 silly audit   '@esbuild/freebsd-arm64': [ '0.19.12' ],
+16 silly audit   '@esbuild/freebsd-x64': [ '0.19.12' ],
+16 silly audit   '@esbuild/linux-arm': [ '0.19.12' ],
+16 silly audit   '@esbuild/linux-arm64': [ '0.19.12' ],
+16 silly audit   '@esbuild/linux-ia32': [ '0.19.12' ],
+16 silly audit   '@esbuild/linux-loong64': [ '0.19.12' ],
+16 silly audit   '@esbuild/linux-mips64el': [ '0.19.12' ],
+16 silly audit   '@esbuild/linux-ppc64': [ '0.19.12' ],
+16 silly audit   '@esbuild/linux-riscv64': [ '0.19.12' ],
+16 silly audit   '@esbuild/linux-s390x': [ '0.19.12' ],
+16 silly audit   '@esbuild/linux-x64': [ '0.19.12' ],
+16 silly audit   '@esbuild/netbsd-x64': [ '0.19.12' ],
+16 silly audit   '@esbuild/openbsd-x64': [ '0.19.12' ],
+16 silly audit   '@esbuild/sunos-x64': [ '0.19.12' ],
+16 silly audit   '@esbuild/win32-arm64': [ '0.19.12' ],
+16 silly audit   '@esbuild/win32-ia32': [ '0.19.12' ],
+16 silly audit   '@esbuild/win32-x64': [ '0.19.12' ],
+16 silly audit   '@rollup/rollup-android-arm-eabi': [ '4.57.1' ],
+16 silly audit   '@rollup/rollup-android-arm64': [ '4.57.1' ],
+16 silly audit   '@rollup/rollup-darwin-arm64': [ '4.57.1' ],
+16 silly audit   '@rollup/rollup-darwin-x64': [ '4.57.1' ],
+16 silly audit   '@rollup/rollup-freebsd-arm64': [ '4.57.1' ],
+16 silly audit   '@rollup/rollup-freebsd-x64': [ '4.57.1' ],
+16 silly audit   '@rollup/rollup-linux-arm-gnueabihf': [ '4.57.1' ],
+16 silly audit   '@rollup/rollup-linux-arm-musleabihf': [ '4.57.1' ],
+16 silly audit   '@rollup/rollup-linux-arm64-gnu': [ '4.57.1' ],
+16 silly audit   '@rollup/rollup-linux-arm64-musl': [ '4.57.1' ],
+16 silly audit   '@rollup/rollup-linux-loong64-gnu': [ '4.57.1' ],
+16 silly audit   '@rollup/rollup-linux-loong64-musl': [ '4.57.1' ],
+16 silly audit   '@rollup/rollup-linux-ppc64-gnu': [ '4.57.1' ],
+16 silly audit   '@rollup/rollup-linux-ppc64-musl': [ '4.57.1' ],
+16 silly audit   '@rollup/rollup-linux-riscv64-gnu': [ '4.57.1' ],
+16 silly audit   '@rollup/rollup-linux-riscv64-musl': [ '4.57.1' ],
+16 silly audit   '@rollup/rollup-linux-s390x-gnu': [ '4.57.1' ],
+16 silly audit   '@rollup/rollup-linux-x64-gnu': [ '4.57.1' ],
+16 silly audit   '@rollup/rollup-linux-x64-musl': [ '4.57.1' ],
+16 silly audit   '@rollup/rollup-openbsd-x64': [ '4.57.1' ],
+16 silly audit   '@rollup/rollup-openharmony-arm64': [ '4.57.1' ],
+16 silly audit   '@rollup/rollup-win32-arm64-msvc': [ '4.57.1' ],
+16 silly audit   '@rollup/rollup-win32-ia32-msvc': [ '4.57.1' ],
+16 silly audit   '@rollup/rollup-win32-x64-gnu': [ '4.57.1' ],
+16 silly audit   '@rollup/rollup-win32-x64-msvc': [ '4.57.1' ],
+16 silly audit   '@types/estree': [ '1.0.8' ],
+16 silly audit   esbuild: [ '0.19.12' ],
+16 silly audit   fsevents: [ '2.3.3' ],
+16 silly audit   'js-tokens': [ '4.0.0' ],
+16 silly audit   'loose-envify': [ '1.4.0' ],
+16 silly audit   nanoid: [ '3.3.11' ],
+16 silly audit   picocolors: [ '1.1.1' ],
+16 silly audit   postcss: [ '8.5.6' ],
+16 silly audit   react: [ '18.2.0' ],
+16 silly audit   'react-dom': [ '18.2.0' ],
+16 silly audit   rollup: [ '4.57.1' ],
+16 silly audit   scheduler: [ '0.23.2' ],
+16 silly audit   'source-map-js': [ '1.2.1' ],
+16 silly audit   vite: [ '5.0.0' ]
+16 silly audit }
+17 verbose audit error FetchError: request to https://registry.npmjs.org/-/npm/v1/security/advisories/bulk failed, reason: 
+17 verbose audit error     at ClientRequest.<anonymous> (C:\Program Files\nodejs\node_modules\npm\node_modules\minipass-fetch\lib\index.js:130:14)
+17 verbose audit error     at ClientRequest.emit (node:events:508:28)
+17 verbose audit error     at emitErrorEvent (node:_http_client:108:11)
+17 verbose audit error     at _destroy (node:_http_client:962:9)
+17 verbose audit error     at onSocketNT (node:_http_client:982:5)
+17 verbose audit error     at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+17 verbose audit error   code: 'EACCES',
+17 verbose audit error   errno: 'EACCES',
+17 verbose audit error   type: 'system'
+17 verbose audit error }
+18 silly audit error undefined
+19 silly audit report null
+20 verbose cwd C:\Users\Homework\Desktop\Gitify
+21 verbose os Windows_NT 10.0.26200
+22 verbose node v24.12.0
+23 verbose npm  v11.6.2
+24 verbose exit 0
+25 info ok
