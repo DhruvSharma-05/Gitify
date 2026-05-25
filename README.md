@@ -1,6 +1,13 @@
 # Gitify - GitHub Visual Learning App
 
-Gitify is a local React + Vite teaching app for learning Git and GitHub visually. It turns common Git workflows into interactive lessons so learners can see files, commits, branches, conflicts, remotes, and rebases move instead of only reading commands.
+Gitify is an interactive React + Vite web application designed to teach Git and GitHub concepts visually. It translates command-line workflows into animated simulations so learners can see files, commits, branches, conflicts, remotes, stashes, cherry-picks, and rebases in action.
+
+## Key Features
+
+- Interactive animations for files, commits, branches, and remotes.
+- Visual cues for staging, committing, pushing, merging, stashing, and rebasing.
+- Real-world scenarios for conflicts, remote teamwork, history repair, and clean history.
+- Local Vite app that is easy to run for lessons, demos, and classroom use.
 
 ## Lessons
 
@@ -14,8 +21,6 @@ Gitify is a local React + Vite teaching app for learning Git and GitHub visually
 - Lesson 7: Rebase & Clean History - compares merge and rebase, includes interactive rebase actions, and explains safe force pushing.
 
 ## Commands Covered
-
-The app introduces these commands through interactive scenarios:
 
 ```text
 git add
@@ -90,20 +95,24 @@ npm.cmd run preview
 
 ## Project Structure
 
-- `index.html` - Vite entry HTML.
-- `package.json` - scripts and dependencies.
-- `src/main.jsx` - React entry point.
-- `src/App.jsx` - top-level lesson router.
-- `src/components/Intro.jsx` - Lesson 0.
-- `src/components/Flow.jsx` - Lesson 1 playground.
-- `src/components/BranchingLesson.jsx` - Lesson 2.
-- `src/components/MergeConflictsLesson.jsx` - Lesson 3.
-- `src/components/HistoryLesson.jsx` - Lesson 4.
-- `src/components/StashCherryPickLesson.jsx` - Lesson 5.
-- `src/components/RemoteCollaborationLesson.jsx` - Lesson 6.
-- `src/components/RebaseLesson.jsx` - Lesson 7.
-- `src/components/Sidebar.jsx` - lesson navigation.
-- `src/styles.css` - shared styling and lesson-specific UI.
+```text
+index.html
+package.json
+src/
+  main.jsx
+  App.jsx
+  styles.css
+  components/
+    Sidebar.jsx
+    Intro.jsx
+    Flow.jsx
+    BranchingLesson.jsx
+    MergeConflictsLesson.jsx
+    HistoryLesson.jsx
+    StashCherryPickLesson.jsx
+    RemoteCollaborationLesson.jsx
+    RebaseLesson.jsx
+```
 
 ## Development Notes
 
