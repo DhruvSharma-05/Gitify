@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import PretextCanvas from './PretextCanvas.jsx'
 
 const stashSeed = [
@@ -12,7 +12,7 @@ const hotfixCommits = [
   { hash: 'd82aa8', message: 'Refactor checkout state', conflict: true }
 ]
 
-export default function StashCherryPickLesson() {
+export default function StashCherryPickLesson({ onSuccess, setTerminalSyncListener }) {
   const [dirtyFiles, setDirtyFiles] = useState(['Checkout.jsx', 'styles.css'])
   const [stashes, setStashes] = useState(stashSeed)
   const [selectedStash, setSelectedStash] = useState(0)
@@ -24,6 +24,56 @@ export default function StashCherryPickLesson() {
 
   const activeStash = stashes.find((stash) => stash.id === selectedStash) || stashes[0]
   const canSwitch = dirtyFiles.length === 0
+
+  useEffect(() => {
+    if (setTerminalSyncListener) {
+      setTerminalSyncListener(() => (syncState) => {
+        if (syncState.branch) setBranch(syncState.branch)
+        if (syncState.files !== undefined) setDirtyFiles(syncState.files)
+        if (syncState.stashes !== undefined) setStashes(syncState.stashes)
+        if (syncState.picked !== undefined) setPicked(syncState.picked)
+        setAppliedNote('✓ Synced workspace elements with global terminal console command.')
+      })
+    }
+    return () => {
+      if (setTerminalSyncListener) setTerminalSyncListener(null)
+    }
+  }, [setTerminalSyncListener])
+
+  const verifyLessonState = () => {
+    fetch('http://localhost:8000/api/exercises/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lesson_id: 5,
+        state: {
+          files: dirtyFiles,
+          stashes: stashes,
+          picked: picked,
+          branch: branch
+        }
+      })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.verified) {
+          setAppliedNote("✓ " + data.message)
+          if (onSuccess) onSuccess()
+        } else {
+          setAppliedNote("✗ Verification failed: " + data.message)
+        }
+      })
+      .catch(err => {
+        console.warn("Backend verifier offline, validating locally:", err)
+        // Fallback local validation:
+        if (stashes.length > stashSeed.length && picked.includes('b7a91c')) {
+          setAppliedNote("✓ Lesson successfully completed (offline)!")
+          if (onSuccess) onSuccess()
+        } else {
+          setAppliedNote("✗ Offline validation: Please stash your uncommitted work and cherry-pick commit b7a91c first.")
+        }
+      })
+  }
 
   const createStash = () => {
     if (dirtyFiles.length === 0) return
@@ -84,9 +134,28 @@ export default function StashCherryPickLesson() {
 
   return (
     <div className="stash-lesson">
-      <header className="lesson-header">
+      <header className="lesson-header" style={{ paddingBottom: '20px' }}>
         <span className="lesson-kicker">Lesson 5</span>
-        <h1>Stash & Cherry-Pick</h1>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <h1 style={{ margin: 0 }}>Stash & Cherry-Pick</h1>
+          <button 
+            className="control-btn verify-btn" 
+            onClick={verifyLessonState}
+            style={{ 
+              background: '#10b981', 
+              color: '#fff', 
+              border: 'none', 
+              borderRadius: '8px', 
+              padding: '10px 20px', 
+              fontWeight: 'bold', 
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              boxShadow: '0 4px 10px rgba(16, 185, 129, 0.2)'
+            }}
+          >
+            Verify Exercise
+          </button>
+        </div>
         <p>Save work-in-progress without committing, then transplant individual commits across branches.</p>
       </header>
       <PretextCanvas scene="stashPick" height={220} />
