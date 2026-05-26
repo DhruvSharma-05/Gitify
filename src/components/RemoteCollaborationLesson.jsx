@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import PretextCanvas from './PretextCanvas.jsx'
 
 const team = [
   { name: 'Alex', branch: 'feature/auth', commits: ['login form', 'token refresh'], color: '#3b82f6' },
@@ -44,10 +45,11 @@ export default function RemoteCollaborationLesson() {
   return (
     <div className="remote-lesson">
       <header className="lesson-header">
-        <span className="lesson-kicker">Lesson 5</span>
+        <span className="lesson-kicker">Lesson 6</span>
         <h1>Remote Collaboration</h1>
         <p>Git is local. GitHub is shared. Teamwork means syncing, reviewing, and pushing without stepping on each other.</p>
       </header>
+      <PretextCanvas scene="remotePackets" height={180} />
 
       <main className="remote-layout">
         <section className="remote-panel team-panel">
