@@ -1,11 +1,45 @@
 import React, { useState, useEffect, useRef } from 'react'
 
-export default function TerminalShell({ lessonId, onSyncState, onSuccess }) {
-  const [history, setHistory] = useState([
-    { type: 'system', text: 'Welcome to Gitify Interactive Console v0.1.0' },
-    { type: 'system', text: 'Type real Git commands here to modify the visual workspace.' },
-    { type: 'system', text: 'Try "git status", "git log", "git stash", or "ls". Type "clear" to empty console.' }
-  ])
+// Levenshtein distance matcher for typos suggestion
+function getLevenshteinDistance(a, b) {
+  const matrix = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0))
+  for (let i = 0; i <= a.length; i++) matrix[i][0] = i
+  for (let j = 0; j <= b.length; j++) matrix[0][j] = j
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      if (a[i - 1] === b[j - 1]) {
+        matrix[i][j] = matrix[i - 1][j - 1]
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j] + 1,    // deletion
+          matrix[i][j - 1] + 1,    // insertion
+          matrix[i - 1][j - 1] + 1 // substitution
+        )
+      }
+    }
+  }
+  return matrix[a.length][b.length]
+}
+
+function getGitSuggestion(cmd) {
+  const dictionary = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote']
+  let bestMatch = null
+  let minDistance = 3 // Suggest only if distance is <= 2
+  
+  for (const item of dictionary) {
+    const dist = getLevenshteinDistance(cmd, item)
+    if (dist < minDistance) {
+      minDistance = dist
+      bestMatch = item
+    }
+  }
+  return bestMatch
+}
+
+export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetTrigger }) {
+  const [pwd, setPwd] = useState('')
+  const [branch, setBranch] = useState('main')
+  const [history, setHistory] = useState([])
   const [inputValue, setInputValue] = useState('')
   const [cmdHistory, setCmdHistory] = useState([])
   const [historyPointer, setHistoryPointer] = useState(-1)
@@ -13,18 +47,35 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess }) {
   const [isExecuting, setIsExecuting] = useState(false)
   const [minimized, setMinimized] = useState(false)
   
+  // Local caches for autocompletion
+  const [files, setFiles] = useState([])
+  const [branches, setBranches] = useState(['main'])
+
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
 
   // Initialize unique session ID
   useEffect(() => {
     let activeSession = localStorage.getItem("gitify_session_id")
-    if (!activeSession) {
+    if (!activeSession || activeSession === "null" || activeSession === "undefined") {
       activeSession = `session_${Math.random().toString(36).substring(2, 11)}`
       localStorage.setItem("gitify_session_id", activeSession)
     }
     setSessionId(activeSession)
   }, [])
+
+  // Handle lesson change or reset trigger
+  useEffect(() => {
+    setHistory([
+      { type: 'system', text: `📟 Welcome to Gitify Sandbox Console - Lesson ${lessonId}` },
+      { type: 'system', text: 'Type Git commands to solve the exercise tasks in real time.' },
+      { type: 'system', text: 'Try "git status", "git log", "git stash", or "ls". Type "clear" to empty console. Hit [Tab] to autocomplete!' }
+    ])
+    setPwd('')
+    setBranch('main')
+    setFiles([])
+    setBranches(['main'])
+  }, [lessonId, resetTrigger])
 
   // Auto scroll to bottom
   useEffect(() => {
@@ -36,8 +87,13 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess }) {
     const rawCmd = inputValue.trim()
     if (!rawCmd) return
     
+    // Construct dynamic prompt prefix for history print
+    const promptPath = pwd ? `/${pwd.replace(/\\/g, '/')}` : ''
+    const promptBranch = branch ? ` (${branch})` : ''
+    const fullPromptPrefix = `student@gitify:~/workspace${promptPath}${promptBranch}$ `
+
     // Add to history lines
-    setHistory(prev => [...prev, { type: 'input', text: rawCmd }])
+    setHistory(prev => [...prev, { type: 'input', text: `${fullPromptPrefix}${rawCmd}` }])
     setCmdHistory(prev => [rawCmd, ...prev])
     setHistoryPointer(-1)
     setInputValue('')
@@ -50,7 +106,8 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess }) {
       body: JSON.stringify({
         command: rawCmd,
         session_id: sessionId,
-        lesson_id: lessonId
+        lesson_id: lessonId,
+        username: 'student'
       })
     })
       .then(res => {
@@ -77,6 +134,58 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess }) {
           text: data.output || '(No output)' 
         }])
 
+        // Typo suggestion check: if failed or warning, look for mistyped Git commands
+        const parts = rawCmd.split(/\s+/)
+        if (parts[0] === 'git' && parts.length > 1) {
+          const dict = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote']
+          const sub = parts[1].toLowerCase()
+          if (!dict.includes(sub)) {
+            const suggestion = getGitSuggestion(sub)
+            if (suggestion) {
+              setHistory(prev => [...prev, {
+                type: 'system',
+                text: `💡 Gitify Hint: Did you mean "git ${suggestion}"?`
+              }])
+            }
+          }
+        }
+
+        // Update active prompt path & branch
+        if (data.sync_state) {
+          if (data.sync_state.pwd !== undefined) {
+            setPwd(data.sync_state.pwd)
+          }
+          if (data.sync_state.branch !== undefined) {
+            setBranch(data.sync_state.branch)
+          }
+
+          // Cache files list for autocomplete
+          if (data.sync_state.files) {
+            setFiles(data.sync_state.files)
+          }
+
+          // Cache branches list from DAG graph for autocomplete
+          if (data.sync_state.commits_graph) {
+            const brList = new Set(['main', 'master'])
+            data.sync_state.commits_graph.forEach(c => {
+              c.branches.forEach(b => {
+                if (b !== 'HEAD') brList.add(b)
+              })
+            })
+            setBranches(Array.from(brList))
+          }
+        }
+
+        // Sync with React visualizer
+        if (onSyncState) {
+          onSyncState({
+            ...data.sync_state,
+            subtasks: data.subtasks || [],
+            verified: data.verified || false,
+            validation_message: data.validation_message || ''
+          })
+        }
+
         // Show verification success
         if (data.verified) {
           setHistory(prev => [...prev, { 
@@ -84,11 +193,6 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess }) {
             text: `🎉 EXERCISE SOLVED: ${data.validation_message}` 
           }])
           if (onSuccess) onSuccess()
-        }
-
-        // Sync with React visualizer
-        if (data.sync_state && onSyncState) {
-          onSyncState(data.sync_state)
         }
       })
       .catch(err => {
@@ -101,7 +205,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess }) {
       })
   }
 
-  // Handle command history up/down keypresses
+  // Intercept keys
   const handleKeyDown = (e) => {
     if (e.key === 'ArrowUp') {
       e.preventDefault()
@@ -121,12 +225,66 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess }) {
         setHistoryPointer(-1)
         setInputValue('')
       }
+    } else if (e.key === 'Tab') {
+      e.preventDefault()
+      handleTabComplete()
+    }
+  }
+
+  const handleTabComplete = () => {
+    const text = inputValue
+    if (!text) return
+
+    const words = text.split(/\s+/)
+    const currentWord = words[words.length - 1]
+
+    // Completing the base command
+    if (words.length === 1) {
+      const allowedBase = ['git', 'ls', 'cat', 'cd', 'touch', 'mkdir', 'rm', 'mv', 'cp', 'clear']
+      const match = allowedBase.find(c => c.startsWith(text.toLowerCase()))
+      if (match) {
+        setInputValue(match + ' ')
+      }
+      return
+    }
+
+    // Completing git subcommands
+    if (words[0] === 'git' && words.length === 2) {
+      const gitCmds = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote']
+      const match = gitCmds.find(c => c.startsWith(currentWord.toLowerCase()))
+      if (match) {
+        setInputValue(`git ${match} `)
+      }
+      return
+    }
+
+    // Completing file names
+    if (words.length > 1 && (words[words.length - 2] === 'add' || words[0] === 'cat' || words[0] === 'rm' || words[0] === 'cd')) {
+      const match = files.find(f => f.toLowerCase().startsWith(currentWord.toLowerCase()))
+      if (match) {
+        words[words.length - 1] = match
+        setInputValue(words.join(' ') + ' ')
+      }
+      return
+    }
+
+    // Completing branch names
+    if (words.length > 1 && (words[words.length - 2] === 'checkout' || words[words.length - 2] === 'merge' || words[words.length - 2] === 'rebase')) {
+      const match = branches.find(b => b.toLowerCase().startsWith(currentWord.toLowerCase()))
+      if (match) {
+        words[words.length - 1] = match
+        setInputValue(words.join(' ') + ' ')
+      }
+      return
     }
   }
 
   const focusInput = () => {
     inputRef.current?.focus()
   }
+
+  const promptPath = pwd ? `/${pwd.replace(/\\/g, '/')}` : ''
+  const promptBranch = branch ? ` (${branch})` : ''
 
   if (minimized) {
     return (
@@ -192,7 +350,9 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess }) {
           <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#ef4444', display: 'inline-block' }}></span>
           <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#fbbf24', display: 'inline-block' }}></span>
           <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span>
-          <span style={{ marginLeft: '6px', fontWeight: '500' }}>gitify@sandbox:~/workspace</span>
+          <span style={{ marginLeft: '6px', fontWeight: '500' }}>
+            gitify@sandbox:~/workspace{promptPath}{promptBranch}
+          </span>
         </div>
         <button 
           onClick={(e) => {
@@ -226,13 +386,10 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess }) {
       >
         {history.map((line, idx) => (
           <div key={idx} className={`terminal-line line-${line.type}`} style={{ whiteSpace: 'pre-wrap' }}>
-            {line.type === 'input' && (
-              <span style={{ color: '#10b981', marginRight: '6px' }}>student@gitify:~$</span>
-            )}
             <span style={{
               color: line.type === 'error' ? '#fecaca' : 
                      line.type === 'success' ? '#6ee7b7' : 
-                     line.type === 'input' ? '#f0f6fc' : '#8b949e'
+                     line.type === 'input' ? '#38bdf8' : '#8b949e'
             }}>
               {line.text}
             </span>
@@ -256,7 +413,9 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess }) {
           border: '1px solid rgba(255,255,255,0.03)'
         }}
       >
-        <span style={{ color: '#10b981', marginRight: '8px', userSelect: 'none' }}>student@gitify:~$</span>
+        <span style={{ color: '#10b981', marginRight: '8px', userSelect: 'none', fontWeight: '600' }}>
+          student@gitify:~/workspace{promptPath}{promptBranch}$
+        </span>
         <input 
           ref={inputRef}
           type="text"
