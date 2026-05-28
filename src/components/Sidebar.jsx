@@ -11,7 +11,7 @@ const lessons = [
   { id: 7, title: 'Lesson 7: Rebase & Clean History', description: 'Rewrite commits into a clean story' }
 ]
 
-export default function Sidebar({ isOpen, onClose, currentLesson, onSelectLesson }) {
+export default function Sidebar({ isOpen, onClose, currentLesson, onSelectLesson, completedLessons = [] }) {
   return (
     <>
       {/* Backdrop */}
@@ -31,13 +31,18 @@ export default function Sidebar({ isOpen, onClose, currentLesson, onSelectLesson
           {lessons.map(lesson => (
             <div
               key={lesson.id}
-              className={`lesson-item ${currentLesson === lesson.id ? 'active' : ''}`}
+              className={`lesson-item ${currentLesson === lesson.id ? 'active' : ''} ${completedLessons.includes(lesson.id) ? 'completed' : ''}`}
               onClick={() => {
                 onSelectLesson(lesson.id)
                 onClose()
               }}
             >
-              <h3>{lesson.title}</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3>{lesson.title}</h3>
+                {completedLessons.includes(lesson.id) && (
+                  <span style={{ color: '#10b981', fontSize: '0.85rem', fontWeight: '700' }}>✓ Solved</span>
+                )}
+              </div>
               <p>{lesson.description}</p>
             </div>
           ))}

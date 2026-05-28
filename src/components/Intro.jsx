@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import PretextCanvas from './PretextCanvas.jsx'
 
 export default function Intro({ onComplete }) {
   const [scrollTriggered, setScrollTriggered] = useState({})
@@ -78,6 +79,7 @@ export default function Intro({ onComplete }) {
           </button>
         </div>
         <div className="hero-visual">
+          <PretextCanvas scene="gitBasics" height={190} />
           <div className="mock-terminal">
             <div className="terminal-bar">
               <span className="dot red"></span>
