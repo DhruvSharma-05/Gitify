@@ -1,6 +1,7 @@
 # Gitify - GitHub Visual Learning App
 
-Gitify is an interactive React + Vite web application designed to teach Git and GitHub concepts visually. It translates command-line workflows into animated simulations so learners can see files, commits, branches, conflicts, remotes, stashes, cherry-picks, and rebases in action.
+ 
+Gitify is an interactive React + Vite web application designed to teach Git and GitHub concepts visually. It translates command-line workflows into animated simulations so learners can see files, commits, branches, conflicts, remotes, stashes, cherry-picks, and rebases in action.A way for new coders to understand git.
 
 ## Key Features
 

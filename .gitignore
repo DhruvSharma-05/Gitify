@@ -1,3 +1,9 @@
 node_modules/
 dist/
 .npm-cache/
+.env
+.DS_Store
+.idea/
+.vscode/
+*.log
+*.tsbuildinfo
