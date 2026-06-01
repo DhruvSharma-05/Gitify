@@ -1,0 +1,213 @@
+.file-inspector-panel {
+  display: flex;
+  flex-direction: column;
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  height: 100%;
+  color: #e2e8f0;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.file-inspector-panel:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.45);
+}
+
+.inspector-header {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 8px;
+}
+
+.empty-inspector {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  color: #64748b;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+/* Tabs */
+.inspector-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.inspector-tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.inspector-tabs::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.tab-btn {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: #94a3b8;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #cbd5e1;
+}
+
+.tab-btn.active {
+  background: rgba(56, 189, 248, 0.1);
+  border-color: rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
+}
+
+/* Code Viewer Area */
+.code-viewer-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.code-viewer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.15);
+  padding: 8px 14px;
+  font-size: 0.8rem;
+  font-family: monospace;
+  color: #cbd5e1;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.conflict-badge {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.code-pretext-wrapper {
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+}
+
+.code-editor-pre {
+  margin: 0;
+  padding: 0;
+  font-family: 'Fira Code', Consolas, Monaco, monospace;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: #e2e8f0;
+}
+
+.code-editor-pre code {
+  display: flex;
+  flex-direction: column;
+}
+
+.code-line-row {
+  display: flex;
+  width: 100%;
+}
+
+.line-number {
+  width: 28px;
+  min-width: 28px;
+  color: #475569;
+  text-align: right;
+  margin-right: 12px;
+  user-select: none;
+  font-size: 0.75rem;
+}
+
+.line-text {
+  flex: 1;
+  white-space: pre;
+}
+
+/* Conflict Line Highlights */
+.conflict-marker {
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.8rem;
+}
+
+.ours-marker {
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.15);
+  border-left: 3px solid #34d399;
+}
+
+.divider-marker {
+  color: #64748b;
+  background: rgba(100, 116, 139, 0.15);
+  border-left: 3px solid #64748b;
+}
+
+.theirs-marker {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.15);
+  border-left: 3px solid #f87171;
+}
+
+.conflict-line {
+  display: flex;
+}
+
+.ours-line {
+  background: rgba(52, 211, 153, 0.06);
+  border-left: 3px solid rgba(52, 211, 153, 0.5);
+}
+
+.ours-line .line-text {
+  color: #a7f3d0;
+}
+
+.theirs-line {
+  background: rgba(248, 113, 113, 0.06);
+  border-left: 3px solid rgba(248, 113, 113, 0.5);
+}
+
+.theirs-line .line-text {
+  color: #fca5a5;
+}

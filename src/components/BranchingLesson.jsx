@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import PretextCanvas from './PretextCanvas.jsx'
 
 const steps = [
   {
@@ -247,6 +248,7 @@ export default function BranchingLesson() {
         <h1>{step.title}</h1>
         <p>Three levels of branching: Main, Feature, and Bugfix.</p>
       </header>
+      <PretextCanvas scene="branchLabels" height={220} />
 
       <main className="lesson-content">
         {/* Step Info */}

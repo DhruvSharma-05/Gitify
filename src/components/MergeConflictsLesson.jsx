@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
+import PretextCanvas from './PretextCanvas.jsx'
 
 const resolutionText = {
   ours: '  theme: "dark"',
@@ -12,13 +13,61 @@ const resolutionLabels = {
   manual: 'Edit Manually'
 }
 
-export default function MergeConflictsLesson() {
+export default function MergeConflictsLesson({ onSuccess, setTerminalSyncListener }) {
   const [stage, setStage] = useState(0)
   const [resolution, setResolution] = useState(null)
   const [manualValue, setManualValue] = useState('  theme: "system"')
   const [isAdded, setIsAdded] = useState(false)
   const [isCommitted, setIsCommitted] = useState(false)
   const [previewChoice, setPreviewChoice] = useState('theirs')
+
+  useEffect(() => {
+    if (setTerminalSyncListener) {
+      setTerminalSyncListener(() => (syncState) => {
+        if (syncState.picked && syncState.picked.length > 1) {
+          setIsCommitted(true)
+          setIsAdded(true)
+          setResolution('ours')
+          setStage(2)
+        }
+      })
+    }
+    return () => {
+      if (setTerminalSyncListener) setTerminalSyncListener(null)
+    }
+  }, [setTerminalSyncListener])
+
+  const verifyLessonState = () => {
+    fetch('http://localhost:8000/api/exercises/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lesson_id: 3,
+        state: {
+          isCommitted: isCommitted,
+          resolution: resolution
+        }
+      })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.verified) {
+          alert("✓ " + data.message)
+          if (onSuccess) onSuccess()
+        } else {
+          alert("✗ Verification failed: " + data.message)
+        }
+      })
+      .catch(err => {
+        console.warn("Backend verifier offline, validating locally:", err)
+        if (isCommitted && resolution) {
+          alert("✓ Lesson successfully completed (offline)!")
+          if (onSuccess) onSuccess()
+        } else {
+          alert("✗ Offline validation: Please resolve the merge conflict and commit it first.")
+        }
+      })
+  }
 
   const resolvedLine = useMemo(() => {
     if (resolution === 'manual') return manualValue || resolutionText.manual
@@ -64,9 +113,28 @@ export default function MergeConflictsLesson() {
     <div className="merge-lesson">
       <header className="lesson-header">
         <span className="lesson-kicker">Lesson 3</span>
-        <h1>Merge Conflicts</h1>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <h1 style={{ margin: 0 }}>Merge Conflicts</h1>
+          <button 
+            className="control-btn verify-btn" 
+            onClick={verifyLessonState}
+            style={{ 
+              background: '#10b981', 
+              color: '#fff', 
+              border: 'none', 
+              borderRadius: '8px', 
+              padding: '10px 20px', 
+              fontWeight: 'bold', 
+              cursor: 'pointer',
+              boxShadow: '0 4px 10px rgba(16, 185, 129, 0.2)'
+            }}
+          >
+            Verify Exercise
+          </button>
+        </div>
         <p>When two branches edit the same part of the same file, Git asks you to choose what survives.</p>
       </header>
+      <PretextCanvas scene="conflictDiff" height={220} />
 
       <main className="merge-layout">
         <section className="merge-panel setup-panel">
