@@ -728,3 +728,220 @@ def get_workspace_files_content(repo_path):
         print(f"Error reading workspace files: {e}")
     return contents
 
+def get_friendly_tip(lesson_id: int, command: str, output: str, code: int) -> str:
+    """Provides friendly hints to beginners when a command fails or displays common errors."""
+    output_lower = output.lower()
+    cmd_parts = command.strip().split()
+    base_cmd = cmd_parts[0].lower() if cmd_parts else ""
+    sub_cmd = cmd_parts[1].lower() if len(cmd_parts) > 1 else ""
+
+    # Global mistakes
+    if "not a git repository" in output_lower:
+        return "\n\n💡 Gitify Clue: This directory is not initialized. Start version control by typing 'git init'!"
+
+    if base_cmd == "git":
+        # Lesson 0 & 1
+        if lesson_id in [0, 1]:
+            if "nothing added to commit but untracked files present" in output_lower or "no changes added to commit" in output_lower:
+                return "\n\n💡 Gitify Clue: You have modified/untracked files. Stage them first by running 'git add .'."
+            if sub_cmd == "push" and ("does not appear to be a git repository" in output_lower or "no configured push destination" in output_lower):
+                return "\n\n💡 Gitify Clue: You need to tell Git where the remote is! Run 'git remote add origin ../gitify_session_<your_session_id>_remote.git'. Run 'dir ..' to find your exact session ID folder name."
+
+        # Lesson 2: Branching
+        elif lesson_id == 2:
+            if "nothing to commit" in output_lower:
+                return "\n\n💡 Gitify Clue: Your working tree is clean. You need to create or modify a file first so Git has changes to commit! Run: touch auth.js, then stage it: git add auth.js"
+            if "pathspec 'feature/auth' did not match" in output_lower:
+                return "\n\n💡 Gitify Clue: The branch 'feature/auth' doesn't exist yet. Create and switch to it using 'git checkout -b feature/auth'."
+            if sub_cmd == "merge" and "cannot merge into itself" in output_lower:
+                return "\n\n💡 Gitify Clue: You are trying to merge 'feature/auth' into itself. Switch back to main first: 'git checkout main', then run 'git merge feature/auth'."
+            if sub_cmd == "merge" and "already on 'feature/auth'" in output_lower:
+                return "\n\n💡 Gitify Clue: You need to checkout the 'main' branch first before merging feature/auth into it. Run 'git checkout main'."
+
+        # Lesson 3: Merge Conflicts
+        elif lesson_id == 3:
+            if "commit is not possible because you have unmerged files" in output_lower:
+                return "\n\n💡 Gitify Clue: You still have unresolved conflict markers in config.js. Open config.js, resolve the edits, remove the marker lines (<<<<<<<, =======, >>>>>>>), stage the file with 'git add config.js', and then commit."
+            if "run 'git commit' to conclude the merge" in output_lower:
+                return "\n\n💡 Gitify Clue: The conflicts are resolved and staged! Now finalize the merge by running 'git commit -m \"merge ui changes\"'."
+
+        # Lesson 5: Stash & Cherry-Pick
+        elif lesson_id == 5:
+            if "local changes to the following files would be overwritten by checkout" in output_lower:
+                return "\n\n💡 Gitify Clue: Git is preventing you from losing uncommitted work. Save your changes temporarily using 'git stash' before checking out the other branch."
+            if sub_cmd == "cherry-pick" and "already contains" in output_lower:
+                return "\n\n💡 Gitify Clue: This commit was already cherry-picked or doesn't need to be. Check your 'git log' to see the current history."
+
+        # Lesson 6: Remote Collaboration
+        elif lesson_id == 6:
+            if sub_cmd == "push" and "failed to push some refs" in output_lower:
+                return "\n\n💡 Gitify Clue: Remote updates are rejected because you are out of sync with the teammate's commits. Run 'git fetch', then 'git pull --rebase' to linearize your changes on top of theirs."
+
+        # Lesson 7: Rebase & Clean History
+        elif lesson_id == 7:
+            if sub_cmd == "rebase" and code != 0:
+                return "\n\n💡 Gitify Clue: Interactive rebase failed or was aborted. You can reset the rebase using 'git rebase --abort' and try again."
+
+    return ""
+
+def get_success_tip(lesson_id: int, command: str, repo_path: str) -> str:
+    """Provides proactive next-step hints to beginners after a successful command execution."""
+    cmd_parts = command.strip().split()
+    base_cmd = cmd_parts[0].lower() if cmd_parts else ""
+    sub_cmd = cmd_parts[1].lower() if len(cmd_parts) > 1 else ""
+
+    if base_cmd == "git":
+        # Lesson 0 & 1: Git Basics
+        if lesson_id in [0, 1]:
+            if sub_cmd == "init":
+                return "\n\n💡 Next Step: Great! Your repository is initialized. Now stage the starter files so Git starts tracking them. Run: git add ."
+            elif sub_cmd == "add":
+                # Check if there are commits yet
+                code, _, _ = run_git_command(repo_path, ["log"])
+                if code != 0: # No commits yet
+                    return "\n\n💡 Next Step: Files staged successfully! Now save your snapshot by creating your first commit. Run: git commit -m \"first commit\""
+            elif sub_cmd == "commit":
+                # Check if remote origin already exists
+                code, remotes, _ = run_git_command(repo_path, ["remote"])
+                if "origin" not in remotes:
+                    return "\n\n💡 Next Step: Commit saved locally! Now link your remote repository. Run: dir .. to see your session ID, then run: git remote add origin ../gitify_session_<your_session_id>_remote.git"
+                else:
+                    return "\n\n💡 Next Step: Commit saved! Now push your commits to the remote: git push origin main"
+            elif sub_cmd in ["remote", "push"]:
+                if sub_cmd == "remote" and len(cmd_parts) > 2 and cmd_parts[2].lower() == "add":
+                    return "\n\n💡 Next Step: Remote repository linked! Push your local commits to the remote: git push origin main"
+
+        # Lesson 2: Branching
+        elif lesson_id == 2:
+            if sub_cmd in ["checkout", "switch", "commit"]:
+                # Check active branch
+                _, active_br, _ = run_git_command(repo_path, ["rev-parse", "--abbrev-ref", "HEAD"])
+                active_br = active_br.strip()
+                if active_br == "feature/auth":
+                    # Check if they have made a commit on feature/auth yet (feature/auth should be ahead of main, or has at least 2 commits)
+                    code, log_out, _ = run_git_command(repo_path, ["log", "feature/auth", "--oneline"])
+                    commits_count = len(log_out.strip().split("\n")) if code == 0 else 0
+                    if commits_count < 2:
+                        return "\n\n💡 Next Step: You are on 'feature/auth'! Stage and commit changes to this branch: git commit -a -m \"auth implementation\""
+                    else:
+                        return "\n\n💡 Next Step: You already have commits on feature/auth. Switch back to main branch to prepare for merging: git checkout main"
+                elif active_br == "main":
+                    # Check if feature/auth has been merged yet
+                    _, merged_branches, _ = run_git_command(repo_path, ["branch", "--merged"])
+                    if "feature/auth" not in merged_branches:
+                        return "\n\n💡 Next Step: You are back on main! Merge the feature branch into main: git merge feature/auth"
+
+        # Lesson 3: Merge Conflicts
+        elif lesson_id == 3:
+            if sub_cmd == "add" and "config.js" in command:
+                return "\n\n💡 Next Step: Resolved config.js changes staged! Finalize the merge by creating the merge commit: git commit -m \"resolve merge conflict\""
+
+        # Lesson 5: Stash & Cherry-Pick
+        elif lesson_id == 5:
+            if sub_cmd == "stash":
+                if "pop" not in command and "apply" not in command:
+                    return "\n\n💡 Next Step: Uncommitted changes safely stashed! Now switch branches to hotfix/invoice to inspect the fix: git checkout hotfix/invoice"
+            elif sub_cmd in ["checkout", "switch"]:
+                _, active_br, _ = run_git_command(repo_path, ["rev-parse", "--abbrev-ref", "HEAD"])
+                active_br = active_br.strip()
+                if active_br == "hotfix/invoice":
+                    return "\n\n💡 Next Step: You are on the hotfix branch. Run: git log --oneline to find the commit hash for 'Fix tax rounding'."
+                elif active_br == "feature/payments":
+                    # Check if cherry-pick is done
+                    code, log_out, _ = run_git_command(repo_path, ["log", "--oneline"])
+                    has_pick = "Fix tax rounding" in log_out
+                    if has_pick:
+                        # Check stash list
+                        _, stash_out, _ = run_git_command(repo_path, ["stash", "list"])
+                        if stash_out.strip():
+                            return "\n\n💡 Next Step: Hotfix cherry-picked successfully! Restore your stashed changes back to your working directory: git stash pop"
+
+            elif sub_cmd == "cherry-pick":
+                return "\n\n💡 Next Step: Hotfix commit cherry-picked! Now return back to your payments branch: git checkout feature/payments"
+
+        # Lesson 6: Remote Collaboration
+        elif lesson_id == 6:
+            if sub_cmd == "fetch":
+                return "\n\n💡 Next Step: Remote changes fetched successfully! Pull and rebase your local changes on top of teammate's changes: git pull --rebase"
+
+    return ""
+
+def get_workspace_files_status(repo_path):
+    """
+    Returns a list of files in the workspace with their git lifecycle status:
+    'working' | 'staged' | 'committed' | 'pushed'
+    """
+    if not os.path.exists(repo_path):
+        return []
+
+    # Default if not a git repository
+    if not os.path.exists(os.path.join(repo_path, ".git")):
+        files = []
+        for item in os.listdir(repo_path):
+            if os.path.isfile(os.path.join(repo_path, item)):
+                files.append({"name": item, "status": "working"})
+        return files
+
+    # 1. Get status of files from git status --porcelain
+    code_status, stdout_status, _ = run_git_command(repo_path, ["status", "--porcelain"])
+    status_map = {}
+    if code_status == 0:
+        for line in stdout_status.strip().split("\n"):
+            if not line.strip():
+                continue
+            xy = line[:2]
+            filename = line[3:].strip()
+            if " -> " in filename:
+                filename = filename.split(" -> ")[-1].strip()
+            
+            if xy == "??":
+                status_map[filename] = "working"
+            elif xy[0] in ["A", "M", "D", "R"]:
+                status_map[filename] = "staged"
+            elif xy[1] in ["M", "D"]:
+                status_map[filename] = "working"
+
+    # 2. Check which commits are not pushed yet
+    unpushed_commits = set()
+    code_br, branch_out, _ = run_git_command(repo_path, ["rev-parse", "--abbrev-ref", "HEAD"])
+    active_br = branch_out.strip() if code_br == 0 else "main"
+
+    code_remote, remotes, _ = run_git_command(repo_path, ["remote"])
+    has_origin = code_remote == 0 and "origin" in remotes
+
+    if has_origin:
+        code_log, log_out, _ = run_git_command(repo_path, ["log", f"origin/{active_br}..{active_br}", "--name-only", "--oneline"])
+        if code_log == 0 and log_out.strip():
+            for line in log_out.strip().split("\n"):
+                if line and not line[0].isalnum():
+                    unpushed_commits.add(line.strip())
+                elif " " in line:
+                    pass
+                else:
+                    unpushed_commits.add(line.strip())
+
+    # 3. Classify all files currently on disk
+    files_status = []
+    for item in os.listdir(repo_path):
+        if item == ".git" or not os.path.isfile(os.path.join(repo_path, item)):
+            continue
+        
+        if item in status_map:
+            files_status.append({"name": item, "status": status_map[item]})
+        else:
+            code_log_all, _, _ = run_git_command(repo_path, ["log"])
+            if code_log_all != 0:
+                files_status.append({"name": item, "status": "working"})
+            else:
+                if not has_origin:
+                    files_status.append({"name": item, "status": "committed"})
+                elif item in unpushed_commits:
+                    files_status.append({"name": item, "status": "committed"})
+                else:
+                    files_status.append({"name": item, "status": "pushed"})
+
+    return files_status
+
+
+
+

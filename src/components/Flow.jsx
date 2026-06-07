@@ -1,13 +1,41 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 
 const initialFiles = [
   { id: 1, name: 'index.js', status: 'working' },
   { id: 2, name: 'App.jsx', status: 'working' }
 ]
 
-export default function Flow() {
+export default function Flow({ setTerminalSyncListener, onSuccess }) {
   const [files, setFiles] = useState(initialFiles)
   const [log, setLog] = useState([])
+
+  useEffect(() => {
+    if (setTerminalSyncListener) {
+      setTerminalSyncListener(() => (syncState) => {
+        if (syncState.files_status) {
+          const mapped = syncState.files_status.map((f, idx) => ({
+            id: idx + 1,
+            name: f.name,
+            status: f.status
+          }))
+          setFiles(mapped)
+          
+          const changedStatuses = syncState.files_status.map(f => `${f.name}:${f.status}`).join(', ')
+          addLog(`Terminal sync: files updated (${changedStatuses})`)
+          
+          const hasPushed = syncState.files_status.some(f => f.status === 'pushed')
+          if (hasPushed && onSuccess) {
+            onSuccess()
+          }
+        }
+      })
+    }
+    return () => {
+      if (setTerminalSyncListener) {
+        setTerminalSyncListener(null)
+      }
+    }
+  }, [setTerminalSyncListener, onSuccess])
 
   function addLog(text) {
     setLog(l => [text, ...l].slice(0, 8))

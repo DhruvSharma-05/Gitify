@@ -16,6 +16,13 @@ const decisions = [
   { question: 'Is this a short feature branch?', yes: 'Rebase', no: 'Merge' }
 ]
 
+const ACTION_DETAILS = {
+  pick: { label: 'Pick', icon: '📌', desc: 'Keep this commit exactly as is' },
+  squash: { label: 'Squash', icon: '🥞', desc: 'Combine with the commit directly above it' },
+  reword: { label: 'Reword', icon: '✏️', desc: 'Keep commit but change the commit message' },
+  drop: { label: 'Drop', icon: '🗑️', desc: 'Delete this commit completely from history' }
+}
+
 export default function RebaseLesson() {
   const [view, setView] = useState('both')
   const [commits, setCommits] = useState(startingCommits)
@@ -98,15 +105,74 @@ export default function RebaseLesson() {
       <PretextCanvas scene="rebaseClean" height={220} />
 
       <div className="golden-rule">
-        <strong>Golden Rule:</strong> Never rebase commits that others are already working on.
-        <button onClick={() => setSharedBroken(true)}>Try rebasing a shared branch</button>
+        <div className="golden-rule-content">
+          <span className="warning-emoji">🚨</span>
+          <div>
+            <strong>The Golden Rule of Git:</strong> Never rebase commits that have already been pushed to a shared repository!
+          </div>
+        </div>
+        <button className="golden-rule-btn" onClick={() => setSharedBroken(prev => !prev)}>
+          {sharedBroken ? "Hide Simulation" : "Simulate Shared Branch Rebase"}
+        </button>
       </div>
 
       {sharedBroken && (
-        <div className="broken-team">
-          <div>Jordan rebased <code>feature/payments</code></div>
-          <div>Sam's local branch still points at old hashes</div>
-          <div className="broken-alert">Teammate repo broken: histories no longer match</div>
+        <div className="broken-team-visual">
+          <div className="broken-team-card jordan-card">
+            <div className="card-header-badge jordan">Jordan's Remote (Rebased & Pushed)</div>
+            <p className="card-sub">Commits rewritten, generating entirely brand new hashes</p>
+            <div className="mini-timeline">
+              <div className="mini-node rebased">
+                <span className="mini-badge">new</span>
+                <code>p81_new</code>
+                <span className="mini-msg">Add checkout form</span>
+              </div>
+              <div className="mini-node rebased">
+                <span className="mini-badge">new</span>
+                <code>a12_new</code>
+                <span className="mini-msg">Wire Stripe token</span>
+              </div>
+              <div className="mini-node rebased">
+                <span className="mini-badge">new</span>
+                <code>f09_new</code>
+                <span className="mini-msg">Handle card failures</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="broken-arrow">
+            <span className="mismatch-badge">⚠️ Hash Mismatch</span>
+            <div className="mismatch-icon">⚡</div>
+            <span className="diverged-line"></span>
+          </div>
+
+          <div className="broken-team-card sam-card">
+            <div className="card-header-badge sam">Sam's Local (Original History)</div>
+            <p className="card-sub">Still referencing original hashes prior to Jordan's rebase</p>
+            <div className="mini-timeline">
+              <div className="mini-node original">
+                <code>p81a2c</code>
+                <span className="mini-msg">Add checkout form</span>
+              </div>
+              <div className="mini-node original">
+                <code>c44ef8</code>
+                <span className="mini-msg">Fix typo in payment</span>
+              </div>
+              <div className="mini-node original">
+                <code>a12d90</code>
+                <span className="mini-msg">Wire Stripe token</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="broken-explanation">
+            <h3>💥 Devastating History Desync!</h3>
+            <p>
+              Because Jordan rebased, Git changed the unique identifiers (hashes) for those commits. 
+              Sam's computer is looking for the original hashes, while the cloud now only knows the new hashes.
+              If Sam pulls or pushes, their Git histories will violently conflict, requiring manual force pulls and risk of code loss!
+            </p>
+          </div>
         </div>
       )}
 
@@ -131,36 +197,82 @@ export default function RebaseLesson() {
 
         <section className="rebase-panel interactive-panel">
           <div className="panel-heading">
-            <span>Interactive Rebase</span>
+            <span>Interactive Rebase Sandbox</span>
             <h2>git rebase -i HEAD~5</h2>
+            <p className="panel-subtext">Drag-and-drop or use ▲/▼ to reorder history. Select actions to clean up commits.</p>
           </div>
+
+          <div className="rebase-legend">
+            <div className="legend-title">⚡ Interactive Command Guide:</div>
+            <div className="legend-items">
+              <div className="legend-item pick">
+                <span className="legend-icon">📌</span>
+                <div>
+                  <strong>Pick:</strong> Keep the commit as is.
+                </div>
+              </div>
+              <div className="legend-item squash">
+                <span className="legend-icon">🥞</span>
+                <div>
+                  <strong>Squash:</strong> Melt into the commit above.
+                </div>
+              </div>
+              <div className="legend-item reword">
+                <span className="legend-icon">✏️</span>
+                <div>
+                  <strong>Reword:</strong> Keep, but change commit message.
+                </div>
+              </div>
+              <div className="legend-item drop">
+                <span className="legend-icon">🗑️</span>
+                <div>
+                  <strong>Drop:</strong> Remove/Delete from history.
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="rebase-command-list">
             {commits.map((commit, index) => (
               <div
                 key={commit.id}
-                className={`rebase-card action-${commit.action}`}
+                className={`rebase-card action-${commit.action} ${draggedId === commit.id ? 'dragging' : ''}`}
                 draggable
                 onDragStart={() => setDraggedId(commit.id)}
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={() => moveCommit(draggedId, commit.id)}
               >
-                <div className="rebase-card-main">
-                  <span>{index + 1}</span>
+                <div className="rebase-card-header">
+                  <span className={`card-badge badge-${commit.action}`}>
+                    <span className="action-emoji">{ACTION_DETAILS[commit.action].icon}</span>
+                    <span className="action-type-label">{ACTION_DETAILS[commit.action].label}</span>
+                  </span>
+                  <span className="card-index">Commit #{index + 1}</span>
+                </div>
+                <div className="rebase-card-body">
                   <code>{commit.hash}</code>
-                  <strong>{commit.message}</strong>
+                  <div className="commit-details-inline">
+                    <strong className="commit-msg">{commit.message}</strong>
+                    <p className="commit-action-desc">{ACTION_DETAILS[commit.action].desc}</p>
+                  </div>
                 </div>
                 <div className="rebase-card-actions">
-                  {['pick', 'squash', 'reword', 'drop'].map((action) => (
-                    <button
-                      key={action}
-                      className={commit.action === action ? 'selected' : ''}
-                      onClick={() => updateAction(commit.id, action)}
-                    >
-                      {action}
-                    </button>
-                  ))}
-                  <button onClick={() => nudgeCommit(commit.id, -1)}>Up</button>
-                  <button onClick={() => nudgeCommit(commit.id, 1)}>Down</button>
+                  <div className="action-selectors">
+                    {['pick', 'squash', 'reword', 'drop'].map((action) => (
+                      <button
+                        key={action}
+                        className={`action-btn btn-${action} ${commit.action === action ? 'selected' : ''}`}
+                        onClick={() => updateAction(commit.id, action)}
+                      >
+                        <span className="btn-icon-mini">{ACTION_DETAILS[action].icon}</span>
+                        {action}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="nudge-selectors">
+                    <button className="nudge-btn up" onClick={() => nudgeCommit(commit.id, -1)} title="Move Up">▲</button>
+                    <button className="nudge-btn down" onClick={() => nudgeCommit(commit.id, 1)} title="Move Down">▼</button>
+                  </div>
                 </div>
               </div>
             ))}

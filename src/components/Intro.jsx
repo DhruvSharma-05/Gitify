@@ -201,9 +201,7 @@ export default function Intro({ onComplete }) {
                 <div className="code-line">Code example</div>
               </div>
             </div>
-            <div className="confusion-icons">
-              <span>❓</span>
-            </div>
+            {/* Removed confusion-icons */}
           </div>
         </div>
       </section>

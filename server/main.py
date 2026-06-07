@@ -152,8 +152,13 @@ def execute_terminal_command(data: TerminalExecuteRequest):
             exec_cwd = base_path
         
         # 2. Strict command verification & security check
+        import shlex
         cmd_string = data.command.strip()
-        parts = cmd_string.split()
+        try:
+            parts = shlex.split(cmd_string, posix=False)
+            parts = [p.strip('"\'') for p in parts]
+        except Exception:
+            parts = cmd_string.split()
         if not parts:
             return {
                 "status": "success",
@@ -251,6 +256,17 @@ def execute_terminal_command(data: TerminalExecuteRequest):
         # 3. Execute command
         if base_cmd == "git":
             code, stdout, stderr = verifier.run_git_command(exec_cwd, parts[1:])
+        elif base_cmd == "touch" and len(parts) > 1:
+            try:
+                target_file = os.path.normpath(os.path.join(exec_cwd, parts[1]))
+                if not target_file.startswith(base_path):
+                    code, stdout, stderr = -1, "", "Access denied: Cannot write outside sandbox."
+                else:
+                    with open(target_file, "w") as f:
+                        f.write("")
+                    code, stdout, stderr = 0, "", ""
+            except Exception as e:
+                code, stdout, stderr = -1, "", str(e)
         else:
             try:
                 res = subprocess.run(
@@ -315,9 +331,19 @@ def execute_terminal_command(data: TerminalExecuteRequest):
         commits_graph = verifier.get_live_commit_graph(base_path)
         file_contents = verifier.get_workspace_files_content(base_path)
 
+        cmd_output = stdout if code == 0 else stderr or stdout or "Command returned non-zero code."
+        if code == 0:
+            success_tip = verifier.get_success_tip(data.lesson_id, data.command, base_path)
+            if success_tip:
+                cmd_output += success_tip
+        else:
+            friendly_tip = verifier.get_friendly_tip(data.lesson_id, data.command, cmd_output, code)
+            if friendly_tip:
+                cmd_output += friendly_tip
+
         return {
             "status": "success" if code == 0 else "error",
-            "output": stdout if code == 0 else stderr or stdout or "Command returned non-zero code.",
+            "output": cmd_output,
             "exit_code": code,
             "session_id": session_id,
             "verified": verified,
@@ -326,6 +352,7 @@ def execute_terminal_command(data: TerminalExecuteRequest):
             "sync_state": {
                 "branch": current_branch,
                 "files": files_list,
+                "files_status": verifier.get_workspace_files_status(base_path),
                 "stashes": stashes_list,
                 "picked": picked_commits,
                 "pwd": cwd_rel,

@@ -147,6 +147,61 @@ export default function ExerciseGuide({
     }
   }
 
+  const getLearningSuggestions = () => {
+    switch (lessonId) {
+      case 0:
+      case 1:
+        return [
+          "Type 'git status' in the terminal to inspect your workspace files.",
+          "Create a new file by typing 'touch playground.js' and notice how Git detects it as untracked.",
+          "Stage your new file using 'git add playground.js' or 'git add .'.",
+          "Commit your staged file by typing 'git commit -m \"my custom commit\"' to save a snapshot!"
+        ]
+      case 2:
+        return [
+          "Type 'git branch' to see your active and available branches.",
+          "Create a new branch by running 'git branch design-refresh'.",
+          "Switch to your new branch using 'git checkout design-refresh'.",
+          "Type 'git checkout main' to return to your main development line."
+        ]
+      case 3:
+        return [
+          "Type 'git branch -a' to see the main and feature/ui branches.",
+          "Inspect the config.js file contents by running 'cat config.js'.",
+          "Switch branches ('git checkout feature/ui' and 'git checkout main') and watch how config.js changes live on your disk!"
+        ]
+      case 4:
+        return [
+          "Type 'git log' or 'git log --oneline' to view the full history of commits.",
+          "Compare changes between the last two commits by running 'git diff HEAD~1'.",
+          "View details of a specific commit using 'git show <hash>'."
+        ]
+      case 5:
+        return [
+          "Type 'git stash list' to see if there are any shelved changes.",
+          "Create a temporary file, stage it, and run 'git stash' to save it to your stash stack.",
+          "Type 'git stash pop' to restore your stashed changes back to your workspace."
+        ]
+      case 6:
+        return [
+          "Type 'git remote -v' to view the configured remote URL locations.",
+          "Run 'git fetch' to download references and updates from the remote repository.",
+          "Run 'git branch -r' to see all tracked remote branches."
+        ]
+      case 7:
+        return [
+          "Type 'git log --oneline --graph' to see the linear (or branched) commit history graph.",
+          "Run 'git rebase main' to practice rebasing a branch onto main.",
+          "If a rebase goes wrong, run 'git rebase --abort' to cancel it completely."
+        ]
+      default:
+        return [
+          "Type 'git status' to check your current working tree status.",
+          "Use 'ls' to view files in the current sandbox directory."
+        ]
+    }
+  }
+
   const details = getExerciseDetails()
 
   return (
@@ -170,9 +225,19 @@ export default function ExerciseGuide({
         <div className="mode-content learning-mode-content">
           <h3>Interactive Sandbox Playground</h3>
           <p>
-            You are currently in <strong>Learning Mode</strong>. Feel free to use the visual controls above or type Git commands in the terminal below to experiment with files, commits, branches, and conflicts. No grading is active!
+            You are currently in <strong>Learning Mode</strong>. Feel free to use the visual controls or type Git commands in the terminal below. No grading is active!
           </p>
-          <div className="guide-cta-box">
+          
+          <div className="learning-suggestions-box" style={{ marginTop: '16px', background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', color: '#38bdf8' }}>💡 Things to Try:</h4>
+            <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '0.85rem', color: '#94a3b8', display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left' }}>
+              {getLearningSuggestions().map((suggestion, idx) => (
+                <li key={idx} style={{ lineHeight: '1.4' }}>{suggestion}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="guide-cta-box" style={{ marginTop: '20px' }}>
             <h4>Ready to test your skills?</h4>
             <p>Switch to <strong>Exercise Mode</strong> to attempt the graded lab checklist for this lesson!</p>
             <button className="cta-btn" onClick={() => handleModeToggle('exercise')}>
