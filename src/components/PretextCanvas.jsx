@@ -220,11 +220,15 @@ function drawDiffColumn(ctx, x, y, width, height, title, lines, t) {
 }
 
 function drawHistoryLog(ctx, width, height, t, data) {
-  const scroll = (t * 32) % 120
+  const rowHeight = 42
+  const totalHeight = data.commits.length * rowHeight
+  const scroll = (t * 32) % totalHeight
   const preparedRows = data.commits.map((commit) => getPrepared(commit, labelFont))
   preparedRows.forEach((prepared, index) => {
-    const y = 24 + index * 42 - scroll
-    if (y < -42 || y > height + 20) return
+    // Place each row within [0, totalHeight) so it wraps seamlessly: a row
+    // that scrolls off the top re-enters from the bottom.
+    const y = 24 + ((index * rowHeight - scroll) % totalHeight + totalHeight) % totalHeight - rowHeight
+    if (y < -rowHeight || y > height + 20) return
     let maxLineWidth = 0
     walkLineRanges(prepared, width - 80, (line) => { maxLineWidth = Math.max(maxLineWidth, line.width) })
     const bubbleWidth = maxLineWidth + 28
@@ -234,7 +238,8 @@ function drawHistoryLog(ctx, width, height, t, data) {
     const line = layoutWithLines(prepared, width - 80, 20).lines[0]
     ctx.font = labelFont
     ctx.fillStyle = '#f0f6fc'
-    ctx.fillText(line.text, 36, y + 8)
+    ctx.textBaseline = 'middle'
+    ctx.fillText(line.text, 36, y + 15)
   })
 }
 
