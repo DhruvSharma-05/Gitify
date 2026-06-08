@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: gitify-api
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    disk:
+      name: gitify-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: GITIFY_DB_PATH
+        value: /data/gitify.db
+      - key: GITIFY_SESSION_ROOT
+        value: /tmp/gitify-sessions
+      - key: GITIFY_CORS_ORIGINS
+        sync: false

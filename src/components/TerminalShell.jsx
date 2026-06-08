@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { apiUrl } from '../api.js'
 
 // Levenshtein distance matcher for typos suggestion
 function getLevenshteinDistance(a, b) {
@@ -100,7 +101,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
     setIsExecuting(true)
 
     // Execute via FastAPI
-    fetch('http://localhost:8000/api/terminal/execute', {
+    fetch(apiUrl('/api/terminal/execute'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

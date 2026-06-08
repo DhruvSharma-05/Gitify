@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import PretextCanvas from './PretextCanvas.jsx'
+import { apiUrl } from '../api.js'
 
 const stashSeed = [
   { id: 0, name: 'stash@{0}', label: 'wip: payment form cleanup', files: ['Checkout.jsx', 'styles.css'] },
@@ -41,7 +42,7 @@ export default function StashCherryPickLesson({ onSuccess, setTerminalSyncListen
   }, [setTerminalSyncListener])
 
   const verifyLessonState = () => {
-    fetch('http://localhost:8000/api/exercises/verify', {
+    fetch(apiUrl('/api/exercises/verify'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

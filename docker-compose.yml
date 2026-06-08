@@ -1,0 +1,25 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    environment:
+      GITIFY_DB_PATH: /data/gitify.db
+      GITIFY_CORS_ORIGINS: http://localhost:5173,http://localhost:8080
+      GITIFY_SESSION_ROOT: /tmp/gitify-sessions
+    volumes:
+      - gitify-data:/data
+    ports:
+      - "8000:8000"
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - server
+    ports:
+      - "8080:80"
+
+volumes:
+  gitify-data:

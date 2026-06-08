@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react'
 import PretextCanvas from './PretextCanvas.jsx'
+import { apiUrl } from '../api.js'
 
 const resolutionText = {
   ours: '  theme: "dark"',
@@ -38,7 +39,7 @@ export default function MergeConflictsLesson({ onSuccess, setTerminalSyncListene
   }, [setTerminalSyncListener])
 
   const verifyLessonState = () => {
-    fetch('http://localhost:8000/api/exercises/verify', {
+    fetch(apiUrl('/api/exercises/verify'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

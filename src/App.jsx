@@ -13,6 +13,7 @@ import TerminalShell from './components/TerminalShell.jsx'
 import ExerciseGuide from './components/ExerciseGuide.jsx'
 import FileInspector from './components/FileInspector.jsx'
 import LiveCommitGraph from './components/LiveCommitGraph.jsx'
+import { apiUrl } from './api.js'
 
 const lessonOrder = [0, 1, 2, 3, 4, 5, 6, 7]
 
@@ -49,7 +50,7 @@ export default function App() {
 
   // Query progression on start
   useEffect(() => {
-    fetch('http://localhost:8000/api/progress?username=student')
+    fetch(apiUrl('/api/progress?username=student'))
       .then(res => res.json())
       .then(data => {
         if (data.status === 'success' && data.progress) {
@@ -80,7 +81,7 @@ export default function App() {
     if (completedLessons.includes(lessonId)) return
     
     // Sync completion with Python backend
-    fetch('http://localhost:8000/api/progress', {
+    fetch(apiUrl('/api/progress'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lesson_id: lessonId, completed: true, score: 100, username: 'student' })
