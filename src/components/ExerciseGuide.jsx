@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import './ExerciseGuide.css'
+import { apiUrl } from '../api.js'
 
 export default function ExerciseGuide({ 
   lessonId, 
@@ -19,7 +20,7 @@ export default function ExerciseGuide({
   useEffect(() => {
     if (!isExerciseMode) return
 
-    fetch(`http://localhost:8000/api/exercises/checkpoints?lesson_id=${lessonId}&username=student`)
+    fetch(apiUrl(`/api/exercises/checkpoints?lesson_id=${lessonId}&username=student`))
       .then(res => res.json())
       .then(data => {
         if (data.status === 'success' && data.checkpoints && subtasks.length > 0) {
@@ -36,7 +37,7 @@ export default function ExerciseGuide({
   const handleResetClick = () => {
     setLoading(true)
     setError('')
-    fetch('http://localhost:8000/api/exercises/reset', {
+    fetch(apiUrl('/api/exercises/reset'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -71,7 +72,7 @@ export default function ExerciseGuide({
       onToggleMode(true)
       // Automatically trigger reset/setup when switching to exercise mode
       setLoading(true)
-      fetch('http://localhost:8000/api/exercises/reset', {
+      fetch(apiUrl('/api/exercises/reset'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
