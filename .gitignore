@@ -1,6 +1,8 @@
 node_modules/
 dist/
 .npm-cache/
+*venv
+*pycache*
 __pycache__/
 *.py[cod]
 .venv/
