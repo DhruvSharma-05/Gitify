@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import './ExerciseGuide.css'
-import { apiUrl } from '../api.js'
+import { apiUrl, getInitialSubtasks, getInitialOfflineState } from '../api.js'
 
 export default function ExerciseGuide({ 
   lessonId, 
@@ -62,8 +62,21 @@ export default function ExerciseGuide({
       })
       .catch(err => {
         setLoading(false)
-        setError('Error connecting to backend server.')
-        console.error(err)
+        console.warn("Backend unavailable, resetting sandbox locally:", err)
+        const localTasks = getInitialSubtasks(lessonId)
+        const localState = getInitialOfflineState(lessonId)
+        onSubtasksChange(localTasks, {
+          branch: localState.branch,
+          files: localState.files,
+          stashes: localState.stashes,
+          picked: [],
+          pwd: localState.pwd,
+          commits_graph: localState.commits,
+          file_contents: localState.fileContents
+        })
+        if (onResetExercise) {
+          onResetExercise()
+        }
       })
   }
 
@@ -95,7 +108,21 @@ export default function ExerciseGuide({
         })
         .catch(err => {
           setLoading(false)
-          console.error(err)
+          console.warn("Backend unavailable, initializing exercise locally:", err)
+          const localTasks = getInitialSubtasks(lessonId)
+          const localState = getInitialOfflineState(lessonId)
+          onSubtasksChange(localTasks, {
+            branch: localState.branch,
+            files: localState.files,
+            stashes: localState.stashes,
+            picked: [],
+            pwd: localState.pwd,
+            commits_graph: localState.commits,
+            file_contents: localState.fileContents
+          })
+          if (onResetExercise) {
+            onResetExercise()
+          }
         })
     } else {
       onToggleMode(false)

@@ -34,6 +34,11 @@ export default function App() {
   const [commitsGraph, setCommitsGraph] = useState([])
   const [workspaceFiles, setWorkspaceFiles] = useState([])
 
+  // Commit details inspection modal state
+  const [selectedCommit, setSelectedCommit] = useState(null)
+  const [commitDetails, setCommitDetails] = useState('')
+  const [isLoadingCommit, setIsLoadingCommit] = useState(false)
+
   const currentLessonIndex = lessonOrder.indexOf(currentLesson)
   const nextLesson = lessonOrder[currentLessonIndex + 1]
 
@@ -108,6 +113,38 @@ export default function App() {
     setCurrentLesson(nextLesson)
   }
 
+  const handleCommitSelect = (commit) => {
+    setSelectedCommit(commit)
+    setIsLoadingCommit(true)
+    setCommitDetails('')
+    
+    fetch(apiUrl('/api/terminal/commit-details'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        commit_hash: commit.full_hash || commit.hash,
+        session_id: sessionId
+      })
+    })
+      .then(res => {
+        if (!res.ok) throw new Error("Commit details not found or backend offline");
+        return res.json()
+      })
+      .then(data => {
+        setIsLoadingCommit(false)
+        if (data.status === 'success') {
+          setCommitDetails(data.details)
+        } else {
+          setCommitDetails("Failed to fetch details for this commit.")
+        }
+      })
+      .catch(err => {
+        setIsLoadingCommit(false)
+        console.warn("Could not fetch commit details:", err)
+        setCommitDetails(`Commit: ${commit.hash}\nMessage: ${commit.message}\nBranch: ${commit.branches.join(', ') || 'none'}\n\n(Note: Connect to the running FastAPI backend to view full file diffs)`)
+      })
+  }
+
   const handleTerminalSync = (syncState) => {
     // 1. Sync visualizer
     if (terminalSyncListener) {
@@ -161,7 +198,7 @@ export default function App() {
             
             {/* Dynamic Commit SVG DAG */}
             {isExerciseMode && commitsGraph.length > 0 && (
-              <LiveCommitGraph commits={commitsGraph} />
+              <LiveCommitGraph commits={commitsGraph} onSelectCommit={handleCommitSelect} />
             )}
 
             {currentLesson === 2 ? (
@@ -260,6 +297,116 @@ export default function App() {
           onSuccess={() => handleVerifySuccess(currentLesson)}
           resetTrigger={resetTrigger}
         />
+      )}
+
+      {selectedCommit && (
+        <div 
+          className="modal-backdrop" 
+          onClick={() => setSelectedCommit(null)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+        >
+          <div 
+            className="modal-content glassmorphic" 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'rgba(22, 27, 34, 0.9)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: '16px',
+              padding: '24px',
+              maxWidth: '700px',
+              width: '100%',
+              maxHeight: '80vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
+              position: 'relative'
+            }}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '12px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '1.5rem' }}>🔍</span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#fff' }}>Commit Inspection</h3>
+                  <code style={{ fontSize: '0.8rem', color: '#38bdf8' }}>{selectedCommit.full_hash || selectedCommit.hash}</code>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedCommit(null)} 
+                aria-label="Close modal"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#8b949e',
+                  fontSize: '1.8rem',
+                  cursor: 'pointer',
+                  lineHeight: 1
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Details Body */}
+            <div style={{ flex: 1, overflowY: 'auto', paddingRight: '8px' }}>
+              {isLoadingCommit ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', padding: '40px 0', color: '#8b949e' }}>
+                  <span className="spinner-ring" style={{ width: '30px', height: '30px' }}></span>
+                  <span>Fetching git show details from sandbox...</span>
+                </div>
+              ) : (
+                <pre 
+                  style={{
+                    margin: 0,
+                    padding: '16px',
+                    background: 'rgba(0, 0, 0, 0.4)',
+                    border: '1px solid rgba(255,255,255,0.03)',
+                    borderRadius: '8px',
+                    color: '#e2e8f0',
+                    fontFamily: "'Fira Code', 'Consolas', monospace",
+                    fontSize: '0.82rem',
+                    whiteSpace: 'pre-wrap',
+                    overflowX: 'auto'
+                  }}
+                >
+                  {commitDetails}
+                </pre>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>
+              <button 
+                onClick={() => setSelectedCommit(null)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  color: '#fff',
+                  padding: '8px 20px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

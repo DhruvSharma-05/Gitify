@@ -504,8 +504,35 @@ def load_checkpoints(lesson_id: int, username: str = "student"):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+class CommitDetailsRequest(BaseModel):
+    commit_hash: str
+    session_id: str
+
+@app.post("/api/terminal/commit-details")
+def get_commit_details(data: CommitDetailsRequest):
+    try:
+        session_id = data.session_id.strip()
+        if session_id not in SESSION_SANDBOXES:
+            raise HTTPException(status_code=404, detail="Session sandbox not found.")
+            
+        base_path = SESSION_SANDBOXES[session_id]["base_path"]
+        if not os.path.exists(os.path.join(base_path, ".git")):
+            raise HTTPException(status_code=400, detail="Git repository not initialized in sandbox.")
+            
+        code, stdout, stderr = verifier.run_git_command(base_path, ["show", "--stat", data.commit_hash])
+        if code != 0:
+            raise HTTPException(status_code=400, detail=stderr or "Failed to retrieve commit details.")
+            
+        return {
+            "status": "success",
+            "details": stdout
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/health")
 def health_check():
     return {"status": "healthy", "service": "Gitify Python Backend"}
+
 
 
