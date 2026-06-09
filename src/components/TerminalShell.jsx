@@ -37,7 +37,52 @@ function getGitSuggestion(cmd) {
   return bestMatch
 }
 
-export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetTrigger }) {
+/**
+ * Returns a contextual hint for common git errors to guide students.
+ */
+function getSmartHint(command, output, lessonId) {
+  if (!output) return null
+  const out = output.toLowerCase()
+  const cmd = command.toLowerCase()
+
+  if (out.includes('fatal: not a git repository')) {
+    return "💡 Tip: You're not inside a git repo yet. Run 'git init' to initialize one."
+  }
+  if (out.includes('nothing to commit') && out.includes('working tree clean')) {
+    return "💡 Tip: Nothing to commit — your working tree is clean. Make a change or add a file first."
+  }
+  if (out.includes('nothing added to commit') || out.includes('no changes added to commit')) {
+    return "💡 Tip: Changes exist but aren't staged. Run 'git add <filename>' or 'git add .' to stage them."
+  }
+  if (out.includes('pathspec') && out.includes('did not match')) {
+    const fileGuess = (command.match(/\b([\w./]+\.[\w]+)\b/) || [])[1]
+    return `💡 Tip: File not found. Run 'ls' to see what's in the workspace${fileGuess ? ` — did you mean '${fileGuess}'?` : '.'}`
+  }
+  if (out.includes('conflict') || out.includes('<<<<<<<')) {
+    return "💡 Tip: Merge conflict detected. Open the file in the inspector, edit out the conflict markers (<<<, ===, >>>), then 'git add <file>' and 'git commit'."
+  }
+  if (out.includes('your branch is behind') || out.includes('updates were rejected')) {
+    return "💡 Tip: Your local branch is behind the remote. Try 'git pull --rebase' to sync up."
+  }
+  if (out.includes('needs merge') || out.includes('unresolved conflicts')) {
+    return "💡 Tip: Unresolved conflicts exist. Resolve them in the editor, then 'git add' the file."
+  }
+  if (cmd.includes('git stash') && (out.includes('no local changes') || out.includes('nothing to stash'))) {
+    return "💡 Tip: There's nothing to stash. Make a change to a tracked file first."
+  }
+  if (out.includes('already up to date')) {
+    return "💡 Tip: Already up to date — no new commits to merge or pull."
+  }
+  if (out.includes('error: failed to push') || out.includes('rejected')) {
+    return "💡 Tip: Push rejected. Run 'git pull' first to integrate remote changes."
+  }
+  if (out.includes('detached head')) {
+    return "💡 Tip: You're in detached HEAD state. Create a branch with 'git checkout -b <branch-name>' to keep your work."
+  }
+  return null
+}
+
+export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetTrigger, onRebaseInteractive }) {
   const [pwd, setPwd] = useState('')
   const [branch, setBranch] = useState('main')
   const [history, setHistory] = useState([])
@@ -48,6 +93,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
   const [isExecuting, setIsExecuting] = useState(false)
   const [minimized, setMinimized] = useState(false)
   const [offlineState, setOfflineState] = useState(() => getInitialOfflineState(lessonId))
+  const [backendOnline, setBackendOnline] = useState(true)
   
   // Local caches for autocompletion
   const [files, setFiles] = useState([])
@@ -150,6 +196,22 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
     setSuggestions([])
     setIsExecuting(true)
 
+    // Intercept: git rebase -i — open modal instead of sending to backend
+    const rebaseInteractiveMatch = rawCmd.match(/^git\s+rebase\s+-i/i)
+    if (rebaseInteractiveMatch && onRebaseInteractive) {
+        setIsExecuting(false)
+        setBackendOnline(true)
+
+        setHistory(prev => [...prev, {
+        type: 'system',
+        text: '📟 Opening interactive rebase editor… (Use the modal to arrange commits, then click Save & Execute)'
+      }])
+      // Pass current commit graph from offline state or cached data
+      const commitsForModal = offlineState?.commits || []
+      onRebaseInteractive(commitsForModal, sessionId)
+      return
+    }
+
     // Execute via FastAPI
     fetch(apiUrl('/api/terminal/execute'), {
       method: 'POST',
@@ -161,7 +223,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
         username: 'student'
       })
     })
-      .then(res => {
+    .then(res => {
         if (!res.ok) {
           throw new Error(`Server returned HTTP ${res.status}: ${res.statusText}`);
         }
@@ -169,6 +231,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
       })
       .then(data => {
         setIsExecuting(false)
+        setBackendOnline(true)
         if (data.session_id) {
           setSessionId(data.session_id)
           localStorage.setItem("gitify_session_id", data.session_id)
@@ -184,6 +247,14 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
           type: data.status === 'success' ? 'output' : 'error', 
           text: data.output || '(No output)' 
         }])
+
+        // Show smart contextual hint if output suggests an error
+        if (data.status === 'error' || data.status === 'warning') {
+          const hint = getSmartHint(rawCmd, data.output, lessonId)
+          if (hint) {
+            setHistory(prev => [...prev, { type: 'system', text: hint }])
+          }
+        }
 
         // Typo suggestion check: if failed or warning, look for mistyped Git commands
         const parts = rawCmd.split(/\s+/)
@@ -248,6 +319,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
       })
       .catch(err => {
         setIsExecuting(false)
+        setBackendOnline(false)
         console.warn("Terminal server error, using offline mock simulation:", err)
         
         const result = simulateCommandOffline(rawCmd, offlineState, lessonId)
@@ -267,9 +339,17 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
           },
           {
             type: 'system',
-            text: '📟 [Offline Fallback Mode Active - simulated in memory]'
+            text: '📟 [Offline Fallback Mode — server unreachable, simulating in memory]'
           }
         ])
+
+        // Smart hint in offline mode too
+        if (result.status === 'error') {
+          const hint = getSmartHint(rawCmd, result.output, lessonId)
+          if (hint) {
+            setHistory(prev => [...prev, { type: 'system', text: hint }])
+          }
+        }
 
         if (updatedOfflineState.pwd !== undefined) setPwd(updatedOfflineState.pwd)
         if (updatedOfflineState.branch !== undefined) setBranch(updatedOfflineState.branch)
@@ -459,6 +539,26 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Connection status pill */}
+          <div
+            title={backendOnline ? 'Connected to Gitify backend' : 'Offline — commands simulated in memory'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '5px',
+              fontSize: '0.7rem', fontWeight: '600',
+              color: backendOnline ? '#34d399' : '#fbbf24',
+              background: backendOnline ? 'rgba(16,185,129,0.1)' : 'rgba(251,191,36,0.1)',
+              border: `1px solid ${backendOnline ? 'rgba(16,185,129,0.25)' : 'rgba(251,191,36,0.25)'}`,
+              padding: '2px 8px', borderRadius: '20px', transition: 'all 0.3s ease'
+            }}
+          >
+            <span style={{
+              width: '6px', height: '6px', borderRadius: '50%',
+              background: backendOnline ? '#10b981' : '#f59e0b',
+              display: 'inline-block',
+              boxShadow: backendOnline ? '0 0 6px #10b981' : '0 0 6px #f59e0b'
+            }} />
+            {backendOnline ? 'Server Connected' : 'Offline Mode'}
+          </div>
           <button
             type="button"
             onClick={(e) => {

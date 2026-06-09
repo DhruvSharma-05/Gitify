@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import './FileInspector.css'
+import { apiUrl } from '../api.js'
 
-export default function FileInspector({ files = [], fileContents = {} }) {
+export default function FileInspector({ files = [], fileContents = {}, sessionId, onFileEdit }) {
   const [selectedFile, setSelectedFile] = useState('')
+  const [isEditing, setIsEditing] = useState(false)
+  const [editBuffer, setEditBuffer] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveMsg, setSaveMsg] = useState('')
 
   // Auto-select the first file when files load, or prioritize config.js / index.js
   useEffect(() => {
@@ -17,27 +22,71 @@ export default function FileInspector({ files = [], fileContents = {} }) {
     } else {
       setSelectedFile('')
     }
+    // Cancel any active edit if files reload
+    setIsEditing(false)
+    setSaveMsg('')
   }, [files])
 
   const content = selectedFile ? fileContents[selectedFile] || '// Empty file or no content' : ''
 
+  const startEdit = () => {
+    setEditBuffer(content)
+    setIsEditing(true)
+    setSaveMsg('')
+  }
+
+  const cancelEdit = () => {
+    setIsEditing(false)
+    setSaveMsg('')
+  }
+
+  const saveEdit = async () => {
+    if (!selectedFile) return
+    setIsSaving(true)
+    setSaveMsg('')
+    try {
+      const res = await fetch(apiUrl('/api/terminal/write-file'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: sessionId,
+          filename: selectedFile,
+          content: editBuffer
+        })
+      })
+      const data = await res.json()
+      if (data.status === 'success') {
+        setIsEditing(false)
+        setSaveMsg('✓ Saved')
+        if (onFileEdit) onFileEdit(selectedFile, editBuffer, data.sync_state)
+        setTimeout(() => setSaveMsg(''), 3000)
+      } else {
+        setSaveMsg('✗ Save failed')
+      }
+    } catch (err) {
+      console.warn('Backend offline, applying edit locally:', err)
+      // Offline fallback: update through callback directly
+      setIsEditing(false)
+      setSaveMsg('✓ Saved (local)')
+      if (onFileEdit) onFileEdit(selectedFile, editBuffer, null)
+      setTimeout(() => setSaveMsg(''), 3000)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   // Split lines and identify conflict blocks for premium highlights
   const lines = content.split('\n')
-  
-  let conflictZone = null // 'ours', 'theirs', or null
+  let conflictZone = null
 
   const renderedLines = lines.map((line, idx) => {
     const isConflictStart = line.startsWith('<<<<<<<')
     const isConflictMiddle = line.startsWith('=======')
     const isConflictEnd = line.startsWith('>>>>>>>')
 
-    if (isConflictStart) {
-      conflictZone = 'ours'
-    } else if (isConflictMiddle) {
-      conflictZone = 'theirs'
-    } else if (isConflictEnd) {
-      conflictZone = null
-    }
+    if (isConflictStart) conflictZone = 'ours'
+    else if (isConflictMiddle) conflictZone = 'theirs'
+    else if (isConflictEnd) conflictZone = null
 
     let lineClass = 'code-line-normal'
     if (isConflictStart) lineClass = 'conflict-marker ours-marker'
@@ -71,7 +120,7 @@ export default function FileInspector({ files = [], fileContents = {} }) {
               <button
                 key={file}
                 className={`tab-btn ${selectedFile === file ? 'active' : ''}`}
-                onClick={() => setSelectedFile(file)}
+                onClick={() => { setSelectedFile(file); setIsEditing(false); setSaveMsg('') }}
               >
                 📄 {file}
               </button>
@@ -81,14 +130,60 @@ export default function FileInspector({ files = [], fileContents = {} }) {
           <div className="code-viewer-container">
             <div className="code-viewer-header">
               <span>{selectedFile}</span>
-              {content.includes('<<<<<<<') && (
-                <span className="conflict-badge">⚠️ MERGE CONFLICT DETECTED</span>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {content.includes('<<<<<<<') && (
+                  <span className="conflict-badge">⚠️ MERGE CONFLICT</span>
+                )}
+                {saveMsg && (
+                  <span className={`save-status-msg ${saveMsg.startsWith('✓') ? 'save-ok' : 'save-err'}`}>
+                    {saveMsg}
+                  </span>
+                )}
+                {!isEditing ? (
+                  <button
+                    className="edit-toggle-btn"
+                    onClick={startEdit}
+                    title="Edit this file"
+                    aria-label={`Edit ${selectedFile}`}
+                  >
+                    ✏️ Edit
+                  </button>
+                ) : (
+                  <div className="edit-actions-bar">
+                    <button
+                      className="save-btn"
+                      onClick={saveEdit}
+                      disabled={isSaving}
+                      aria-label="Save file changes"
+                    >
+                      {isSaving ? '⏳' : '💾 Save'}
+                    </button>
+                    <button
+                      className="cancel-btn"
+                      onClick={cancelEdit}
+                      aria-label="Cancel editing"
+                    >
+                      ✖ Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
+
             <div className="code-pretext-wrapper">
-              <pre className="code-editor-pre">
-                <code>{renderedLines}</code>
-              </pre>
+              {isEditing ? (
+                <textarea
+                  className="edit-textarea"
+                  value={editBuffer}
+                  onChange={e => setEditBuffer(e.target.value)}
+                  spellCheck={false}
+                  aria-label={`Edit content of ${selectedFile}`}
+                />
+              ) : (
+                <pre className="code-editor-pre">
+                  <code>{renderedLines}</code>
+                </pre>
+              )}
             </div>
           </div>
         </>

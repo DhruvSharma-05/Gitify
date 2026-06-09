@@ -211,3 +211,101 @@
 .theirs-line .line-text {
   color: #fca5a5;
 }
+
+/* ── Edit Mode ─────────────────────────────────────── */
+.edit-toggle-btn {
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
+  padding: 3px 10px;
+  border-radius: 5px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.edit-toggle-btn:hover {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: rgba(56, 189, 248, 0.5);
+}
+
+.edit-actions-bar {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.save-btn {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #34d399;
+  padding: 3px 10px;
+  border-radius: 5px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.save-btn:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.25);
+}
+
+.save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cancel-btn {
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  color: #f87171;
+  padding: 3px 10px;
+  border-radius: 5px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.cancel-btn:hover {
+  background: rgba(248, 113, 113, 0.2);
+}
+
+.edit-textarea {
+  width: 100%;
+  height: 100%;
+  min-height: 220px;
+  background: rgba(0, 0, 0, 0.25);
+  border: none;
+  outline: none;
+  color: #e2e8f0;
+  font-family: 'Fira Code', Consolas, Monaco, monospace;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  padding: 12px;
+  resize: none;
+  caret-color: #38bdf8;
+  tab-size: 2;
+}
+
+.save-status-msg {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.save-status-msg.save-ok {
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.save-status-msg.save-err {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.1);
+}

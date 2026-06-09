@@ -530,9 +530,160 @@ def get_commit_details(data: CommitDetailsRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+class WriteFileRequest(BaseModel):
+    session_id: str
+    filename: str
+    content: str
+
+@app.post("/api/terminal/write-file")
+def write_sandbox_file(data: WriteFileRequest):
+    """Writes edited file content into the user's sandbox workspace."""
+    try:
+        session_id = data.session_id.strip()
+        if session_id not in SESSION_SANDBOXES:
+            raise HTTPException(status_code=404, detail="Session sandbox not found.")
+
+        base_path = SESSION_SANDBOXES[session_id]["base_path"]
+
+        # Security: only allow simple filenames, no path traversal
+        filename = os.path.basename(data.filename)
+        if not filename or filename.startswith(".git"):
+            raise HTTPException(status_code=400, detail="Invalid filename.")
+
+        file_path = os.path.join(base_path, filename)
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(data.content)
+
+        # Return updated workspace state
+        files_list = []
+        try:
+            for item in os.listdir(base_path):
+                if item != ".git" and os.path.isfile(os.path.join(base_path, item)):
+                    files_list.append(item)
+        except Exception:
+            pass
+
+        file_contents = verifier.get_workspace_files_content(base_path)
+        commits_graph = verifier.get_live_commit_graph(base_path)
+
+        return {
+            "status": "success",
+            "message": f"File '{filename}' saved successfully.",
+            "sync_state": {
+                "files": files_list,
+                "file_contents": file_contents,
+                "commits_graph": commits_graph
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class RebasePlanItem(BaseModel):
+    hash: str
+    action: str  # pick | squash | drop | reword
+    message: Optional[str] = ""
+
+class RebaseInteractiveRequest(BaseModel):
+    session_id: str
+    lesson_id: int
+    plan: List[RebasePlanItem]
+
+@app.post("/api/terminal/rebase-interactive")
+def execute_rebase_interactive(data: RebaseInteractiveRequest):
+    """Applies an interactive rebase plan to the sandbox repository."""
+    import subprocess
+    try:
+        session_id = data.session_id.strip()
+        if session_id not in SESSION_SANDBOXES:
+            raise HTTPException(status_code=404, detail="Session sandbox not found.")
+
+        base_path = SESSION_SANDBOXES[session_id]["base_path"]
+        if not os.path.exists(os.path.join(base_path, ".git")):
+            raise HTTPException(status_code=400, detail="Git repository not initialized.")
+
+        # Build the rebase-todo content
+        todo_lines = []
+        for item in data.plan:
+            action = item.action.strip().lower()
+            if action not in ("pick", "squash", "fixup", "drop", "reword", "edit"):
+                action = "pick"
+            msg = item.message.strip() if item.message else ""
+            if msg:
+                todo_lines.append(f"{action} {item.hash} {msg}")
+            else:
+                todo_lines.append(f"{action} {item.hash}")
+        todo_content = "\n".join(todo_lines) + "\n"
+
+        # Write todo to a temp file and use it as GIT_SEQUENCE_EDITOR
+        import tempfile as tmpmod
+        todo_file = tmpmod.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8")
+        todo_file.write(todo_content)
+        todo_file.close()
+
+        # Use a simple script that just copies our pre-built todo file
+        if os.name == "nt":
+            editor_script = f'cmd /c copy /Y "{todo_file.name}" "$1"'
+        else:
+            editor_script = f'cp "{todo_file.name}" "$1"'
+
+        env = os.environ.copy()
+        env["GIT_SEQUENCE_EDITOR"] = editor_script
+        env["GIT_CONFIG_NOSYSTEM"] = "1"
+        env["GIT_AUTHOR_NAME"] = "Gitify Student"
+        env["GIT_AUTHOR_EMAIL"] = "student@gitify.edu"
+        env["GIT_COMMITTER_NAME"] = "Gitify Student"
+        env["GIT_COMMITTER_EMAIL"] = "student@gitify.edu"
+        env["GIT_EDITOR"] = "true"  # accept default commit messages
+
+        n = len(data.plan)
+        result = subprocess.run(
+            ["git", "rebase", "-i", f"HEAD~{n}"],
+            cwd=base_path,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=env,
+            timeout=15
+        )
+
+        try:
+            os.unlink(todo_file.name)
+        except Exception:
+            pass
+
+        output = result.stdout or result.stderr or "Rebase complete."
+        success = result.returncode == 0
+
+        verified, v_msg, subtasks = verifier.check_sandbox_state(base_path, data.lesson_id)
+        commits_graph = verifier.get_live_commit_graph(base_path)
+        file_contents = verifier.get_workspace_files_content(base_path)
+
+        files_list = []
+        try:
+            for item in os.listdir(base_path):
+                if item != ".git" and os.path.isfile(os.path.join(base_path, item)):
+                    files_list.append(item)
+        except Exception:
+            pass
+
+        return {
+            "status": "success" if success else "error",
+            "output": output,
+            "verified": verified,
+            "validation_message": v_msg,
+            "subtasks": subtasks,
+            "sync_state": {
+                "files": files_list,
+                "file_contents": file_contents,
+                "commits_graph": commits_graph
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/health")
 def health_check():
     return {"status": "healthy", "service": "Gitify Python Backend"}
-
-
-
