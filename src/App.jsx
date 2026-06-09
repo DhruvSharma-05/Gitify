@@ -145,7 +145,7 @@ export default function App() {
         completedLessons={completedLessons}
       />
 
-      <button className="menu-btn" onClick={() => setIsSidebarOpen(true)}>
+      <button className="menu-btn" onClick={() => setIsSidebarOpen(true)} aria-label="Open sidebar menu">
         <span className="hamburger-line"></span>
         <span className="hamburger-line"></span>
         <span className="hamburger-line"></span>

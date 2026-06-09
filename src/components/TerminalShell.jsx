@@ -362,6 +362,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
             e.stopPropagation()
             setMinimized(true)
           }}
+          aria-label="Minimize terminal"
           style={{
             background: 'transparent',
             border: 'none',
