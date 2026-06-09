@@ -12,6 +12,7 @@ import TerminalShell from './components/TerminalShell.jsx'
 import ExerciseGuide from './components/ExerciseGuide.jsx'
 import FileInspector from './components/FileInspector.jsx'
 import LiveCommitGraph from './components/LiveCommitGraph.jsx'
+import PretextCanvas from './components/PretextCanvas.jsx'
 import { apiUrl } from './api.js'
 
 const lessonOrder = [0, 1, 2, 3, 4, 5, 6, 7]
@@ -279,7 +280,7 @@ export default function App() {
             ) : currentLesson === 7 ? (
               <RebaseLesson onSuccess={() => handleVerifySuccess(7)} setTerminalSyncListener={setTerminalSyncListener} />
             ) : (
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '18px' }}>
                 <header>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                     <a
@@ -294,6 +295,7 @@ export default function App() {
                   <h1>GitHub Visual - Interactive demo</h1>
                   <p>Click actions to see files move through working/stage/commit/push.</p>
                 </header>
+                <PretextCanvas scene="playgroundFlow" height={150} />
                 <main>
                   <Flow onSuccess={() => handleVerifySuccess(1)} setTerminalSyncListener={setTerminalSyncListener} />
                 </main>
