@@ -52,7 +52,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
   const [files, setFiles] = useState([])
   const [branches, setBranches] = useState(['main'])
 
-  const bottomRef = useRef(null)
+  const historyRef = useRef(null)
   const inputRef = useRef(null)
 
   // Initialize unique session ID
@@ -78,9 +78,11 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
     setBranches(['main'])
   }, [lessonId, resetTrigger])
 
-  // Auto scroll to bottom
+  // Auto scroll to bottom of the terminal container (without scrolling the main window)
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (historyRef.current) {
+      historyRef.current.scrollTop = historyRef.current.scrollHeight
+    }
   }, [history])
 
   const handleCommandSubmit = (e) => {
@@ -374,6 +376,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
 
       {/* Terminal History */}
       <div 
+        ref={historyRef}
         className="terminal-history"
         style={{
           flex: 1,
@@ -399,7 +402,6 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
         {isExecuting && (
           <div style={{ color: '#8b949e', fontStyle: 'italic' }}>Running subprocess command...</div>
         )}
-        <div ref={bottomRef} />
       </div>
 
       {/* Input Prompt */}

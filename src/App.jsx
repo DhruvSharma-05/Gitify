@@ -62,7 +62,7 @@ export default function App() {
       .catch(err => console.warn("Backend not running or progress unavailable:", err))
   }, [])
 
-  // Reset exercise state when moving lessons
+  // Reset exercise state and scroll to top when moving lessons
   useEffect(() => {
     setIsSolved(false)
     setSubtasks([])
@@ -70,6 +70,7 @@ export default function App() {
     setFileContents({})
     setCommitsGraph([])
     setWorkspaceFiles([])
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [currentLesson])
 
   const handleLessonSelect = (lessonId) => {
@@ -105,7 +106,6 @@ export default function App() {
   const handleNextLesson = () => {
     if (nextLesson === undefined) return
     setCurrentLesson(nextLesson)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const handleTerminalSync = (syncState) => {
