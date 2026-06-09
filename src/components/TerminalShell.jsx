@@ -659,19 +659,9 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
 
           {/* List of commands */}
           <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '4px' }}>
-            <CheatItem cmd="git init" desc="Create a new local Git repository." />
-            <CheatItem cmd="git status" desc="Show status of files in working tree vs staging area." />
-            <CheatItem cmd="git add <file>" desc="Stage modifications or untracked files." />
-            <CheatItem cmd="git commit -m '<msg>'" desc="Snapshot staged changes with a descriptive message." />
-            <CheatItem cmd="git log" desc="List commit history for current branch." />
-            <CheatItem cmd="git checkout -b <branch>" desc="Create and switch to a new local branch." />
-            <CheatItem cmd="git checkout <branch>" desc="Switch to an existing local branch." />
-            <CheatItem cmd="git merge <branch>" desc="Merge commits from branch into active branch." />
-            <CheatItem cmd="git stash" desc="Shelve uncommitted changes for later reuse." />
-            <CheatItem cmd="git stash pop" desc="Restore the latest stashed changes and remove them from stash list." />
-            <CheatItem cmd="git cherry-pick <hash>" desc="Transplant a specific commit's changes onto current HEAD." />
-            <CheatItem cmd="git pull --rebase" desc="Fetch remote updates and replay local commits on top." />
-            <CheatItem cmd="git push origin <branch>" desc="Upload local commits to remote repository branch." />
+            {getCheatsheetCommands(lessonId).map((item, idx) => (
+              <CheatItem key={idx} cmd={item.cmd} desc={item.desc} />
+            ))}
           </div>
         </div>
       )}
@@ -686,6 +676,67 @@ function CheatItem({ cmd, desc }) {
       <span style={{ color: '#94a3b8', fontSize: '0.72rem' }}>{desc}</span>
     </div>
   )
+}
+
+function getCheatsheetCommands(lessonId) {
+  switch (lessonId) {
+    case 0:
+    case 1:
+      return [
+        { cmd: "ls", desc: "List files: Shows all files in the current workspace directory." },
+        { cmd: "git init", desc: "Initialize: Creates a new local Git repository in the sandbox directory." },
+        { cmd: "git status", desc: "Check status: Displays which files are staged, unstaged/modified, or untracked." },
+        { cmd: "git add index.js App.jsx", desc: "Stage files: Stages 'index.js' and 'App.jsx', preparing them to be committed." },
+        { cmd: "git commit -m 'first commit'", desc: "Commit snapshot: Permanently saves your staged changes in a commit snapshot with a description." },
+        { cmd: "git push origin main", desc: "Push to remote: Sends your main branch commits to the remote repository (origin)." }
+      ]
+    case 2:
+      return [
+        { cmd: "git branch", desc: "List branches: Lists all local branches. The active branch has an asterisk (*) next to it." },
+        { cmd: "git checkout -b feature/auth", desc: "Create & switch branch: Creates a new branch named 'feature/auth' and immediately switches your HEAD to it." },
+        { cmd: "git commit -a -m 'auth changes'", desc: "Stage & commit: Automatically stages all modified files and commits them in one step." },
+        { cmd: "git checkout main", desc: "Switch branch: Switches your active branch back to the 'main' branch." },
+        { cmd: "git merge feature/auth", desc: "Merge branches: Merges the commits from 'feature/auth' into your current active branch ('main')." }
+      ]
+    case 3:
+      return [
+        { cmd: "git merge feature/ui", desc: "Trigger merge: Merges the UI branch. Since both main and feature/ui modified config.js, this triggers conflict markers." },
+        { cmd: "cat config.js", desc: "Inspect file: Reads the config.js file to find the conflict markers (<<<<<<<, =======, >>>>>>>)." },
+        { cmd: "git add config.js", desc: "Stage resolved: Marks config.js as conflict-free and ready for the merge commit." },
+        { cmd: "git commit -m 'resolve merge conflict'", desc: "Finalize merge: Finalizes the merge and commits the resolved changes." }
+      ]
+    case 4:
+      return [
+        { cmd: "git log --oneline", desc: "Show history: Lists recent commits with short hashes and messages so you can identify the buggy commit." },
+        { cmd: "git show <commit-hash>", desc: "Inspect commit: Displays the exact code changes and message of a specific commit." },
+        { cmd: "git revert <commit-hash>", desc: "Safe revert: Creates a new commit that applies the exact opposite changes of the buggy commit, safely undoing it." },
+        { cmd: "git reset --hard <commit-hash>", desc: "Hard reset: Moves your branch pointer back to the specified commit, permanently discarding all commits and work after it." }
+      ]
+    case 5:
+      return [
+        { cmd: "git stash", desc: "Stash WIP: Saves your dirty working directory changes to a temporary stack, leaving a clean workspace." },
+        { cmd: "git stash list", desc: "List stashes: Displays your saved stashes (e.g. stash@{0})." },
+        { cmd: "git checkout hotfix/invoice", desc: "Switch branch: Switches to the hotfix branch to find the commit hash you need to pick." },
+        { cmd: "git log --oneline", desc: "Show history: Helps you locate the 'Fix tax rounding' commit hash." },
+        { cmd: "git checkout feature/payments", desc: "Switch back: Returns you to your working branch." },
+        { cmd: "git cherry-pick <commit-hash>", desc: "Cherry-pick: Copies the tax fix commit from the hotfix branch directly onto feature/payments." },
+        { cmd: "git stash pop", desc: "Restore stashed work: Applies your stashed changes back to your working directory and removes them from the stash." }
+      ]
+    case 6:
+      return [
+        { cmd: "git fetch", desc: "Fetch remote: Downloads the latest branch pointers and commits from origin without changing your local workspace." },
+        { cmd: "git branch -r", desc: "List remote branches: Shows remote-tracking branches, such as origin/main." },
+        { cmd: "git pull --rebase", desc: "Pull with rebase: Fetches origin/main and replays your local commits on top of teammate changes to maintain a clean linear timeline." },
+        { cmd: "git push origin main", desc: "Push updates: Uploads your rebased commits to origin/main remote repository." }
+      ]
+    case 7:
+      return [
+        { cmd: "git log --oneline", desc: "Check history: View all commits and count them (e.g. 5 commits) to determine the rebase depth." },
+        { cmd: "git rebase -i HEAD~5", desc: "Interactive rebase: Opens the interactive rebase editor for the last 5 commits, where you can pick, squash, drop, or reword." }
+      ]
+    default:
+      return []
+  }
 }
 
 function checkOfflineProgress(state, lessonId) {
