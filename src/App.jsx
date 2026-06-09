@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import Flow from './components/Flow.jsx'
 import Intro from './components/Intro.jsx'
 import Sidebar from './components/Sidebar.jsx'
-import ContactInfo from './components/ContactInfo.jsx'
 import BranchingLesson from './components/BranchingLesson.jsx'
 import MergeConflictsLesson from './components/MergeConflictsLesson.jsx'
 import HistoryLesson from './components/HistoryLesson.jsx'
@@ -262,8 +261,6 @@ export default function App() {
           resetTrigger={resetTrigger}
         />
       )}
-
-      <ContactInfo />
     </div>
   )
 }
