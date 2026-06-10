@@ -518,8 +518,13 @@ def get_commit_details(data: CommitDetailsRequest):
         base_path = SESSION_SANDBOXES[session_id]["base_path"]
         if not os.path.exists(os.path.join(base_path, ".git")):
             raise HTTPException(status_code=400, detail="Git repository not initialized in sandbox.")
-            
-        code, stdout, stderr = verifier.run_git_command(base_path, ["show", "--stat", data.commit_hash])
+
+        import re as _re
+        safe_hash = data.commit_hash.strip()
+        if not _re.match(r'^[0-9a-f]{4,40}$', safe_hash, _re.IGNORECASE):
+            raise HTTPException(status_code=400, detail="Invalid commit hash.")
+
+        code, stdout, stderr = verifier.run_git_command(base_path, ["show", "--stat", safe_hash])
         if code != 0:
             raise HTTPException(status_code=400, detail=stderr or "Failed to retrieve commit details.")
             
@@ -603,30 +608,45 @@ def execute_rebase_interactive(data: RebaseInteractiveRequest):
         if not os.path.exists(os.path.join(base_path, ".git")):
             raise HTTPException(status_code=400, detail="Git repository not initialized.")
 
+        if not data.plan:
+            raise HTTPException(status_code=400, detail="Rebase plan must contain at least one commit.")
+        if len(data.plan) > 20:
+            raise HTTPException(status_code=400, detail="Rebase plan cannot exceed 20 commits.")
+
         # Build the rebase-todo content
+        import re as _re
+        _hash_re = _re.compile(r'^[0-9a-f]{4,40}$', _re.IGNORECASE)
         todo_lines = []
         for item in data.plan:
             action = item.action.strip().lower()
             if action not in ("pick", "squash", "fixup", "drop", "reword", "edit"):
                 action = "pick"
+            # Reject hashes that look like git flags or contain whitespace/newlines
+            safe_hash = item.hash.strip()
+            if not _hash_re.match(safe_hash):
+                raise HTTPException(status_code=400, detail=f"Invalid commit hash: {safe_hash!r}")
             msg = item.message.strip() if item.message else ""
+            # Strip newlines from message to prevent todo-file injection
+            msg = msg.replace('\n', ' ').replace('\r', '')
             if msg:
-                todo_lines.append(f"{action} {item.hash} {msg}")
+                todo_lines.append(f"{action} {safe_hash} {msg}")
             else:
-                todo_lines.append(f"{action} {item.hash}")
+                todo_lines.append(f"{action} {safe_hash}")
         todo_content = "\n".join(todo_lines) + "\n"
 
         # Write todo to a temp file and use it as GIT_SEQUENCE_EDITOR
         import tempfile as tmpmod
+        import sys as _sys
         todo_file = tmpmod.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8")
         todo_file.write(todo_content)
         todo_file.close()
 
-        # Use a simple script that just copies our pre-built todo file
-        if os.name == "nt":
-            editor_script = f'cmd /c copy /Y "{todo_file.name}" "$1"'
-        else:
-            editor_script = f'cp "{todo_file.name}" "$1"'
+        # Write a small Python helper that copies our pre-built todo over git's file.
+        # Using Python avoids shell-quoting differences ($1 vs %1) across platforms.
+        helper_file = tmpmod.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8")
+        helper_file.write(f"import shutil, sys\nshutil.copy2({repr(todo_file.name)}, sys.argv[1])\n")
+        helper_file.close()
+        editor_script = f'{_sys.executable} "{helper_file.name}"'
 
         env = os.environ.copy()
         env["GIT_SEQUENCE_EDITOR"] = editor_script
@@ -648,10 +668,11 @@ def execute_rebase_interactive(data: RebaseInteractiveRequest):
             timeout=15
         )
 
-        try:
-            os.unlink(todo_file.name)
-        except Exception:
-            pass
+        for _tmp in (todo_file.name, helper_file.name):
+            try:
+                os.unlink(_tmp)
+            except Exception:
+                pass
 
         output = result.stdout or result.stderr or "Rebase complete."
         success = result.returncode == 0

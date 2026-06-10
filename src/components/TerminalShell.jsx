@@ -82,7 +82,7 @@ function getSmartHint(command, output, lessonId) {
   return null
 }
 
-export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetTrigger, onRebaseInteractive }) {
+export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetTrigger, onRebaseInteractive, liveCommits, onSessionChange }) {
   const [pwd, setPwd] = useState('')
   const [branch, setBranch] = useState('main')
   const [history, setHistory] = useState([])
@@ -206,8 +206,8 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
         type: 'system',
         text: '📟 Opening interactive rebase editor… (Use the modal to arrange commits, then click Save & Execute)'
       }])
-      // Pass current commit graph from offline state or cached data
-      const commitsForModal = offlineState?.commits || []
+      // Prefer live backend commits; fall back to offline seed only when server is unreachable
+      const commitsForModal = (liveCommits && liveCommits.length > 0) ? liveCommits : (offlineState?.commits || [])
       onRebaseInteractive(commitsForModal, sessionId)
       return
     }
@@ -235,6 +235,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
         if (data.session_id) {
           setSessionId(data.session_id)
           localStorage.setItem("gitify_session_id", data.session_id)
+          if (onSessionChange) onSessionChange(data.session_id)
         }
 
         if (data.output === 'CLEAR_CONSOLE') {
@@ -1218,6 +1219,8 @@ function simulateCommandOffline(commandText, state, lessonId) {
           if (nextState.lessonId === 3 && mergeSrc === "feature/ui" && nextState.branch === "main") {
             nextState.conflict_active = true
             nextState.conflict_triggered = true
+            nextState.fileContents['config.js'] =
+              "export const config = {\n  api: '/v1',\n  retries: 3,\n<<<<<<< HEAD\n  theme: 'dark',\n=======\n  theme: 'light',\n>>>>>>> feature/ui\n};\n"
             output = "Auto-merging config.js\nCONFLICT (content): Merge conflict in config.js\nAutomatic merge failed; fix conflicts and then commit the result."
             status = "error"
           } else {

@@ -1,6 +1,20 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState, useEffect, useRef } from 'react'
 
 export default function LiveCommitGraph({ commits = [], onSelectCommit }) {
+  const [hoveredNode, setHoveredNode] = useState(null)
+  const [animatingHashes, setAnimatingHashes] = useState(new Set())
+  const seenHashesRef = useRef(new Set())
+
+  useEffect(() => {
+    const fresh = commits.filter(c => !seenHashesRef.current.has(c.hash)).map(c => c.hash)
+    if (fresh.length > 0) {
+      fresh.forEach(h => seenHashesRef.current.add(h))
+      setAnimatingHashes(new Set(fresh))
+      const t = setTimeout(() => setAnimatingHashes(new Set()), 500)
+      return () => clearTimeout(t)
+    }
+  }, [commits])
+
   const parsedGraph = useMemo(() => {
     if (!commits || commits.length === 0) return null
 
@@ -8,34 +22,38 @@ export default function LiveCommitGraph({ commits = [], onSelectCommit }) {
     const chronoCommits = [...commits].reverse()
     
     // 2. Assign coordinate lanes (vertical lines) dynamically
-    const branchLanes = {}
+    const branchLanes = { 'main': 0, 'master': 0 }
     let laneCounter = 0
+    // hashToLane resolves both short and full hashes
+    const hashToLane = {}
 
-    // Assign main to lane 0
-    branchLanes['main'] = 0
-    branchLanes['master'] = 0
-
-    const nodes = chronoCommits.map((commit, idx) => {
-      // Find branch label to determine lane
-      let lane = 0
-      
-      // Look for branch tags
+    // Process in chronological order (oldest first) so parents are resolved before children
+    chronoCommits.forEach(commit => {
       const branchLabel = commit.branches.find(b => b !== 'HEAD')
-      
+      let lane = 0
+
       if (branchLabel) {
         if (branchLanes[branchLabel] === undefined) {
           laneCounter++
           branchLanes[branchLabel] = laneCounter
         }
         lane = branchLanes[branchLabel]
-      } else {
-        // Fallback to parent lane if no direct branch label
-        lane = 0
+      } else if (commit.parents.length > 0) {
+        // Inherit lane from first known parent (parent is earlier in chronoCommits)
+        for (const pHash of commit.parents) {
+          const resolved = hashToLane[pHash] ?? hashToLane[commit.full_hash?.slice(0, pHash.length) === pHash ? commit.full_hash : pHash]
+          if (resolved !== undefined) { lane = resolved; break }
+        }
       }
 
-      // X coordinate spaced out
+      hashToLane[commit.hash] = lane
+      if (commit.full_hash) hashToLane[commit.full_hash] = lane
+    })
+
+    const nodes = chronoCommits.map((commit, idx) => {
+      const lane = hashToLane[commit.hash] ?? 0
+      const branchLabel = commit.branches.find(b => b !== 'HEAD') || ''
       const x = 50 + idx * 85
-      // Y coordinate based on lane index
       const y = 50 + lane * 60
 
       return {
@@ -43,7 +61,7 @@ export default function LiveCommitGraph({ commits = [], onSelectCommit }) {
         x,
         y,
         lane,
-        branchLabel: branchLabel || ''
+        branchLabel
       }
     })
 
@@ -131,16 +149,33 @@ export default function LiveCommitGraph({ commits = [], onSelectCommit }) {
           />
         ))}
 
+        {/* Hovered commit tooltip — rendered first (behind nodes) so nodes stay on top */}
+        {hoveredNode && (() => {
+          const msg = hoveredNode.message.length > 38 ? `${hoveredNode.message.slice(0, 36)}…` : hoveredNode.message
+          const tipW = Math.max(100, msg.length * 6.2 + 20)
+          const tipX = Math.min(Math.max(hoveredNode.x - tipW / 2, 4), width - tipW - 4)
+          const tipY = hoveredNode.y - 62
+          return (
+            <g className="commit-tooltip" style={{ pointerEvents: 'none' }}>
+              <rect x={tipX} y={tipY} width={tipW} height={36} rx="5" fill="rgba(15,23,42,0.97)" stroke="#475569" strokeWidth="1" />
+              <text x={tipX + tipW / 2} y={tipY + 14} fill="#e2e8f0" fontSize="9.5" fontWeight="600" fontFamily="monospace" textAnchor="middle">{msg}</text>
+              <text x={tipX + tipW / 2} y={tipY + 28} fill="#64748b" fontSize="8" fontFamily="monospace" textAnchor="middle">{hoveredNode.full_hash?.slice(0, 8) || hoveredNode.hash}</text>
+            </g>
+          )
+        })()}
+
         {/* Render nodes */}
         {nodes.map(node => {
           const glowFilter = node.is_head ? 'drop-shadow(0px 0px 8px #10b981)' : 'none'
           const nodeColor = node.is_head ? '#10b981' : node.parents.length > 1 ? '#a78bfa' : '#38bdf8'
           const nodeSize = node.is_head ? '9' : '7.5'
 
+          const isAnimating = animatingHashes.has(node.hash)
+
           return (
-            <g 
-              key={node.hash} 
-              className="commit-node-group"
+            <g
+              key={node.hash}
+              className={`commit-node-group${isAnimating ? ' commit-node-new' : ''}`}
               role="button"
               tabIndex={0}
               aria-label={`Commit ${node.hash}: ${node.message}`}
@@ -151,6 +186,8 @@ export default function LiveCommitGraph({ commits = [], onSelectCommit }) {
                   onSelectCommit && onSelectCommit(node);
                 }
               }}
+              onMouseEnter={() => setHoveredNode(node)}
+              onMouseLeave={() => setHoveredNode(null)}
               style={{ transition: 'all 0.3s ease', outline: 'none' }}
             >
               {/* Highlight circle ring */}
@@ -244,11 +281,19 @@ export default function LiveCommitGraph({ commits = [], onSelectCommit }) {
           0% { transform: scale(0.85); opacity: 0.8; }
           100% { transform: scale(1.4); opacity: 0; }
         }
+        @keyframes node-enter {
+          0% { transform: scale(0); opacity: 0; }
+          70% { transform: scale(1.25); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
         .head-pulse {
           animation: pulse-ring 2s cubic-bezier(0.215, 0.610, 0.355, 1) infinite;
         }
         .commit-node-group {
           cursor: pointer;
+        }
+        .commit-node-new circle {
+          animation: node-enter 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
         .commit-node-group:hover circle {
           transform: scale(1.3);
@@ -259,6 +304,7 @@ export default function LiveCommitGraph({ commits = [], onSelectCommit }) {
           stroke-width: 3.5px;
           transform: scale(1.3);
         }
+        .commit-tooltip text { user-select: none; }
       `}</style>
     </div>
   )
