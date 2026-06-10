@@ -35,12 +35,15 @@ export function getInitialOfflineState(lessonId) {
     ]
   } else if (lessonId === 3) {
     base.initialized = true
+    base.branches = ['main', 'feature/ui']
     base.files = ['config.js']
     base.fileContents = {
-      'config.js': "export const config = {\n  api: '/v1',\n  retries: 3,\n  theme: 'system'\n};\n"
+      'config.js': "export const config = {\n  api: '/v1',\n  retries: 3,\n  theme: 'dark'\n};\n"
     }
     base.commits = [
-      { hash: 'c1c1c1c', full_hash: 'c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1', message: 'Base config', branches: ['main'], parents: [], is_head: true }
+      { hash: 'c1c1c1c', full_hash: 'c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1', message: 'Base config', branches: [], parents: [], is_head: false },
+      { hash: 'c2c2c2c', full_hash: 'c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2', message: 'ALEX: set dark theme', branches: ['main'], parents: ['c1c1c1c'], is_head: true },
+      { hash: 'd1d1d1d', full_hash: 'd1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1', message: 'SAM: set light theme', branches: ['feature/ui'], parents: ['c1c1c1c'], is_head: false }
     ]
   } else if (lessonId === 4) {
     base.initialized = true

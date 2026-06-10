@@ -2,10 +2,29 @@ import React, { useState, useEffect } from 'react'
 import './FileInspector.css'
 import { apiUrl } from '../api.js'
 
+function computeLineDiff(original, modified) {
+  const a = original.split('\n')
+  const b = modified.split('\n')
+  const m = a.length, n = b.length
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0))
+  for (let i = m - 1; i >= 0; i--)
+    for (let j = n - 1; j >= 0; j--)
+      dp[i][j] = a[i] === b[j] ? dp[i+1][j+1] + 1 : Math.max(dp[i+1][j], dp[i][j+1])
+  const result = []
+  let i = 0, j = 0
+  while (i < m || j < n) {
+    if (i < m && j < n && a[i] === b[j]) { result.push({ type: 'context', text: a[i] }); i++; j++ }
+    else if (j < n && (i >= m || dp[i+1][j] <= dp[i][j+1])) { result.push({ type: 'added', text: b[j] }); j++ }
+    else { result.push({ type: 'removed', text: a[i] }); i++ }
+  }
+  return result
+}
+
 export default function FileInspector({ files = [], fileContents = {}, sessionId, onFileEdit }) {
   const [selectedFile, setSelectedFile] = useState('')
   const [isEditing, setIsEditing] = useState(false)
   const [editBuffer, setEditBuffer] = useState('')
+  const [showDiff, setShowDiff] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
 
@@ -32,11 +51,13 @@ export default function FileInspector({ files = [], fileContents = {}, sessionId
   const startEdit = () => {
     setEditBuffer(content)
     setIsEditing(true)
+    setShowDiff(false)
     setSaveMsg('')
   }
 
   const cancelEdit = () => {
     setIsEditing(false)
+    setShowDiff(false)
     setSaveMsg('')
   }
 
@@ -151,9 +172,17 @@ export default function FileInspector({ files = [], fileContents = {}, sessionId
                 ) : (
                   <div className="edit-actions-bar">
                     <button
+                      className={`diff-toggle-btn ${showDiff ? 'active' : ''}`}
+                      onClick={() => setShowDiff(d => !d)}
+                      aria-label="Toggle diff preview"
+                      title="Preview changes"
+                    >
+                      {showDiff ? '✏️ Edit' : '± Diff'}
+                    </button>
+                    <button
                       className="save-btn"
                       onClick={saveEdit}
-                      disabled={isSaving}
+                      disabled={isSaving || showDiff}
                       aria-label="Save file changes"
                     >
                       {isSaving ? '⏳' : '💾 Save'}
@@ -171,7 +200,27 @@ export default function FileInspector({ files = [], fileContents = {}, sessionId
             </div>
 
             <div className="code-pretext-wrapper">
-              {isEditing ? (
+              {isEditing && showDiff ? (
+                <pre className="code-editor-pre diff-preview">
+                  <code>
+                    {computeLineDiff(content, editBuffer).map((entry, i) => (
+                      <div
+                        key={i}
+                        className={`code-line-row diff-line-${entry.type}`}
+                        style={{
+                          background: entry.type === 'added' ? 'rgba(34,197,94,0.12)' : entry.type === 'removed' ? 'rgba(239,68,68,0.12)' : 'transparent',
+                          color: entry.type === 'added' ? '#86efac' : entry.type === 'removed' ? '#fca5a5' : undefined
+                        }}
+                      >
+                        <span className="line-number" style={{ color: entry.type === 'added' ? '#4ade80' : entry.type === 'removed' ? '#f87171' : undefined }}>
+                          {entry.type === 'added' ? '+' : entry.type === 'removed' ? '-' : ' '}
+                        </span>
+                        <span className="line-text">{entry.text}</span>
+                      </div>
+                    ))}
+                  </code>
+                </pre>
+              ) : isEditing ? (
                 <textarea
                   className="edit-textarea"
                   value={editBuffer}

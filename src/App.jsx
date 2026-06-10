@@ -45,6 +45,7 @@ export default function App() {
   const [rebasePlan, setRebasePlan] = useState([]) // [{ hash, message, action }]
   const [rebaseSessionId, setRebaseSessionId] = useState(null)
   const [isRebasing, setIsRebasing] = useState(false)
+  const [rebaseDragIdx, setRebaseDragIdx] = useState(null)
 
   const currentLessonIndex = lessonOrder.indexOf(currentLesson)
   const nextLesson = lessonOrder[currentLessonIndex + 1]
@@ -139,6 +140,18 @@ export default function App() {
     setRebaseSessionId(sid)
     setRebaseModalOpen(true)
   }
+
+  const handleRebaseDragStart = (idx) => setRebaseDragIdx(idx)
+  const handleRebaseDragOver = (e, idx) => {
+    e.preventDefault()
+    if (rebaseDragIdx === null || rebaseDragIdx === idx) return
+    const updated = [...rebasePlan]
+    const [moved] = updated.splice(rebaseDragIdx, 1)
+    updated.splice(idx, 0, moved)
+    setRebasePlan(updated)
+    setRebaseDragIdx(idx)
+  }
+  const handleRebaseDragEnd = () => setRebaseDragIdx(null)
 
   const submitRebasePlan = () => {
     setIsRebasing(true)
@@ -525,12 +538,21 @@ export default function App() {
             {/* Commit rows */}
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
               {rebasePlan.map((commit, idx) => (
-                <div key={commit.hash} style={{
-                  display: 'flex', alignItems: 'center', gap: '10px',
-                  background: commit.action === 'drop' ? 'rgba(248,113,113,0.06)' : commit.action === 'squash' ? 'rgba(167,139,250,0.07)' : 'rgba(255,255,255,0.03)',
-                  border: `1px solid ${ commit.action === 'drop' ? 'rgba(248,113,113,0.2)' : commit.action === 'squash' ? 'rgba(167,139,250,0.2)' : 'rgba(255,255,255,0.06)'}`,
-                  borderRadius: '8px', padding: '10px 12px'
-                }}>
+                <div
+                  key={commit.hash}
+                  draggable={!isRebasing}
+                  onDragStart={() => handleRebaseDragStart(idx)}
+                  onDragOver={(e) => handleRebaseDragOver(e, idx)}
+                  onDragEnd={handleRebaseDragEnd}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    background: rebaseDragIdx === idx ? 'rgba(56,189,248,0.08)' : commit.action === 'drop' ? 'rgba(248,113,113,0.06)' : commit.action === 'squash' ? 'rgba(167,139,250,0.07)' : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${ rebaseDragIdx === idx ? 'rgba(56,189,248,0.4)' : commit.action === 'drop' ? 'rgba(248,113,113,0.2)' : commit.action === 'squash' ? 'rgba(167,139,250,0.2)' : 'rgba(255,255,255,0.06)'}`,
+                    borderRadius: '8px', padding: '10px 12px', cursor: isRebasing ? 'not-allowed' : 'grab',
+                    transition: 'background 0.15s, border-color 0.15s'
+                  }}
+                >
+                  <span style={{ color: '#475569', fontSize: '1rem', cursor: 'grab', userSelect: 'none', lineHeight: 1 }} title="Drag to reorder">⠿</span>
                   <span style={{ color: '#475569', fontSize: '0.75rem', minWidth: '16px' }}>{idx + 1}</span>
                   <select
                     value={commit.action}

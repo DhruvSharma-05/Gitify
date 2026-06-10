@@ -1219,6 +1219,8 @@ function simulateCommandOffline(commandText, state, lessonId) {
           if (nextState.lessonId === 3 && mergeSrc === "feature/ui" && nextState.branch === "main") {
             nextState.conflict_active = true
             nextState.conflict_triggered = true
+            nextState.fileContents['config.js'] =
+              "export const config = {\n  api: '/v1',\n  retries: 3,\n<<<<<<< HEAD\n  theme: 'dark',\n=======\n  theme: 'light',\n>>>>>>> feature/ui\n};\n"
             output = "Auto-merging config.js\nCONFLICT (content): Merge conflict in config.js\nAutomatic merge failed; fix conflicts and then commit the result."
             status = "error"
           } else {

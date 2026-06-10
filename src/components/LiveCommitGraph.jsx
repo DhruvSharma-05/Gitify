@@ -22,34 +22,38 @@ export default function LiveCommitGraph({ commits = [], onSelectCommit }) {
     const chronoCommits = [...commits].reverse()
     
     // 2. Assign coordinate lanes (vertical lines) dynamically
-    const branchLanes = {}
+    const branchLanes = { 'main': 0, 'master': 0 }
     let laneCounter = 0
+    // hashToLane resolves both short and full hashes
+    const hashToLane = {}
 
-    // Assign main to lane 0
-    branchLanes['main'] = 0
-    branchLanes['master'] = 0
-
-    const nodes = chronoCommits.map((commit, idx) => {
-      // Find branch label to determine lane
-      let lane = 0
-      
-      // Look for branch tags
+    // Process in chronological order (oldest first) so parents are resolved before children
+    chronoCommits.forEach(commit => {
       const branchLabel = commit.branches.find(b => b !== 'HEAD')
-      
+      let lane = 0
+
       if (branchLabel) {
         if (branchLanes[branchLabel] === undefined) {
           laneCounter++
           branchLanes[branchLabel] = laneCounter
         }
         lane = branchLanes[branchLabel]
-      } else {
-        // Fallback to parent lane if no direct branch label
-        lane = 0
+      } else if (commit.parents.length > 0) {
+        // Inherit lane from first known parent (parent is earlier in chronoCommits)
+        for (const pHash of commit.parents) {
+          const resolved = hashToLane[pHash] ?? hashToLane[commit.full_hash?.slice(0, pHash.length) === pHash ? commit.full_hash : pHash]
+          if (resolved !== undefined) { lane = resolved; break }
+        }
       }
 
-      // X coordinate spaced out
+      hashToLane[commit.hash] = lane
+      if (commit.full_hash) hashToLane[commit.full_hash] = lane
+    })
+
+    const nodes = chronoCommits.map((commit, idx) => {
+      const lane = hashToLane[commit.hash] ?? 0
+      const branchLabel = commit.branches.find(b => b !== 'HEAD') || ''
       const x = 50 + idx * 85
-      // Y coordinate based on lane index
       const y = 50 + lane * 60
 
       return {
@@ -57,7 +61,7 @@ export default function LiveCommitGraph({ commits = [], onSelectCommit }) {
         x,
         y,
         lane,
-        branchLabel: branchLabel || ''
+        branchLabel
       }
     })
 
