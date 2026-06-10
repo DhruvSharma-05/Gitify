@@ -151,7 +151,10 @@ export default function App() {
         plan: rebasePlan.map(c => ({ hash: c.hash, action: c.action, message: c.message }))
       })
     })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`Server error ${res.status}`)
+        return res.json()
+      })
       .then(data => {
         setIsRebasing(false)
         setRebaseModalOpen(false)
@@ -207,7 +210,7 @@ export default function App() {
       .catch(err => {
         setIsLoadingCommit(false)
         console.warn("Could not fetch commit details:", err)
-        setCommitDetails(`Commit: ${commit.hash}\nMessage: ${commit.message}\nBranch: ${commit.branches.join(', ') || 'none'}\n\n(Note: Connect to the running FastAPI backend to view full file diffs)`)
+        setCommitDetails(`Commit: ${commit.hash}\nMessage: ${commit.message}\nBranch: ${Array.isArray(commit.branches) && commit.branches.length ? commit.branches.join(', ') : 'none'}\n\n(Note: Connect to the running FastAPI backend to view full file diffs)`)
       })
   }
 
@@ -369,6 +372,8 @@ export default function App() {
           onSuccess={() => handleVerifySuccess(currentLesson)}
           resetTrigger={resetTrigger}
           onRebaseInteractive={handleRebaseInteractive}
+          liveCommits={commitsGraph}
+          onSessionChange={setSessionId}
         />
       )}
 

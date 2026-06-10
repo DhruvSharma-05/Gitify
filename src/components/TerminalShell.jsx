@@ -82,7 +82,7 @@ function getSmartHint(command, output, lessonId) {
   return null
 }
 
-export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetTrigger, onRebaseInteractive }) {
+export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetTrigger, onRebaseInteractive, liveCommits, onSessionChange }) {
   const [pwd, setPwd] = useState('')
   const [branch, setBranch] = useState('main')
   const [history, setHistory] = useState([])
@@ -206,8 +206,8 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
         type: 'system',
         text: '📟 Opening interactive rebase editor… (Use the modal to arrange commits, then click Save & Execute)'
       }])
-      // Pass current commit graph from offline state or cached data
-      const commitsForModal = offlineState?.commits || []
+      // Prefer live backend commits; fall back to offline seed only when server is unreachable
+      const commitsForModal = (liveCommits && liveCommits.length > 0) ? liveCommits : (offlineState?.commits || [])
       onRebaseInteractive(commitsForModal, sessionId)
       return
     }
@@ -235,6 +235,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
         if (data.session_id) {
           setSessionId(data.session_id)
           localStorage.setItem("gitify_session_id", data.session_id)
+          if (onSessionChange) onSessionChange(data.session_id)
         }
 
         if (data.output === 'CLEAR_CONSOLE') {

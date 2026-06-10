@@ -138,7 +138,7 @@ def verify_lesson_5(commands):
             run_git_command(temp_dir, cmd_parts[1:])
             
         code, stash_out, _ = run_git_command(temp_dir, ["stash", "list"])
-        has_stash = len(stash_out.strip()) > 0 or (os.path.exists(os.path.join(temp_dir, "Checkout.jsx")) and os.path.exists(os.path.join(temp_dir, "styles.css")))
+        has_stash = len(stash_out.strip()) > 0
         
         code, log_out, _ = run_git_command(temp_dir, ["log", "--oneline"])
         has_pick = "Fix tax rounding" in log_out
@@ -663,7 +663,7 @@ def check_sandbox_state(repo_path, lesson_id):
                 rebase_started = "debug payment state" not in log_out.lower()
                 
                 # Squashed: checkout form and fixed typo are squashed or message merged
-                commits_squashed = rebase_started and not any("fix typo" in line.lower() for line in log_lines)
+                commits_squashed = rebase_started and not any("fix typo" in line.lower() for line in log_lines) and not any("add checkout form" in line.lower() for line in log_lines)
                 
                 # Clean: total commit count is reduced and has linear structure
                 timeline_clean = rebase_started and commits_squashed and len(log_lines) <= 4
