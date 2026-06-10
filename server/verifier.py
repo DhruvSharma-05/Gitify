@@ -85,6 +85,14 @@ def verify_lesson_2(commands):
             
         # Validations
         code, stdout, stderr = run_git_command(temp_dir, ["branch", "-a"])
+        br_exists = "feature/auth" in stdout
+        if not br_exists:
+            return False, "Branch 'feature/auth' not found."
+
+        code, merged_branches, _ = run_git_command(temp_dir, ["branch", "--merged"])
+        if "feature/auth" not in merged_branches:
+            return False, "Branch 'feature/auth' is not merged into main."
+
         code, log_out, stderr = run_git_command(temp_dir, ["log", "--oneline"])
         commits = log_out.strip().split("\n")
         if len(commits) < 2:
@@ -130,7 +138,7 @@ def verify_lesson_5(commands):
             run_git_command(temp_dir, cmd_parts[1:])
             
         code, stash_out, _ = run_git_command(temp_dir, ["stash", "list"])
-        has_stash = len(stash_out.strip()) > 0
+        has_stash = len(stash_out.strip()) > 0 or (os.path.exists(os.path.join(temp_dir, "Checkout.jsx")) and os.path.exists(os.path.join(temp_dir, "styles.css")))
         
         code, log_out, _ = run_git_command(temp_dir, ["log", "--oneline"])
         has_pick = "Fix tax rounding" in log_out
@@ -168,6 +176,17 @@ def verify_simulated_state(lesson_id, state):
             return True, "History repaired successfully!"
         return False, "Inspect the log and revert the broken commit or hard reset."
         
+    elif lesson_id == 5:
+        files = state.get("files", [])
+        picked = state.get("picked", [])
+        has_pick = "b7a91c" in picked
+        has_popped = "Checkout.jsx" in files and "styles.css" in files
+        if has_pick and has_popped:
+            return True, "Stash and cherry-pick completed successfully!"
+        if not has_pick:
+            return False, "Please cherry-pick the hotfix commit b7a91c."
+        return False, "Please stash your WIP files, switch branches, cherry-pick, and then pop your stash."
+
     elif lesson_id == 6:
         push_state = state.get("pushState")
         if push_state == "pushed":
@@ -644,7 +663,7 @@ def check_sandbox_state(repo_path, lesson_id):
                 rebase_started = "debug payment state" not in log_out.lower()
                 
                 # Squashed: checkout form and fixed typo are squashed or message merged
-                commits_squashed = rebase_started and not ("Fix typo in payment copy" in log_out and "Add checkout form" in log_out)
+                commits_squashed = rebase_started and not any("fix typo" in line.lower() for line in log_lines)
                 
                 # Clean: total commit count is reduced and has linear structure
                 timeline_clean = rebase_started and commits_squashed and len(log_lines) <= 4

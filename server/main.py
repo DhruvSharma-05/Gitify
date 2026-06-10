@@ -1,16 +1,30 @@
+from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
+import os
+import shlex
 import database
 import verifier
 
 app = FastAPI(title="Gitify API", version="0.1.0")
 
+cors_origins = [
+    origin.strip()
+    for origin in os.environ.get(
+        "GITIFY_CORS_ORIGINS",
+        "http://localhost:5173,http://localhost:3000,http://localhost:8080",
+    ).split(",")
+    if origin.strip()
+]
+cors_origin_regex = os.environ.get("GITIFY_CORS_ORIGIN_REGEX")
+
 # Setup CORS middleware to allow cross-origin requests from our React App
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=cors_origins,
+    allow_origin_regex=cors_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -112,12 +126,86 @@ class ResetRequest(BaseModel):
 
 import tempfile
 import uuid
-import os
-import subprocess
 import shutil
 
 BASE_SANDBOX_DIR=os.path.join(tempfile.gettempdir(),"gitify")
 SESSION_SANDBOXES = {}
+SESSION_ROOT = Path(os.environ.get("GITIFY_SESSION_ROOT", os.path.join(tempfile.gettempdir(), "gitify-sessions"))).resolve()
+SESSION_ROOT.mkdir(parents=True, exist_ok=True)
+
+def create_session_dir() -> str:
+    return tempfile.mkdtemp(prefix="gitify_session_", dir=str(SESSION_ROOT))
+
+def resolve_sandbox_path(base_path: str, cwd_rel: str, user_path: str = "") -> str:
+    base = Path(base_path).resolve()
+    candidate = (base / cwd_rel / user_path).resolve()
+    if candidate != base and base not in candidate.parents:
+        raise ValueError("Access denied: Cannot access outside sandbox.")
+    return str(candidate)
+
+def run_sandbox_command(base_path: str, cwd_rel: str, parts: List[str]):
+    base_cmd = parts[0]
+    args = parts[1:]
+
+    try:
+        if base_cmd in ["ls", "dir"]:
+            target = resolve_sandbox_path(base_path, cwd_rel, args[0] if args else "")
+            if not os.path.exists(target):
+                return -1, "", f"{base_cmd}: no such file or directory"
+            if os.path.isdir(target):
+                return 0, "\n".join(sorted(os.listdir(target))), ""
+            return 0, os.path.basename(target), ""
+
+        if base_cmd in ["cat", "type"]:
+            if not args:
+                return -1, "", f"{base_cmd}: missing file operand"
+            target = resolve_sandbox_path(base_path, cwd_rel, args[0])
+            with open(target, "r", encoding="utf-8", errors="ignore") as file:
+                return 0, file.read(), ""
+
+        if base_cmd == "echo":
+            return 0, " ".join(args), ""
+
+        if base_cmd == "touch":
+            if not args:
+                return -1, "", "touch: missing file operand"
+            target = resolve_sandbox_path(base_path, cwd_rel, args[0])
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            Path(target).touch()
+            return 0, "", ""
+
+        if base_cmd == "mkdir":
+            if not args:
+                return -1, "", "mkdir: missing operand"
+            os.makedirs(resolve_sandbox_path(base_path, cwd_rel, args[0]), exist_ok=True)
+            return 0, "", ""
+
+        if base_cmd == "rm":
+            if not args:
+                return -1, "", "rm: missing operand"
+            target = resolve_sandbox_path(base_path, cwd_rel, args[-1])
+            if os.path.isdir(target):
+                shutil.rmtree(target)
+            else:
+                os.remove(target)
+            return 0, "", ""
+
+        if base_cmd in ["mv", "cp"]:
+            if len(args) < 2:
+                return -1, "", f"{base_cmd}: missing file operand"
+            source = resolve_sandbox_path(base_path, cwd_rel, args[0])
+            target = resolve_sandbox_path(base_path, cwd_rel, args[1])
+            if base_cmd == "mv":
+                shutil.move(source, target)
+            elif os.path.isdir(source):
+                shutil.copytree(source, target, dirs_exist_ok=True)
+            else:
+                shutil.copy2(source, target)
+            return 0, "", ""
+    except Exception as exc:
+        return -1, "", str(exc)
+
+    return -1, "", f"Command '{base_cmd}' is not supported."
 
 @app.post("/api/terminal/execute")
 def execute_terminal_command(data: TerminalExecuteRequest):
@@ -138,7 +226,7 @@ def execute_terminal_command(data: TerminalExecuteRequest):
         session_obj = SESSION_SANDBOXES[session_id]
         base_path = session_obj["base_path"]
         cwd_rel = session_obj["cwd_relative"]
-        exec_cwd = os.path.normpath(os.path.join(base_path, cwd_rel))
+        exec_cwd = resolve_sandbox_path(base_path, cwd_rel)
         
         # Ensure temp folder exists
         if not os.path.exists(base_path):
@@ -218,7 +306,7 @@ def execute_terminal_command(data: TerminalExecuteRequest):
                         "sync_state": {"branch": "main", "files": [], "stashes": [], "picked": [], "pwd": cwd_rel}
                     }
                 
-                full_path = os.path.join(base_path, candidate)
+                full_path = resolve_sandbox_path(base_path, "", candidate)
                 if os.path.exists(full_path) and os.path.isdir(full_path):
                     new_cwd_rel = candidate
                 else:
@@ -271,19 +359,7 @@ def execute_terminal_command(data: TerminalExecuteRequest):
             except Exception as e:
                 code, stdout, stderr = -1, "", str(e)
         else:
-            try:
-                res = subprocess.run(
-                    parts,
-                    cwd=exec_cwd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    timeout=4,
-                    shell=True if os.name == 'nt' else False
-                )
-                code, stdout, stderr = res.returncode, res.stdout, res.stderr
-            except Exception as e:
-                code, stdout, stderr = -1, "", str(e)
+            code, stdout, stderr = run_sandbox_command(base_path, cwd_rel, parts)
                 
         # 4. Check exercise checklist checkpoints state on disk!
         verified, v_msg, subtasks = verifier.check_sandbox_state(base_path, data.lesson_id)
@@ -452,8 +528,212 @@ def load_checkpoints(lesson_id: int, username: str = "student"):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+class CommitDetailsRequest(BaseModel):
+    commit_hash: str
+    lesson_id: Optional[int] = None
+    session_id: Optional[str] = None
+
+@app.post("/api/terminal/commit-details")
+def get_commit_details(data: CommitDetailsRequest):
+    try:
+        # Support both lesson_id (new) and session_id (legacy fallback)
+        if data.lesson_id is not None:
+            session_id = f"lesson_{data.lesson_id}"
+        elif data.session_id:
+            session_id = data.session_id.strip()
+        else:
+            raise HTTPException(status_code=400, detail="Either lesson_id or session_id is required.")
+
+        # Auto-register sandbox if it doesn't exist
+        if session_id not in SESSION_SANDBOXES:
+            if data.lesson_id is not None:
+                temp_dir = os.path.normpath(os.path.join(BASE_SANDBOX_DIR, f"lesson_{data.lesson_id}"))
+                if os.path.exists(temp_dir):
+                    SESSION_SANDBOXES[session_id] = {"base_path": temp_dir, "cwd_relative": ""}
+                else:
+                    raise HTTPException(status_code=404, detail="Sandbox not found. Initialize by running a command first.")
+            else:
+                raise HTTPException(status_code=404, detail="Session sandbox not found.")
+
+        base_path = SESSION_SANDBOXES[session_id]["base_path"]
+        if not os.path.exists(os.path.join(base_path, ".git")):
+            raise HTTPException(status_code=400, detail="Git repository not initialized in sandbox.")
+            
+        code, stdout, stderr = verifier.run_git_command(base_path, ["show", "--stat", data.commit_hash])
+        if code != 0:
+            raise HTTPException(status_code=400, detail=stderr or "Failed to retrieve commit details.")
+            
+        return {
+            "status": "success",
+            "details": stdout
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class WriteFileRequest(BaseModel):
+    lesson_id: int
+    filename: str
+    content: str
+
+@app.post("/api/terminal/write-file")
+def write_sandbox_file(data: WriteFileRequest):
+    """Writes edited file content into the user's sandbox workspace."""
+    try:
+        session_id = f"lesson_{data.lesson_id}"
+
+        # Auto-register sandbox if it doesn't exist yet
+        if session_id not in SESSION_SANDBOXES:
+            temp_dir = os.path.normpath(os.path.join(BASE_SANDBOX_DIR, f"lesson_{data.lesson_id}"))
+            os.makedirs(temp_dir, exist_ok=True)
+            SESSION_SANDBOXES[session_id] = {
+                "base_path": temp_dir,
+                "cwd_relative": ""
+            }
+
+        base_path = SESSION_SANDBOXES[session_id]["base_path"]
+
+        if not os.path.exists(base_path):
+            raise HTTPException(status_code=404, detail="Sandbox directory not found. Please run a command first to initialize it.")
+
+        # Security: only allow simple filenames, no path traversal
+        filename = os.path.basename(data.filename)
+        if not filename or filename.startswith(".git"):
+            raise HTTPException(status_code=400, detail="Invalid filename.")
+
+        file_path = os.path.join(base_path, filename)
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(data.content)
+
+        # Return updated workspace state
+        files_list = []
+        try:
+            for item in os.listdir(base_path):
+                if item != ".git" and os.path.isfile(os.path.join(base_path, item)):
+                    files_list.append(item)
+        except Exception:
+            pass
+
+        file_contents = verifier.get_workspace_files_content(base_path)
+        commits_graph = verifier.get_live_commit_graph(base_path)
+
+        return {
+            "status": "success",
+            "message": f"File '{filename}' saved successfully.",
+            "sync_state": {
+                "files": files_list,
+                "file_contents": file_contents,
+                "commits_graph": commits_graph
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class RebasePlanItem(BaseModel):
+    hash: str
+    action: str  # pick | squash | drop | reword
+    message: Optional[str] = ""
+
+class RebaseInteractiveRequest(BaseModel):
+    session_id: str
+    lesson_id: int
+    plan: List[RebasePlanItem]
+
+@app.post("/api/terminal/rebase-interactive")
+def execute_rebase_interactive(data: RebaseInteractiveRequest):
+    """Applies an interactive rebase plan to the sandbox repository."""
+    import subprocess
+    try:
+        session_id = data.session_id.strip()
+        if session_id not in SESSION_SANDBOXES:
+            raise HTTPException(status_code=404, detail="Session sandbox not found.")
+
+        base_path = SESSION_SANDBOXES[session_id]["base_path"]
+        if not os.path.exists(os.path.join(base_path, ".git")):
+            raise HTTPException(status_code=400, detail="Git repository not initialized.")
+
+        # Build the rebase-todo content
+        todo_lines = []
+        for item in data.plan:
+            action = item.action.strip().lower()
+            if action not in ("pick", "squash", "fixup", "drop", "reword", "edit"):
+                action = "pick"
+            msg = item.message.strip() if item.message else ""
+            if msg:
+                todo_lines.append(f"{action} {item.hash} {msg}")
+            else:
+                todo_lines.append(f"{action} {item.hash}")
+        todo_content = "\n".join(todo_lines) + "\n"
+
+        # Write todo to a temp file and use it as GIT_SEQUENCE_EDITOR
+        import tempfile as tmpmod
+        todo_file = tmpmod.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8")
+        todo_file.write(todo_content)
+        todo_file.close()
+
+        # Use a simple script that just copies our pre-built todo file
+        if os.name == "nt":
+            editor_script = f'cmd /c copy /Y "{todo_file.name}" "$1"'
+        else:
+            editor_script = f'cp "{todo_file.name}" "$1"'
+
+        env = os.environ.copy()
+        env["GIT_SEQUENCE_EDITOR"] = editor_script
+        env["GIT_CONFIG_NOSYSTEM"] = "1"
+        env["GIT_AUTHOR_NAME"] = "Gitify Student"
+        env["GIT_AUTHOR_EMAIL"] = "student@gitify.edu"
+        env["GIT_COMMITTER_NAME"] = "Gitify Student"
+        env["GIT_COMMITTER_EMAIL"] = "student@gitify.edu"
+        env["GIT_EDITOR"] = "true"  # accept default commit messages
+
+        n = len(data.plan)
+        result = subprocess.run(
+            ["git", "rebase", "-i", f"HEAD~{n}"],
+            cwd=base_path,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=env,
+            timeout=15
+        )
+
+        try:
+            os.unlink(todo_file.name)
+        except Exception:
+            pass
+
+        output = result.stdout or result.stderr or "Rebase complete."
+        success = result.returncode == 0
+
+        verified, v_msg, subtasks = verifier.check_sandbox_state(base_path, data.lesson_id)
+        commits_graph = verifier.get_live_commit_graph(base_path)
+        file_contents = verifier.get_workspace_files_content(base_path)
+
+        files_list = []
+        try:
+            for item in os.listdir(base_path):
+                if item != ".git" and os.path.isfile(os.path.join(base_path, item)):
+                    files_list.append(item)
+        except Exception:
+            pass
+
+        return {
+            "status": "success" if success else "error",
+            "output": output,
+            "verified": verified,
+            "validation_message": v_msg,
+            "subtasks": subtasks,
+            "sync_state": {
+                "files": files_list,
+                "file_contents": file_contents,
+                "commits_graph": commits_graph
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/health")
 def health_check():
     return {"status": "healthy", "service": "Gitify Python Backend"}
-
-

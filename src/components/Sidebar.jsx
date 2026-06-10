@@ -24,7 +24,7 @@ export default function Sidebar({ isOpen, onClose, currentLesson, onSelectLesson
       <div className={`sidebar ${isOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <h2>Menu</h2>
-          <button className="close-btn" onClick={onClose}>×</button>
+          <button className="close-btn" onClick={onClose} aria-label="Close sidebar">×</button>
         </div>
 
         <div className="lesson-list">

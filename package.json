@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "lint": "node scripts/lint-frontend.mjs",
+    "test": "node scripts/test-frontend.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

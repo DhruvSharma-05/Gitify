@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react'
 
-export default function LiveCommitGraph({ commits = [] }) {
+export default function LiveCommitGraph({ commits = [], onSelectCommit }) {
   const parsedGraph = useMemo(() => {
     if (!commits || commits.length === 0) return null
 
@@ -138,7 +138,21 @@ export default function LiveCommitGraph({ commits = [] }) {
           const nodeSize = node.is_head ? '9' : '7.5'
 
           return (
-            <g key={node.hash} style={{ transition: 'all 0.3s ease' }}>
+            <g 
+              key={node.hash} 
+              className="commit-node-group"
+              role="button"
+              tabIndex={0}
+              aria-label={`Commit ${node.hash}: ${node.message}`}
+              onClick={() => onSelectCommit && onSelectCommit(node)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onSelectCommit && onSelectCommit(node);
+                }
+              }}
+              style={{ transition: 'all 0.3s ease', outline: 'none' }}
+            >
               {/* Highlight circle ring */}
               {node.is_head && (
                 <circle
@@ -162,7 +176,11 @@ export default function LiveCommitGraph({ commits = [] }) {
                 fill={nodeColor}
                 stroke="#0f172a"
                 strokeWidth="2.5"
-                style={{ filter: glowFilter }}
+                style={{ 
+                  transformOrigin: `${node.x}px ${node.y}px`, 
+                  transition: 'all 0.25s ease', 
+                  filter: glowFilter 
+                }}
               />
 
               {/* Branch name tag pills */}
@@ -220,7 +238,7 @@ export default function LiveCommitGraph({ commits = [] }) {
         })}
       </svg>
       
-      {/* Styles for pulsing HEAD animation */}
+      {/* Styles for pulsing HEAD animation and node interactions */}
       <style>{`
         @keyframes pulse-ring {
           0% { transform: scale(0.85); opacity: 0.8; }
@@ -228,6 +246,18 @@ export default function LiveCommitGraph({ commits = [] }) {
         }
         .head-pulse {
           animation: pulse-ring 2s cubic-bezier(0.215, 0.610, 0.355, 1) infinite;
+        }
+        .commit-node-group {
+          cursor: pointer;
+        }
+        .commit-node-group:hover circle {
+          transform: scale(1.3);
+          stroke: #ffffff;
+        }
+        .commit-node-group:focus circle {
+          stroke: #fbbf24;
+          stroke-width: 3.5px;
+          transform: scale(1.3);
         }
       `}</style>
     </div>

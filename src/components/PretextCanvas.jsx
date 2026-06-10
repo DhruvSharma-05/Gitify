@@ -48,6 +48,9 @@ const scenes = {
   },
   rebaseClean: {
     commits: ['Add checkout form', 'Wire Stripe token', 'Handle declined cards']
+  },
+  playgroundFlow: {
+    columns: ['Working', 'Staging', 'Local', 'Remote']
   }
 }
 
@@ -101,6 +104,7 @@ export default function PretextCanvas({ scene, className = '', height = 220 }) {
       if (scene === 'stashPick') drawStashPick(ctx, width, height, t, sceneData)
       if (scene === 'remotePackets') drawRemotePackets(ctx, width, height, t, sceneData)
       if (scene === 'rebaseClean') drawRebaseClean(ctx, width, height, t, sceneData)
+      if (scene === 'playgroundFlow') drawPlaygroundFlow(ctx, width, height, t, sceneData)
       rafId = requestAnimationFrame(tick)
     }
 
@@ -220,11 +224,15 @@ function drawDiffColumn(ctx, x, y, width, height, title, lines, t) {
 }
 
 function drawHistoryLog(ctx, width, height, t, data) {
-  const scroll = (t * 32) % 120
+  const rowHeight = 42
+  const totalHeight = data.commits.length * rowHeight
+  const scroll = (t * 32) % totalHeight
   const preparedRows = data.commits.map((commit) => getPrepared(commit, labelFont))
   preparedRows.forEach((prepared, index) => {
-    const y = 24 + index * 42 - scroll
-    if (y < -42 || y > height + 20) return
+    // Place each row within [0, totalHeight) so it wraps seamlessly: a row
+    // that scrolls off the top re-enters from the bottom.
+    const y = 24 + ((index * rowHeight - scroll) % totalHeight + totalHeight) % totalHeight - rowHeight
+    if (y < -rowHeight || y > height + 20) return
     let maxLineWidth = 0
     walkLineRanges(prepared, width - 80, (line) => { maxLineWidth = Math.max(maxLineWidth, line.width) })
     const bubbleWidth = maxLineWidth + 28
@@ -234,7 +242,8 @@ function drawHistoryLog(ctx, width, height, t, data) {
     const line = layoutWithLines(prepared, width - 80, 20).lines[0]
     ctx.font = labelFont
     ctx.fillStyle = '#f0f6fc'
-    ctx.fillText(line.text, 36, y + 8)
+    ctx.textBaseline = 'middle'
+    ctx.fillText(line.text, 36, y + 15)
   })
 }
 
@@ -358,4 +367,75 @@ function roundRect(ctx, x, y, width, height, radius) {
 
 function ease(value) {
   return 1 - Math.pow(1 - value, 3)
+}
+
+function drawPlaygroundFlow(ctx, width, height, t, data) {
+  const colWidth = (width - 60) / 4
+  const y = height / 2
+
+  // Draw 4 column areas
+  data.columns.forEach((col, idx) => {
+    const cx = 18 + idx * (colWidth + 8)
+    const cy = 20
+    const cw = colWidth
+    const ch = height - 40
+    
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.6)'
+    roundRect(ctx, cx, cy, cw, ch, 8)
+    ctx.fill()
+    ctx.strokeStyle = idx === 0 ? '#38bdf8' : idx === 1 ? '#f59e0b' : idx === 2 ? '#10b981' : '#8b5cf6'
+    ctx.lineWidth = 1.5
+    ctx.stroke()
+
+    ctx.font = labelFont
+    ctx.fillStyle = '#94a3b8'
+    ctx.textBaseline = 'top'
+    ctx.fillText(col, cx + 10, cy + 10)
+  })
+
+  // Animate file bubble flowing
+  const cycle = t % 6 // 6 seconds cycle
+  let activeCol = 0
+  let progress = 0
+  if (cycle < 1.5) {
+    activeCol = 0 // working
+    progress = 0
+  } else if (cycle >= 1.5 && cycle < 3.0) {
+    activeCol = 0
+    progress = (cycle - 1.5) / 1.5 // moving working -> staging
+  } else if (cycle >= 3.0 && cycle < 4.5) {
+    activeCol = 1
+    progress = (cycle - 3.0) / 1.5 // moving staging -> local
+  } else {
+    activeCol = 2
+    progress = (cycle - 4.5) / 1.5 // moving local -> remote
+  }
+
+  // Draw the moving file packet
+  const startIdx = Math.floor(cycle / 1.5) % 4
+  const nextIdx = (startIdx + 1) % 4
+  
+  const startX = 18 + startIdx * (colWidth + 8) + colWidth / 2
+  const nextX = 18 + nextIdx * (colWidth + 8) + colWidth / 2
+  
+  // Ease the transition
+  const p = ease(Math.min(1, (cycle % 1.5) / 1.0)) // animate in first 1.0s, pause for 0.5s
+  const x = startX + (nextX - startX) * p
+  
+  ctx.fillStyle = '#fff'
+  ctx.beginPath()
+  ctx.arc(x, y, 12, 0, Math.PI * 2)
+  ctx.fill()
+  
+  // Outer glowing pulse ring
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.arc(x, y, 12 + 6 * Math.sin(t * 5), 0, Math.PI * 2)
+  ctx.stroke()
+
+  ctx.font = monoFont
+  ctx.fillStyle = '#0f172a'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('📄', x - 7, y)
 }
