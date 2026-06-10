@@ -44,11 +44,11 @@ export default function RemoteCollaborationLesson() {
 
   return (
     <div className="remote-lesson">
-      <header className="lesson-header">
+      <div className="lesson-header">
         <span className="lesson-kicker">Lesson 6</span>
-        <h1>Remote Collaboration</h1>
+        <h2 style={{ margin: '0 0 10px', fontWeight: 800, fontSize: '1.5rem' }}>Remote Collaboration</h2>
         <p>Git is local. GitHub is shared. Teamwork means syncing, reviewing, and pushing without stepping on each other.</p>
-      </header>
+      </div>
       <PretextCanvas scene="remotePackets" height={180} />
 
       <main className="remote-layout">

@@ -2722,9 +2722,35 @@ header p {
 }
 
 /* Remote Collaboration Lesson */
+.remote-lesson {
+  width: 100%;
+}
+
+.lesson-header {
+  margin-bottom: 20px;
+}
+
+.lesson-header h1,
+.lesson-header h2 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0 0 10px 0;
+}
+
+.lesson-header p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.remote-lesson .insight-callout {
+  margin-top: 14px;
+  font-size: 0.88rem;
+}
+
 .remote-layout {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 20px;
 }
 
@@ -2737,6 +2763,8 @@ header p {
 }
 
 .team-panel,
+.pr-panel,
+.fork-panel,
 .push-panel {
   grid-column: 1 / -1;
 }
