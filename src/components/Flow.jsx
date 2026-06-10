@@ -1,13 +1,17 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
 
 const initialFiles = [
   { id: 1, name: 'index.js', status: 'working' },
   { id: 2, name: 'App.jsx', status: 'working' }
 ]
 
-export default function Flow() {
+export default function Flow({ onSuccess, setTerminalSyncListener }) {
   const [files, setFiles] = useState(initialFiles)
   const [log, setLog] = useState([])
+
+  const containerRef = useRef(null)
+  const boardRefs = [useRef(null), useRef(null), useRef(null), useRef(null)]
+  const [layouts, setLayouts] = useState([])
 
   function addLog(text) {
     setLog(l => [text, ...l].slice(0, 8))
@@ -33,7 +37,13 @@ export default function Flow() {
   function gitPush() {
     addLog('git push: pushing to remote...')
     setTimeout(() => {
-      setFiles(f => f.map(x => (x.status === 'committed' ? { ...x, status: 'pushed' } : x)))
+      setFiles(f => {
+        const nextFiles = f.map(x => (x.status === 'committed' ? { ...x, status: 'pushed' } : x))
+        if (nextFiles.some(x => x.status === 'pushed')) {
+          onSuccess?.()
+        }
+        return nextFiles
+      })
       addLog('Push complete: local -> remote')
     }, 900)
   }
@@ -50,6 +60,59 @@ export default function Flow() {
     pushed: files.filter(f => f.status === 'pushed')
   }
 
+  const updateLayouts = () => {
+    if (!containerRef.current) return
+    const containerRect = containerRef.current.getBoundingClientRect()
+    const newLayouts = boardRefs.map(ref => {
+      if (!ref.current) return null
+      const rect = ref.current.getBoundingClientRect()
+      return {
+        left: rect.left - containerRect.left,
+        top: rect.top - containerRect.top,
+        width: rect.width,
+        height: rect.height
+      }
+    })
+    setLayouts(newLayouts)
+  }
+
+  useLayoutEffect(() => {
+    updateLayouts()
+    window.addEventListener('resize', updateLayouts)
+    return () => window.removeEventListener('resize', updateLayouts)
+  }, [])
+
+  // Sync listener setup
+  useEffect(() => {
+    if (setTerminalSyncListener) {
+      setTerminalSyncListener(() => (syncState) => {
+        // Flow handles its own state, but registers listener to align with App.jsx
+      })
+    }
+    return () => {
+      if (setTerminalSyncListener) setTerminalSyncListener(null)
+    }
+  }, [setTerminalSyncListener])
+
+  // Trigger layout updates on file list changes (timeout ensures DOM has adjusted)
+  useEffect(() => {
+    const timer = setTimeout(updateLayouts, 50)
+    return () => clearTimeout(timer)
+  }, [files])
+
+  const colIndices = { working: 0, staged: 1, committed: 2, pushed: 3 }
+  const counts = { working: 0, staged: 0, committed: 0, pushed: 0 }
+  const positionedFiles = files.map(file => {
+    const colIndex = colIndices[file.status]
+    const idx = counts[file.status]
+    counts[file.status] += 1
+    return {
+      ...file,
+      colIndex,
+      idx
+    }
+  })
+
   return (
     <div className="flow">
       <div className="controls">
@@ -60,14 +123,64 @@ export default function Flow() {
         <button onClick={reset}>Reset</button>
       </div>
 
-      <div className="boards">
-        <Board title="Working Directory" files={groups.working} className="board-working" />
-        <Board title="Staging Area" files={groups.staged} className="board-staged" />
-        <Board title="Local Repo" files={groups.committed} className="board-committed" />
-        <Board title="Remote" files={groups.pushed} className="board-pushed" />
+      <div className="boards-container" ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+        <div className="boards">
+          <Board 
+            title="Working Directory" 
+            boardRef={boardRefs[0]} 
+            isEmpty={groups.working.length === 0} 
+            className="board-working" 
+            minHeight={Math.max(200, 68 + groups.working.length * 52 + 20)}
+          />
+          <Board 
+            title="Staging Area" 
+            boardRef={boardRefs[1]} 
+            isEmpty={groups.staged.length === 0} 
+            className="board-staged" 
+            minHeight={Math.max(200, 68 + groups.staged.length * 52 + 20)}
+          />
+          <Board 
+            title="Local Repo" 
+            boardRef={boardRefs[2]} 
+            isEmpty={groups.committed.length === 0} 
+            className="board-committed" 
+            minHeight={Math.max(200, 68 + groups.committed.length * 52 + 20)}
+          />
+          <Board 
+            title="Remote" 
+            boardRef={boardRefs[3]} 
+            isEmpty={groups.pushed.length === 0} 
+            className="board-pushed" 
+            minHeight={Math.max(200, 68 + groups.pushed.length * 52 + 20)}
+          />
+        </div>
+
+        {/* Floating files layer */}
+        {layouts.length === 4 && positionedFiles.map(f => {
+          const layout = layouts[f.colIndex]
+          if (!layout) return null
+          
+          return (
+            <div 
+              className={`file file-${f.status}`} 
+              key={f.id}
+              style={{
+                position: 'absolute',
+                left: `${layout.left + 20}px`,
+                top: `${layout.top + 68 + (f.idx * 52)}px`,
+                width: `${layout.width - 40}px`,
+                transition: 'all 0.8s cubic-bezier(0.25, 1, 0.5, 1)',
+                zIndex: 10,
+                pointerEvents: 'auto'
+              }}
+            >
+              {f.name}
+            </div>
+          )
+        })}
       </div>
 
-      <aside className="log">
+      <aside className="log" style={{ marginTop: '24px' }}>
         <h3>Activity</h3>
         <ul>
           {log.map((l, i) => (
@@ -79,17 +192,19 @@ export default function Flow() {
   )
 }
 
-function Board({ title, files, className }) {
+function Board({ title, boardRef, isEmpty, className, minHeight }) {
   return (
-    <div className={`board ${className}`}>
+    <div 
+      className={`board ${className}`} 
+      ref={boardRef} 
+      style={{ 
+        minHeight: `${minHeight}px`,
+        transition: 'min-height 0.4s ease'
+      }}
+    >
       <h4>{title}</h4>
       <div className="fileList">
-        {files.length === 0 && <div className="empty">—</div>}
-        {files.map(f => (
-          <div className={`file file-${f.status}`} key={f.id}>
-            {f.name}
-          </div>
-        ))}
+        {isEmpty && <div className="empty">—</div>}
       </div>
     </div>
   )

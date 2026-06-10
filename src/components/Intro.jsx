@@ -1,11 +1,99 @@
 import React, { useState, useEffect, useRef } from 'react'
 import PretextCanvas from './PretextCanvas.jsx'
 
+const STEPS = [
+  {
+    id: 'working',
+    title: 'Workspace',
+    subtitle: 'Step 1: Your Workspace (Working Directory)',
+    emoji: '✏️',
+    color: '#38bdf8', // Light blue
+    analogy: 'Your desk with all your draft paperwork scattered around.',
+    description: 'This is your local computer directory where you create, edit, and modify code. Git does not track these changes automatically. They exist only as raw files on your hard drive until you stage them.',
+    command: null,
+  },
+  {
+    id: 'staging',
+    title: 'Staging Area',
+    subtitle: 'Step 2: Preparing to Save',
+    emoji: '📦',
+    color: '#f59e0b', // Amber/Orange
+    analogy: 'A shipping box where you select and pack specific items to be shipped.',
+    description: 'The Staging Area is a preview zone where you prepare changes for your next save. It acts as a safety buffer, letting you stage some file changes while leaving others out of the snapshot.',
+    command: 'git add .',
+  },
+  {
+    id: 'commit',
+    title: 'Local Repository',
+    subtitle: 'Step 3: Save a Snapshot',
+    emoji: '💾',
+    color: '#10b981', // Green
+    analogy: 'Taking a permanent, dated photo of your project at this exact moment.',
+    description: 'Committing saves a permanent, compressed snapshot of your staged files in your Local Repository. Each commit has a description and a unique ID (hash), building an immutable history of your project.',
+    command: 'git commit -m "Add styles and setup configs"',
+  },
+  {
+    id: 'push',
+    title: 'Remote Repository',
+    subtitle: 'Step 4: Share with the World',
+    emoji: '☁️',
+    color: '#8b5cf6', // Purple
+    analogy: 'Uploading your photo album to a cloud backup and sharing it with your team.',
+    description: 'Pushing uploads your local commit history to a Remote Repository on a server like GitHub. This secures your work in the cloud and lets your collaborators download and merge your changes.',
+    command: 'git push origin main',
+  },
+  {
+    id: 'complete',
+    title: 'Complete Flow',
+    subtitle: 'The Unified Workflow',
+    emoji: '🏁',
+    color: '#a78bfa', // Lavender
+    analogy: 'The continuous cycle of coding, staging, committing, and pushing.',
+    description: 'This is the complete, core cycle of modern software development. You write edits, stage them, take a snapshot, and push them to share with your team.',
+    command: null,
+  }
+]
+
 export default function Intro({ onComplete }) {
   const [scrollTriggered, setScrollTriggered] = useState({})
   const sectionRefs = useRef({})
   const containerRef = useRef(null)
   const [showCompleteButton, setShowCompleteButton] = useState(false)
+  const [activeStep, setActiveStep] = useState(0)
+  const [isPlaying, setIsPlaying] = useState(true)
+  const [animationTrigger, setAnimationTrigger] = useState(0)
+
+  useEffect(() => {
+    if (!isPlaying) return
+    const timer = setInterval(() => {
+      setActiveStep((prev) => (prev + 1) % STEPS.length)
+      setAnimationTrigger(Date.now())
+    }, 4500)
+    return () => clearInterval(timer)
+  }, [isPlaying])
+
+  const handleStepClick = (index) => {
+    setActiveStep(index)
+    setIsPlaying(false)
+    setAnimationTrigger(Date.now())
+  }
+
+  const handleNext = () => {
+    setActiveStep((prev) => (prev + 1) % STEPS.length)
+    setIsPlaying(false)
+    setAnimationTrigger(Date.now())
+  }
+
+  const handlePrev = () => {
+    setActiveStep((prev) => (prev - 1 + STEPS.length) % STEPS.length)
+    setIsPlaying(false)
+    setAnimationTrigger(Date.now())
+  }
+
+  const togglePlay = () => {
+    setIsPlaying(!isPlaying)
+  }
+
 
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
@@ -208,209 +296,291 @@ export default function Intro({ onComplete }) {
         </div>
       </section>
 
-      {/* Section 2: Working Directory */}
+      {/* Section 2: Interactive Tour */}
       <section 
-        className={`intro-section intro-working ${scrollTriggered.working ? 'visible' : ''}`}
-        data-section="working"
-        ref={el => sectionRefs.current.working = el}
+        className={`intro-section intro-interactive-tour ${scrollTriggered.tour ? 'visible' : ''}`}
+        data-section="tour"
+        ref={el => sectionRefs.current.tour = el}
       >
-        <div className="section-content">
-          <div className="section-visual working-stage">
-            <div className="stage-box stage-working">
-              <div className="stage-icon">✏️</div>
-              <div className="stage-title">Working Directory</div>
-            </div>
-            <div className="file-examples">
-              <div className="file-item animated-in-1">📄 App.jsx</div>
-              <div className="file-item animated-in-2">🎨 styles.css</div>
-              <div className="file-item animated-in-3">⚙️ config.js</div>
-            </div>
+        <div className="tour-wrapper">
+          <div className="section-title-centered">
+            <span className="features-kicker">Interactive Git Journey</span>
+            <h2>How Code Flows in Git</h2>
+            <p>Understand the lifecycle of code through steps and live visual simulations.</p>
           </div>
-          <div className="section-text">
-            <h2>Step 1: Your Workspace</h2>
-            <p>
-              This is where the magic starts. Your <strong>Working Directory</strong> is your local 
-              computer where you create, edit, and modify files.
-            </p>
-            <div className="highlight-box">
-              💡 <strong>Think of it as:</strong> Your desk with all your work scattered around
-            </div>
-            <p>
-              These changes exist only on your machine. Git doesn't track them yet—you need to 
-              explicitly tell Git you're happy with them.
-            </p>
-          </div>
-        </div>
-      </section>
 
-      {/* Section 3: Staging Area */}
-      <section 
-        className={`intro-section intro-staging ${scrollTriggered.staging ? 'visible' : ''}`}
-        data-section="staging"
-        ref={el => sectionRefs.current.staging = el}
-      >
-        <div className="section-content flow-reverse">
-          <div className="section-text">
-            <h2>Step 2: Preparing to Save</h2>
-            <p>
-              You review your changes and think, "Yes, these are ready!" Now you <strong>"git add"</strong> 
-              them to the Staging Area.
-            </p>
-            <div className="highlight-box highlight-blue">
-              📦 <strong>Think of it as:</strong> Putting selected items in a box before shipping
+          {/* Stepper progress indicator */}
+          <div className="tour-stepper">
+            <div className="stepper-line">
+              <div 
+                className="stepper-line-fill" 
+                style={{ width: `${(activeStep / (STEPS.length - 1)) * 100}%` }}
+              ></div>
             </div>
-            <p>
-              The staging area is your safety net. You can stage some changes but not others. 
-              This gives you full control over what goes into your next snapshot.
-            </p>
-            <p className="code-hint">Command: <code className="inline-code">git add .</code></p>
-          </div>
-          <div className="section-visual staging-stage">
-            <div className="flow-sequence">
-              <div className="flow-item">
-                <div className="stage-box stage-working">
-                  <div className="stage-icon">✏️</div>
+            {STEPS.map((step, idx) => (
+              <button 
+                key={step.id} 
+                className={`step-node ${activeStep === idx ? 'active' : ''} ${idx < activeStep ? 'completed' : ''}`}
+                onClick={() => handleStepClick(idx)}
+                style={{ '--active-color': step.color }}
+              >
+                <div className="step-circle">
+                  <span className="step-emoji">{step.emoji}</span>
+                  <span className="step-number">{idx + 1}</span>
                 </div>
-              </div>
-              <div className="arrow-flow animated-arrow">→</div>
-              <div className="flow-item">
-                <div className="stage-box stage-staging">
-                  <div className="stage-icon">📦</div>
-                  <div className="stage-label">Staging</div>
-                </div>
-              </div>
-            </div>
-            <div className="file-stack">
-              <div className="stack-item stack-1">App.jsx</div>
-              <div className="stack-item stack-2">styles.css</div>
-              <div className="stack-item stack-3">config.js</div>
-            </div>
+                <span className="step-node-label">{step.title}</span>
+              </button>
+            ))}
           </div>
-        </div>
-      </section>
 
-      {/* Section 4: Local Repository */}
-      <section 
-        className={`intro-section intro-commit ${scrollTriggered.commit ? 'visible' : ''}`}
-        data-section="commit"
-        ref={el => sectionRefs.current.commit = el}
-      >
-        <div className="section-content">
-          <div className="section-visual commit-stage">
-            <div className="commit-timeline">
-              <div className="timeline-item">
-                <div className="timeline-dot active"></div>
-                <div className="timeline-content">
-                  <div className="commit-message">First commit</div>
-                  <div className="commit-time">2 mins ago</div>
+          {/* Tour Card Content */}
+          <div className="tour-content-card glass-panel">
+            <div className="tour-content-grid">
+              
+              {/* Left Side: Info & Controls */}
+              <div className="tour-text-panel">
+                <div className="step-badge-indicator" style={{ backgroundColor: `${STEPS[activeStep].color}22`, color: STEPS[activeStep].color }}>
+                  {STEPS[activeStep].emoji} {STEPS[activeStep].title.toUpperCase()}
                 </div>
-              </div>
-              <div className="timeline-item">
-                <div className="timeline-dot active"></div>
-                <div className="timeline-content">
-                  <div className="commit-message">Add styles</div>
-                  <div className="commit-time">5 mins ago</div>
+                
+                <h3 className="step-title-text">{STEPS[activeStep].subtitle}</h3>
+                
+                <p className="step-desc-text">{STEPS[activeStep].description}</p>
+                
+                <div className="step-analogy-box">
+                  <span className="analogy-icon">💡</span>
+                  <div className="analogy-body">
+                    <strong>Think of it as:</strong>
+                    <p>{STEPS[activeStep].analogy}</p>
+                  </div>
                 </div>
-              </div>
-              <div className="timeline-item">
-                <div className="timeline-dot"></div>
-                <div className="timeline-content">
-                  <div className="commit-message">You are here</div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="section-text">
-            <h2>Step 3: Save a Snapshot</h2>
-            <p>
-              <strong>"git commit"</strong> takes everything in the staging area and creates a permanent 
-              snapshot in your Local Repository.
-            </p>
-            <div className="highlight-box highlight-green">
-              ✓ <strong>Think of it as:</strong> Taking a photo of your project at this exact moment
-            </div>
-            <p>
-              Each commit includes a message describing what changed. This creates a complete 
-              history you can look back on anytime.
-            </p>
-            <p className="code-hint">Command: <code className="inline-code">git commit -m "Your message"</code></p>
-          </div>
-        </div>
-      </section>
 
-      {/* Section 5: Remote Repository */}
-      <section 
-        className={`intro-section intro-push ${scrollTriggered.push ? 'visible' : ''}`}
-        data-section="push"
-        ref={el => sectionRefs.current.push = el}
-      >
-        <div className="section-content flow-reverse">
-          <div className="section-text">
-            <h2>Step 4: Share with the World</h2>
-            <p>
-              Your commits are safe on your computer, but what about backups? What about your team? 
-              <strong>"git push"</strong> uploads your commits to a remote server like GitHub.
-            </p>
-            <div className="highlight-box highlight-purple">
-              ☁️ <strong>Think of it as:</strong> Uploading to a cloud backup + sharing portal
-            </div>
-            <p>
-              GitHub is a remote repository. It's your project's home on the internet. Now everyone 
-              can access your code, contribute, and you have a full backup.
-            </p>
-            <p className="code-hint">Command: <code className="inline-code">git push origin main</code></p>
-          </div>
-          <div className="section-visual push-stage">
-            <div className="cloud-animation">
-              <div className="local-repo">
-                <div className="repo-icon">💾</div>
-                <div className="repo-label">Your Computer</div>
-              </div>
-              <div className="push-arrow">
-                <div className="arrow-stem"></div>
-                <div className="arrow-head"></div>
-              </div>
-              <div className="remote-repo">
-                <div className="repo-icon">☁️</div>
-                <div className="repo-label">GitHub</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+                {STEPS[activeStep].command && (
+                  <div className="step-command-box">
+                    <span className="cmd-label">Terminal Command:</span>
+                    <div className="cmd-line-wrapper">
+                      <code>{STEPS[activeStep].command}</code>
+                      <button 
+                        className="copy-cmd-btn"
+                        onClick={() => navigator.clipboard.writeText(STEPS[activeStep].command)}
+                        title="Copy Command"
+                      >
+                        📋
+                      </button>
+                    </div>
+                  </div>
+                )}
 
-      {/* Complete Flow Section */}
-      <section 
-        className={`intro-section intro-complete ${scrollTriggered.complete ? 'visible' : ''}`}
-        data-section="complete"
-        ref={el => sectionRefs.current.complete = el}
-      >
-        <div className="section-content center-flow">
-          <h2>The Complete Flow</h2>
-          <div className="complete-diagram">
-            <div className="diagram-item diagram-1">
-              <div className="item-icon">✏️</div>
-              <div className="item-text">Edit Files<br/><span className="small-text">(Working Dir)</span></div>
+                {/* Navigation and Play controls */}
+                <div className="tour-controls">
+                  <div className="nav-buttons">
+                    <button className="tour-nav-btn prev" onClick={handlePrev}>
+                      ← Back
+                    </button>
+                    <button className="tour-nav-btn next" onClick={handleNext}>
+                      {activeStep === STEPS.length - 1 ? 'Start Again ↺' : 'Next Step →'}
+                    </button>
+                  </div>
+                  <button 
+                    className={`tour-play-btn ${isPlaying ? 'playing' : 'paused'}`} 
+                    onClick={togglePlay}
+                    title={isPlaying ? 'Pause Auto-Play' : 'Start Auto-Play'}
+                  >
+                    {isPlaying ? '⏸ Pause Auto-Tour' : '▶ Play Auto-Tour'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Right Side: Visual Animation panel */}
+              <div className="tour-visual-panel">
+                <div className="visual-panel-header">
+                  <span className="live-pill">● SIMULATION</span>
+                  <button 
+                    className="replay-btn" 
+                    onClick={() => setAnimationTrigger(Date.now())}
+                    title="Replay Animation"
+                  >
+                    🔄 Replay
+                  </button>
+                </div>
+                <div className="visual-panel-body">
+                  {(() => {
+                    switch (activeStep) {
+                      case 0:
+                        return (
+                          <div className="visual-container workspace-anim" key={animationTrigger}>
+                            <div className="mock-editor-window">
+                              <div className="editor-window-header">
+                                <span className="window-dot red"></span>
+                                <span className="window-dot yellow"></span>
+                                <span className="window-dot green"></span>
+                                <span className="window-filename">App.jsx</span>
+                              </div>
+                              <div className="editor-window-body">
+                                <div className="typing-code-line line-1"><span>const</span> Header = () =&gt; &#123;</div>
+                                <div className="typing-code-line line-2">  <span>return</span> &lt;header&gt;Gitify&lt;/header&gt;</div>
+                                <div className="typing-code-line line-3">&#125;</div>
+                                <div className="typing-cursor"></div>
+                              </div>
+                            </div>
+                            <div className="editor-file-status">
+                              <div className="file-status-card modified">
+                                <span className="status-badge modified">Modified</span>
+                                <span className="status-name">App.jsx</span>
+                              </div>
+                              <div className="file-status-card modified delay-1">
+                                <span className="status-badge modified">Modified</span>
+                                <span className="status-name">styles.css</span>
+                              </div>
+                              <div className="file-status-card clean">
+                                <span className="status-badge untracked">Untracked</span>
+                                <span className="status-name">config.js</span>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      case 1:
+                        return (
+                          <div className="visual-container staging-anim" key={animationTrigger}>
+                            <div className="staging-columns">
+                              <div className="stage-side">
+                                <h4>Workspace</h4>
+                                <div className="anim-file-card f-app sliding-1">📄 App.jsx</div>
+                                <div className="anim-file-card f-styles sliding-2">🎨 styles.css</div>
+                                <div className="anim-file-card f-config clean">⚙️ config.js</div>
+                              </div>
+                              <div className="arrow-connector">
+                                <div className="arrow-line"></div>
+                                <div className="arrow-label">git add .</div>
+                              </div>
+                              <div className="stage-side">
+                                <h4>Staging Box</h4>
+                                <div className="staging-box-wrapper">
+                                  <div className="anim-staged-card staged-1">📦 App.jsx</div>
+                                  <div className="anim-staged-card staged-2">📦 styles.css</div>
+                                  <span className="staging-box-empty">Empty</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      case 2:
+                        return (
+                          <div className="visual-container commit-anim" key={animationTrigger}>
+                            <div className="commit-columns">
+                              <div className="commit-stage-source">
+                                <h4>Staged (Ready)</h4>
+                                <div className="staged-pack animate-pack">
+                                  <div className="pack-item">App.jsx</div>
+                                  <div className="pack-item">styles.css</div>
+                                  <span className="pack-label">git commit</span>
+                                </div>
+                              </div>
+                              <div className="arrow-connector down">
+                                <div className="arrow-line-down"></div>
+                              </div>
+                              <div className="commit-timeline-dest">
+                                <h4>Local Commit History</h4>
+                                <div className="anim-timeline">
+                                  <div className="anim-timeline-node old animate-node-old-1">
+                                    <span className="node-hash">a23c10f</span>
+                                    <span className="node-msg">Initial commit</span>
+                                  </div>
+                                  <div className="anim-timeline-node old animate-node-old-2">
+                                    <span className="node-hash">5bf312b</span>
+                                    <span className="node-msg">Add visualizer base</span>
+                                  </div>
+                                  <div className="anim-timeline-node new-pulse">
+                                    <span className="node-hash">7c91a0c</span>
+                                    <span className="node-msg">Add styles and setup configs</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      case 3:
+                        return (
+                          <div className="visual-container push-anim" key={animationTrigger}>
+                            <div className="push-layout">
+                              <div className="local-timeline-column">
+                                <h4>Local History</h4>
+                                <div className="local-commits-stack">
+                                  <div className="commit-node-bubble current-pushed-node">
+                                    <span className="bubble-hash">7c91a0c</span>
+                                    <span className="bubble-desc">Add styles...</span>
+                                  </div>
+                                  <div className="commit-node-bubble">
+                                    <span className="bubble-hash">5bf312b</span>
+                                    <span className="bubble-desc">Add visualizer...</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="push-arrow-track">
+                                <div className="flying-commit">7c91a0c</div>
+                                <div className="push-track-line"></div>
+                                <span className="track-label">git push</span>
+                              </div>
+                              <div className="remote-cloud-column">
+                                <h4>GitHub Cloud</h4>
+                                <div className="cloud-wrapper">
+                                  <div className="cloud-icon-large">☁️</div>
+                                  <div className="cloud-pushed-status">
+                                    <span className="cloud-success-badge">✓ Updated</span>
+                                    <div className="cloud-pushed-commit">Commit: 7c91a0c</div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      case 4:
+                        return (
+                          <div className="visual-container complete-anim-grid" key={animationTrigger}>
+                            <div className="diagram-grid">
+                              <div className="diagram-node node-working animate-node-1">
+                                <div className="d-icon">✏️</div>
+                                <div className="d-label">Workspace</div>
+                                <div className="d-sub">Local Edits</div>
+                              </div>
+                              <div className="diagram-connector-arrow animate-arrow-1">
+                                <div className="c-line"></div>
+                                <span className="c-text">git add</span>
+                              </div>
+                              <div className="diagram-node node-staging animate-node-2">
+                                <div className="d-icon">📦</div>
+                                <div className="d-label">Staging Area</div>
+                                <div className="d-sub">Prepared Changes</div>
+                              </div>
+                              <div className="diagram-connector-arrow animate-arrow-2">
+                                <div className="c-line"></div>
+                                <span className="c-text">git commit</span>
+                              </div>
+                              <div className="diagram-node node-commit animate-node-3">
+                                <div className="d-icon">💾</div>
+                                <div className="d-label">Local Repo</div>
+                                <div className="d-sub">Version History</div>
+                              </div>
+                              <div className="diagram-connector-arrow animate-arrow-3">
+                                <div className="c-line"></div>
+                                <span className="c-text">git push</span>
+                              </div>
+                              <div className="diagram-node node-push animate-node-4">
+                                <div className="d-icon">☁️</div>
+                                <div className="d-label">GitHub Cloud</div>
+                                <div className="d-sub">Remote Repo</div>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      default:
+                        return null
+                    }
+                  })()}
+                </div>
+              </div>
+
             </div>
-            <div className="diagram-arrow arrow-1"><span className="arrow-bounce">↓</span></div>
-            <div className="diagram-item diagram-2">
-              <div className="item-icon">📦</div>
-              <div className="item-text">Stage Changes<br/><span className="small-text">(git add)</span></div>
-            </div>
-            <div className="diagram-arrow arrow-2"><span className="arrow-bounce">↓</span></div>
-            <div className="diagram-item diagram-3">
-              <div className="item-icon">✓</div>
-              <div className="item-text">Commit<br/><span className="small-text">(git commit)</span></div>
-            </div>
-            <div className="diagram-arrow arrow-3"><span className="arrow-bounce">↓</span></div>
-            <div className="diagram-item diagram-4">
-              <div className="item-icon">☁️</div>
-              <div className="item-text">Push to Remote<br/><span className="small-text">(git push)</span></div>
-            </div>
-          </div>
-          <div className="completion-message">
-            <p>🎉 <strong>That's the entire workflow!</strong></p>
-            <p>From local edits to global collaboration—all in four simple steps.</p>
           </div>
         </div>
       </section>
