@@ -652,6 +652,15 @@ header p {
   pointer-events: none;
 }
 
+/* Shared glassmorphism utility — used by panels, modals, and drawers */
+.glassmorphic {
+  background: rgba(22, 27, 34, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
 /* Sidebar Styles */
 .sidebar-backdrop {
   position: fixed;

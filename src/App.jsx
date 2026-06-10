@@ -297,8 +297,8 @@ export default function App() {
               <RebaseLesson onSuccess={() => handleVerifySuccess(7)} setTerminalSyncListener={setTerminalSyncListener} />
             ) : (
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                <header>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <div style={{ marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '8px' }}>
                     <a
                       href="https://docs.github.com/en/get-started"
                       target="_blank"
@@ -308,9 +308,9 @@ export default function App() {
                       GitHub Docs
                     </a>
                   </div>
-                  <h1>GitHub Visual - Interactive demo</h1>
-                  <p>Click actions to see files move through working/stage/commit/push.</p>
-                </header>
+                  <h2 style={{ margin: '0 0 4px 0', fontSize: '1.25rem', fontWeight: '700', color: '#f0f6fc', textAlign: 'center' }}>GitHub Visual — Interactive demo</h2>
+                  <p style={{ margin: 0, color: '#8b949e', fontSize: '0.88rem', textAlign: 'center' }}>Click actions to see files move through working/stage/commit/push.</p>
+                </div>
                 <PretextCanvas scene="playgroundFlow" height={150} />
                 <main>
                   <Flow onSuccess={() => handleVerifySuccess(1)} setTerminalSyncListener={setTerminalSyncListener} />
@@ -321,7 +321,7 @@ export default function App() {
 
           {/* Column 2: Code File Inspector (Active only in Graded Exercise Mode) */}
           {isExerciseMode && (
-            <div className="lesson-middle-inspector" style={{ flex: 1, minWidth: '280px', maxWidth: '380px' }}>
+            <div className="lesson-middle-inspector" style={{ flex: 1, minWidth: '280px', maxWidth: '380px', maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
               <FileInspector
                 files={workspaceFiles}
                 fileContents={fileContents}
@@ -332,7 +332,7 @@ export default function App() {
           )}
           
           {/* Column 3: Sidebar Checklists */}
-          <div className="lesson-right-sidebar" style={{ flex: 0.9, minWidth: '300px', maxWidth: '380px' }}>
+          <div className="lesson-right-sidebar" style={{ flex: 0.9, minWidth: '300px', maxWidth: '380px', maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
             <ExerciseGuide
               lessonId={currentLesson}
               sessionId={sessionId}
