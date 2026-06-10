@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Flow from './components/Flow.jsx'
 import Intro from './components/Intro.jsx'
 import Sidebar from './components/Sidebar.jsx'
@@ -18,7 +18,14 @@ const lessonOrder = [0, 1, 2, 3, 4, 5, 6, 7]
 
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [currentLesson, setCurrentLesson] = useState(0)
+  const [currentLesson, setCurrentLesson] = useState(() => {
+    const saved = localStorage.getItem("gitify_current_lesson")
+    if (saved !== null) {
+      const parsed = parseInt(saved, 10)
+      if (!isNaN(parsed)) return parsed
+    }
+    return 0
+  })
   const [completedLessons, setCompletedLessons] = useState([])
   const [terminalSyncListener, setTerminalSyncListener] = useState(null)
   
@@ -27,7 +34,7 @@ export default function App() {
   const [isExerciseMode, setIsExerciseMode] = useState(false)
   const [isSolved, setIsSolved] = useState(false)
   const [resetTrigger, setResetTrigger] = useState(0)
-  const [sessionId, setSessionId] = useState(null)
+  const isFirstRender = useRef(true)
 
   // Live IDE dynamic states
   const [fileContents, setFileContents] = useState({})
@@ -36,16 +43,6 @@ export default function App() {
 
   const currentLessonIndex = lessonOrder.indexOf(currentLesson)
   const nextLesson = lessonOrder[currentLessonIndex + 1]
-
-  // Initialize Session ID
-  useEffect(() => {
-    let activeSession = localStorage.getItem("gitify_session_id")
-    if (!activeSession || activeSession === "null" || activeSession === "undefined") {
-      activeSession = `session_${Math.random().toString(36).substring(2, 11)}`
-      localStorage.setItem("gitify_session_id", activeSession)
-    }
-    setSessionId(activeSession)
-  }, [])
 
   // Query progression on start
   useEffect(() => {
@@ -60,6 +57,11 @@ export default function App() {
         }
       })
       .catch(err => console.warn("Backend not running or progress unavailable:", err))
+
+    // Disable browser scroll restoration on load
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual'
+    }
   }, [])
 
   // Reset exercise state when moving lessons
@@ -70,7 +72,43 @@ export default function App() {
     setFileContents({})
     setCommitsGraph([])
     setWorkspaceFiles([])
+    
+    if (isFirstRender.current) {
+      window.scrollTo({ top: 0 })
+      isFirstRender.current = false
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+
+    // Reset backend sandbox directory to baseline WITHOUT clearing progress in database
+    if (currentLesson !== 0) {
+      fetch('http://localhost:8000/api/exercises/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lesson_id: currentLesson,
+          username: 'student',
+          clear_progress: false
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success' && data.sync_state) {
+          if (data.sync_state.file_contents) setFileContents(data.sync_state.file_contents)
+          if (data.sync_state.commits_graph) setCommitsGraph(data.sync_state.commits_graph)
+          if (data.sync_state.files) setWorkspaceFiles(data.sync_state.files)
+          if (data.subtasks) setSubtasks(data.subtasks)
+        }
+      })
+      .catch(err => console.warn("Could not reset backend sandbox on lesson change:", err))
+    }
   }, [currentLesson])
+
+  // Save current lesson to localStorage
+  useEffect(() => {
+    localStorage.setItem("gitify_current_lesson", currentLesson.toString())
+  }, [currentLesson])
+
 
   const handleLessonSelect = (lessonId) => {
     setCurrentLesson(lessonId)
@@ -210,7 +248,6 @@ export default function App() {
           <div className="lesson-right-sidebar" style={{ flex: 0.9, minWidth: '300px', maxWidth: '380px' }}>
             <ExerciseGuide
               lessonId={currentLesson}
-              sessionId={sessionId}
               subtasks={subtasks}
               onSubtasksChange={(updated, syncState) => {
                 setSubtasks(updated)
@@ -244,7 +281,7 @@ export default function App() {
         </div>
       )}
 
-      {nextLesson !== undefined && (
+      {nextLesson !== undefined && currentLesson !== 0 && (
         <nav className="lesson-next-nav" aria-label="Lesson navigation">
           <button className="lesson-next-btn" onClick={handleNextLesson}>
             Next lesson
@@ -259,6 +296,7 @@ export default function App() {
           onSyncState={handleTerminalSync}
           onSuccess={() => handleVerifySuccess(currentLesson)}
           resetTrigger={resetTrigger}
+          isExerciseMode={isExerciseMode}
         />
       )}
 

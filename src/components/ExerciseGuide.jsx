@@ -3,7 +3,6 @@ import './ExerciseGuide.css'
 
 export default function ExerciseGuide({ 
   lessonId, 
-  sessionId, 
   subtasks, 
   onSubtasksChange, 
   isExerciseMode, 
@@ -41,7 +40,6 @@ export default function ExerciseGuide({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         lesson_id: lessonId,
-        session_id: sessionId,
         username: 'student'
       })
     })
@@ -76,7 +74,6 @@ export default function ExerciseGuide({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           lesson_id: lessonId,
-          session_id: sessionId,
           username: 'student'
         })
       })

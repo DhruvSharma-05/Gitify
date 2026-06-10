@@ -99,14 +99,16 @@ def verify_exercise(data: VerifyRequest):
 
 class TerminalExecuteRequest(BaseModel):
     command: str
-    session_id: str
+    session_id: Optional[str] = None
     lesson_id: int
     username: Optional[str] = "student"
+    is_exercise_mode: Optional[bool] = False
 
 class ResetRequest(BaseModel):
     lesson_id: int
-    session_id: str
+    session_id: Optional[str] = None
     username: Optional[str] = "student"
+    clear_progress: Optional[bool] = True
 
 import tempfile
 import uuid
@@ -114,18 +116,18 @@ import os
 import subprocess
 import shutil
 
+BASE_SANDBOX_DIR=os.path.join(tempfile.gettempdir(),"gitify")
 SESSION_SANDBOXES = {}
 
 @app.post("/api/terminal/execute")
 def execute_terminal_command(data: TerminalExecuteRequest):
     try:
-        # 1. Resolve or establish unique sandbox path dict
-        session_id = data.session_id.strip() if data.session_id else ""
-        if not session_id or session_id == "null" or session_id == "undefined":
-            session_id = str(uuid.uuid4())
+        # 1. Resolve or establish unique sandbox path dict using lesson_id
+        session_id = f"lesson_{data.lesson_id}"
             
         if session_id not in SESSION_SANDBOXES:
-            temp_dir = tempfile.mkdtemp(prefix="gitify_session_")
+            temp_dir = os.path.normpath(os.path.join(BASE_SANDBOX_DIR, f"lesson_{data.lesson_id}"))
+            os.makedirs(temp_dir, exist_ok=True)
             SESSION_SANDBOXES[session_id] = {
                 "base_path": temp_dir,
                 "cwd_relative": ""
@@ -140,7 +142,8 @@ def execute_terminal_command(data: TerminalExecuteRequest):
         
         # Ensure temp folder exists
         if not os.path.exists(base_path):
-            temp_dir = tempfile.mkdtemp(prefix="gitify_session_")
+            temp_dir = os.path.normpath(os.path.join(BASE_SANDBOX_DIR, f"lesson_{data.lesson_id}"))
+            os.makedirs(temp_dir, exist_ok=True)
             SESSION_SANDBOXES[session_id] = {
                 "base_path": temp_dir,
                 "cwd_relative": ""
@@ -332,14 +335,15 @@ def execute_terminal_command(data: TerminalExecuteRequest):
         file_contents = verifier.get_workspace_files_content(base_path)
 
         cmd_output = stdout if code == 0 else stderr or stdout or "Command returned non-zero code."
-        if code == 0:
-            success_tip = verifier.get_success_tip(data.lesson_id, data.command, base_path)
-            if success_tip:
-                cmd_output += success_tip
-        else:
-            friendly_tip = verifier.get_friendly_tip(data.lesson_id, data.command, cmd_output, code)
-            if friendly_tip:
-                cmd_output += friendly_tip
+        if not getattr(data, "is_exercise_mode", False):
+            if code == 0:
+                success_tip = verifier.get_success_tip(data.lesson_id, data.command, base_path)
+                if success_tip:
+                    cmd_output += success_tip
+            else:
+                friendly_tip = verifier.get_friendly_tip(data.lesson_id, data.command, cmd_output, code)
+                if friendly_tip:
+                    cmd_output += friendly_tip
 
         return {
             "status": "success" if code == 0 else "error",
@@ -366,51 +370,54 @@ def execute_terminal_command(data: TerminalExecuteRequest):
 @app.post("/api/exercises/reset")
 def reset_exercise_sandbox(data: ResetRequest):
     try:
-        session_id = data.session_id.strip() if data.session_id else ""
-        if not session_id or session_id == "null" or session_id == "undefined":
-            session_id = str(uuid.uuid4())
+        lesson_id = data.lesson_id
+        session_id = f"lesson_{lesson_id}"
+        lesson_dir = os.path.normpath(os.path.join(BASE_SANDBOX_DIR, f"lesson_{lesson_id}"))
+        
+        # 1. Purge the existing lesson folder and its remote bare repository
+        try:
+            shutil.rmtree(lesson_dir, ignore_errors=True)
+        except Exception:
+            pass
+        try:
+            shutil.rmtree(lesson_dir + "_remote.git", ignore_errors=True)
+        except Exception:
+            pass
             
-        if session_id in SESSION_SANDBOXES:
-            old_path = SESSION_SANDBOXES[session_id]["base_path"]
-            try:
-                shutil.rmtree(old_path, ignore_errors=True)
-            except Exception:
-                pass
-                
-        temp_dir = tempfile.mkdtemp(prefix="gitify_session_")
+        os.makedirs(lesson_dir, exist_ok=True)
         SESSION_SANDBOXES[session_id] = {
-            "base_path": temp_dir,
+            "base_path": lesson_dir,
             "cwd_relative": ""
         }
         
         # Run baseline setups
-        verifier.initialize_sandbox(temp_dir, data.lesson_id)
+        verifier.initialize_sandbox(lesson_dir, data.lesson_id)
         
-        # Wipe database checkpoints for this lesson to start fresh!
-        # Get user progress from db to verify baseline
-        database.update_user_progress(data.lesson_id, False, 0, data.username)
-        # Clear out checkpoints in database
-        conn = database.get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT id FROM users WHERE username = ?", (data.username,))
-        user = cursor.fetchone()
-        if user:
-            user_id = user["id"]
-            cursor.execute("DELETE FROM checkpoints WHERE user_id = ? AND lesson_id = ?", (user_id, data.lesson_id))
-            conn.commit()
-        conn.close()
+        # Wipe database checkpoints for this lesson to start fresh if requested
+        if getattr(data, "clear_progress", True):
+            database.update_user_progress(data.lesson_id, False, 0, data.username)
+            # Clear out checkpoints in database
+            conn = database.get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM users WHERE username = ?", (data.username,))
+            user = cursor.fetchone()
+            if user:
+                user_id = user["id"]
+                cursor.execute("DELETE FROM checkpoints WHERE user_id = ? AND lesson_id = ?", (user_id, data.lesson_id))
+                conn.commit()
+            conn.close()
         
         # Load baseline checklists from verifier
-        _, _, subtasks = verifier.check_sandbox_state(temp_dir, data.lesson_id)
+        _, _, subtasks = verifier.check_sandbox_state(lesson_dir, data.lesson_id)
         
         # Calculate baseline commits graph and file contents
-        commits_graph = verifier.get_live_commit_graph(temp_dir)
-        file_contents = verifier.get_workspace_files_content(temp_dir)
+        commits_graph = verifier.get_live_commit_graph(lesson_dir)
+        file_contents = verifier.get_workspace_files_content(lesson_dir)
         
         files_list = []
         try:
-            for item in os.listdir(temp_dir):
-                if item != ".git" and os.path.isfile(os.path.join(temp_dir, item)):
+            for item in os.listdir(lesson_dir):
+                if item != ".git" and os.path.isfile(os.path.join(lesson_dir, item)):
                     files_list.append(item)
         except Exception:
             pass

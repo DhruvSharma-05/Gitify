@@ -745,7 +745,7 @@ def get_friendly_tip(lesson_id: int, command: str, output: str, code: int) -> st
             if "nothing added to commit but untracked files present" in output_lower or "no changes added to commit" in output_lower:
                 return "\n\n💡 Gitify Clue: You have modified/untracked files. Stage them first by running 'git add .'."
             if sub_cmd == "push" and ("does not appear to be a git repository" in output_lower or "no configured push destination" in output_lower):
-                return "\n\n💡 Gitify Clue: You need to tell Git where the remote is! Run 'git remote add origin ../gitify_session_<your_session_id>_remote.git'. Run 'dir ..' to find your exact session ID folder name."
+                return f"\n\n💡 Gitify Clue: You need to tell Git where the remote is! Run this exact command:\n   git remote add origin ../lesson_{lesson_id}_remote.git"
 
         # Lesson 2: Branching
         elif lesson_id == 2:
@@ -804,7 +804,7 @@ def get_success_tip(lesson_id: int, command: str, repo_path: str) -> str:
                 # Check if remote origin already exists
                 code, remotes, _ = run_git_command(repo_path, ["remote"])
                 if "origin" not in remotes:
-                    return "\n\n💡 Next Step: Commit saved locally! Now link your remote repository. Run: dir .. to see your session ID, then run: git remote add origin ../gitify_session_<your_session_id>_remote.git"
+                    return f"\n\n💡 Next Step: Commit saved locally! Now link your remote repository. Run this exact command:\n   git remote add origin ../lesson_{lesson_id}_remote.git"
                 else:
                     return "\n\n💡 Next Step: Commit saved! Now push your commits to the remote: git push origin main"
             elif sub_cmd in ["remote", "push"]:
@@ -910,7 +910,14 @@ def get_workspace_files_status(repo_path):
     has_origin = code_remote == 0 and "origin" in remotes
 
     if has_origin:
-        code_log, log_out, _ = run_git_command(repo_path, ["log", f"origin/{active_br}..{active_br}", "--name-only", "--oneline"])
+        # Check if the remote tracking branch exists
+        code_rev, _, _ = run_git_command(repo_path, ["rev-parse", "--verify", f"origin/{active_br}"])
+        if code_rev != 0:
+            # Remote branch does not exist yet; all commits are unpushed
+            code_log, log_out, _ = run_git_command(repo_path, ["log", "--name-only", "--oneline"])
+        else:
+            code_log, log_out, _ = run_git_command(repo_path, ["log", f"origin/{active_br}..{active_br}", "--name-only", "--oneline"])
+            
         if code_log == 0 and log_out.strip():
             for line in log_out.strip().split("\n"):
                 if line and not line[0].isalnum():

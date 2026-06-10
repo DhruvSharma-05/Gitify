@@ -36,14 +36,13 @@ function getGitSuggestion(cmd) {
   return bestMatch
 }
 
-export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetTrigger }) {
+export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetTrigger, isExerciseMode }) {
   const [pwd, setPwd] = useState('')
   const [branch, setBranch] = useState('main')
   const [history, setHistory] = useState([])
   const [inputValue, setInputValue] = useState('')
   const [cmdHistory, setCmdHistory] = useState([])
   const [historyPointer, setHistoryPointer] = useState(-1)
-  const [sessionId, setSessionId] = useState(null)
   const [isExecuting, setIsExecuting] = useState(false)
   const [minimized, setMinimized] = useState(false)
   
@@ -51,18 +50,8 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
   const [files, setFiles] = useState([])
   const [branches, setBranches] = useState(['main'])
 
-  const bottomRef = useRef(null)
+  const historyRef = useRef(null)
   const inputRef = useRef(null)
-
-  // Initialize unique session ID
-  useEffect(() => {
-    let activeSession = localStorage.getItem("gitify_session_id")
-    if (!activeSession || activeSession === "null" || activeSession === "undefined") {
-      activeSession = `session_${Math.random().toString(36).substring(2, 11)}`
-      localStorage.setItem("gitify_session_id", activeSession)
-    }
-    setSessionId(activeSession)
-  }, [])
 
   // Handle lesson change or reset trigger
   useEffect(() => {
@@ -77,9 +66,11 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
     setBranches(['main'])
   }, [lessonId, resetTrigger])
 
-  // Auto scroll to bottom
+  // Auto scroll to bottom of terminal container (without scrolling the main page)
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (historyRef.current) {
+      historyRef.current.scrollTop = historyRef.current.scrollHeight
+    }
   }, [history])
 
   const handleCommandSubmit = (e) => {
@@ -105,9 +96,9 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         command: rawCmd,
-        session_id: sessionId,
         lesson_id: lessonId,
-        username: 'student'
+        username: 'student',
+        is_exercise_mode: isExerciseMode
       })
     })
       .then(res => {
@@ -118,10 +109,6 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
       })
       .then(data => {
         setIsExecuting(false)
-        if (data.session_id) {
-          setSessionId(data.session_id)
-          localStorage.setItem("gitify_session_id", data.session_id)
-        }
 
         if (data.output === 'CLEAR_CONSOLE') {
           setHistory([])
@@ -373,6 +360,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
 
       {/* Terminal History */}
       <div 
+        ref={historyRef}
         className="terminal-history"
         style={{
           flex: 1,
@@ -398,7 +386,6 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
         {isExecuting && (
           <div style={{ color: '#8b949e', fontStyle: 'italic' }}>Running subprocess command...</div>
         )}
-        <div ref={bottomRef} />
       </div>
 
       {/* Input Prompt */}
