@@ -266,7 +266,7 @@ export default function App() {
           <div className="lesson-left-content" style={{ flex: 1.5, minWidth: '0', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             
             {/* Dynamic Commit SVG DAG */}
-            {isExerciseMode && commitsGraph.length > 0 && (
+            {commitsGraph.length > 0 && (
               <LiveCommitGraph commits={commitsGraph} onSelectCommit={handleCommitSelect} />
             )}
 
