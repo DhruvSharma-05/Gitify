@@ -1000,11 +1000,27 @@ function checkOfflineProgress(state, lessonId) {
   return { verified, msg, subtasks }
 }
 
+// Commands the in-memory simulator can faithfully reproduce. Anything else — shell
+// operators, or tools the simulator doesn't implement — is refused with a clear note
+// rather than silently behaving differently from the live backend.
+const OFFLINE_SUPPORTED_CMDS = ['ls', 'cat', 'touch', 'rm', 'clear', 'git']
+
 function simulateCommandOffline(commandText, state, lessonId) {
   const parts = commandText.trim().split(/\s+/)
   const baseCmd = parts[0]
   let output = ""
   let status = "success"
+
+  // Don't fake features the simulator doesn't really support (pipes, redirection,
+  // chaining, grep/head/tail/wc/…). Be honest so behavior doesn't change on a blip.
+  const usesShellOps = /(&&|\|\||;|\||>>|>)/.test(commandText)
+  if (usesShellOps || !OFFLINE_SUPPORTED_CMDS.includes(baseCmd)) {
+    return {
+      nextState: state,
+      output: '⚠️ Offline mode simulates only basic single commands (git, ls, cat, touch, rm). Reconnect to the server to use pipes "|", redirection ">", chaining "&&", and tools like grep/head/tail/wc.',
+      status: 'error'
+    }
+  }
 
   const nextState = JSON.parse(JSON.stringify(state))
 

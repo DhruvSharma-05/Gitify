@@ -6,6 +6,8 @@ from typing import List, Optional, Dict, Any
 import os
 import glob
 import shlex
+import time
+import threading
 import database
 import verifier
 
@@ -35,6 +37,8 @@ app.add_middleware(
 @app.on_event("startup")
 def startup_event():
     database.init_db()
+    # Background reclamation of idle sandboxes so temp dirs don't accumulate.
+    threading.Thread(target=_sandbox_sweeper_loop, daemon=True).start()
 
 # Request/Response Validation Schemas
 class ProgressUpdate(BaseModel):
@@ -139,9 +143,23 @@ import shutil
 # Per-lesson sandboxes: each (session_id, lesson_id) pair gets its own isolated
 # git repository on disk, seeded once with that lesson's baseline. This keeps every
 # lesson's terminal independent — its own branch, files and history.
+#
+# Each entry is {base_path, cwd_relative, last_used, lock, ready}:
+#   - last_used drives idle eviction (TTL sweeper) and LRU capping
+#   - lock serializes commands on one sandbox so two requests can't race git's index.lock
+#   - ready (Event) lets concurrent first-hits wait for one-time seeding to finish
 SESSION_SANDBOXES = {}
 SESSION_ROOT = Path(os.environ.get("GITIFY_SESSION_ROOT", os.path.join(tempfile.gettempdir(), "gitify-sessions"))).resolve()
 SESSION_ROOT.mkdir(parents=True, exist_ok=True)
+
+# Tunable via env. Defaults suit a single classroom.
+SANDBOX_TTL_SECONDS = int(os.environ.get("GITIFY_SANDBOX_TTL", "1800"))      # evict if idle > 30 min
+SANDBOX_MAX = int(os.environ.get("GITIFY_SANDBOX_MAX", "300"))               # hard cap on live sandboxes
+SANDBOX_SWEEP_INTERVAL = int(os.environ.get("GITIFY_SANDBOX_SWEEP", "300"))  # sweep cadence (s)
+
+# Guards mutations of the SESSION_SANDBOXES registry itself (create/evict).
+# Per-sandbox command serialization uses each entry's own "lock".
+_registry_lock = threading.Lock()
 
 def create_session_dir() -> str:
     return tempfile.mkdtemp(prefix="gitify_session_", dir=str(SESSION_ROOT))
@@ -156,17 +174,90 @@ def normalize_session_id(session_id: str) -> str:
 def sandbox_key(session_id: str, lesson_id: int) -> str:
     return f"{session_id}::L{lesson_id}"
 
+def _remove_sandbox_dir(base_path: str):
+    """Deletes a sandbox dir and its sibling bare remote (lessons 1/6)."""
+    for p in (base_path, base_path + "_remote.git"):
+        try:
+            shutil.rmtree(p, ignore_errors=True)
+        except Exception:
+            pass
+
+def _evict_if_needed_locked():
+    """Drop least-recently-used sandboxes until under the cap. Call holding _registry_lock."""
+    if len(SESSION_SANDBOXES) <= SANDBOX_MAX:
+        return
+    by_age = sorted(SESSION_SANDBOXES.items(), key=lambda kv: kv[1].get("last_used", 0))
+    for key, obj in by_age:
+        if len(SESSION_SANDBOXES) <= SANDBOX_MAX:
+            break
+        _remove_sandbox_dir(obj["base_path"])
+        del SESSION_SANDBOXES[key]
+
+def touch_sandbox(session_obj):
+    """Marks a sandbox as recently used so the sweeper/LRU won't reclaim it mid-use."""
+    session_obj["last_used"] = time.time()
+
 def get_or_create_sandbox(session_id: str, lesson_id: int):
     """Resolves the sandbox for (session, lesson), creating and seeding it on first use
     or if its directory has gone missing. Returns (key, session_obj)."""
     key = sandbox_key(session_id, lesson_id)
-    session_obj = SESSION_SANDBOXES.get(key)
-    if not session_obj or not os.path.exists(session_obj["base_path"]):
-        temp_dir = create_session_dir()
-        SESSION_SANDBOXES[key] = {"base_path": temp_dir, "cwd_relative": ""}
-        verifier.initialize_sandbox(temp_dir, lesson_id)
-        session_obj = SESSION_SANDBOXES[key]
+    needs_seed = False
+    with _registry_lock:
+        session_obj = SESSION_SANDBOXES.get(key)
+        if not session_obj or not os.path.exists(session_obj["base_path"]):
+            session_obj = {
+                "base_path": create_session_dir(),   # mkdtemp is fast; ok under the lock
+                "cwd_relative": "",
+                "last_used": time.time(),
+                "lock": threading.Lock(),
+                "ready": threading.Event(),
+            }
+            SESSION_SANDBOXES[key] = session_obj
+            needs_seed = True
+        else:
+            session_obj["last_used"] = time.time()
+        _evict_if_needed_locked()
+
+    # Seed outside the registry lock (git is slow); concurrent first-hits wait on `ready`.
+    if needs_seed:
+        try:
+            verifier.initialize_sandbox(session_obj["base_path"], lesson_id)
+        finally:
+            session_obj["ready"].set()
+    else:
+        session_obj["ready"].wait(timeout=30)
     return key, session_obj
+
+def _sweep_idle_sandboxes():
+    now = time.time()
+    with _registry_lock:
+        stale = [k for k, v in SESSION_SANDBOXES.items()
+                 if now - v.get("last_used", 0) > SANDBOX_TTL_SECONDS]
+        for k in stale:
+            _remove_sandbox_dir(SESSION_SANDBOXES[k]["base_path"])
+            del SESSION_SANDBOXES[k]
+
+def _sandbox_sweeper_loop():
+    while True:
+        time.sleep(SANDBOX_SWEEP_INTERVAL)
+        try:
+            _sweep_idle_sandboxes()
+        except Exception as e:
+            print(f"[gitify] sandbox sweeper error: {e}")
+
+def ensure_lesson_remote(base_path: str, lesson_id: int):
+    """Lesson 1 ships a bare remote on disk; once the student runs `git init`, wire it
+    up as `origin` so the taught `git push origin main` actually works."""
+    if lesson_id not in (0, 1):
+        return
+    if not os.path.exists(os.path.join(base_path, ".git")):
+        return
+    remote_dir = base_path + "_remote.git"
+    if not os.path.isdir(remote_dir):
+        return
+    _, remotes, _ = verifier.run_git_command(base_path, ["remote"])
+    if "origin" not in remotes.split():
+        verifier.run_git_command(base_path, ["remote", "add", "origin", remote_dir])
 
 def build_sync_state(base_path: str, cwd_rel: str = "") -> Dict[str, Any]:
     """Inspects the sandbox on disk and builds the state-sync payload that drives the
@@ -608,25 +699,31 @@ def execute_terminal_command(data: TerminalExecuteRequest):
                 "sync_state": build_sync_state(base_path, cwd_rel)
             }
 
-        # 3. Run the full command line (supports && / ; sequencing, | pipes, > >> redirection)
-        cwd_state = {"rel": cwd_rel}
-        code, stdout, stderr = run_command_line(base_path, cwd_state, cmd_string)
-        # Persist any working-directory change made by `cd`
-        SESSION_SANDBOXES[sb_key]["cwd_relative"] = cwd_state["rel"]
-        cwd_rel = cwd_state["rel"]
+        # 3. Run the full command line under the per-sandbox lock so concurrent
+        #    requests on the same repo can't collide on git's index.lock.
+        with session_obj["lock"]:
+            cwd_state = {"rel": session_obj["cwd_relative"]}
+            code, stdout, stderr = run_command_line(base_path, cwd_state, cmd_string)
+            # Persist any working-directory change made by `cd`
+            session_obj["cwd_relative"] = cwd_state["rel"]
+            cwd_rel = cwd_state["rel"]
 
-        # 4. Check exercise checklist checkpoints state on disk!
-        verified, v_msg, subtasks = verifier.check_sandbox_state(base_path, data.lesson_id)
+            # Wire up the lesson's remote once the repo exists (e.g. after `git init`)
+            ensure_lesson_remote(base_path, data.lesson_id)
 
-        # Save checkpoints state into SQLite database!
-        for task in subtasks:
-            database.save_user_checkpoint(data.lesson_id, task["id"], task["completed"], data.username)
+            # 4. Check exercise checklist checkpoints state on disk!
+            verified, v_msg, subtasks = verifier.check_sandbox_state(base_path, data.lesson_id)
 
-        if verified:
-            database.update_user_progress(data.lesson_id, True, 100, data.username)
+            # Save checkpoints state into SQLite database!
+            for task in subtasks:
+                database.save_user_checkpoint(data.lesson_id, task["id"], task["completed"], data.username)
 
-        # 5. Build state-sync package to animate frontend React components
-        sync_state = build_sync_state(base_path, cwd_rel)
+            if verified:
+                database.update_user_progress(data.lesson_id, True, 100, data.username)
+
+            # 5. Build state-sync package to animate frontend React components
+            sync_state = build_sync_state(base_path, cwd_rel)
+            touch_sandbox(session_obj)
 
         return {
             "status": "success" if code == 0 else "error",
@@ -650,13 +747,11 @@ def reset_exercise_sandbox(data: ResetRequest):
         session_id = normalize_session_id(data.session_id)
         sb_key = sandbox_key(session_id, data.lesson_id)
 
-        # Tear down only this lesson's sandbox, then re-seed it from baseline.
-        if sb_key in SESSION_SANDBOXES:
-            try:
-                shutil.rmtree(SESSION_SANDBOXES[sb_key]["base_path"], ignore_errors=True)
-            except Exception:
-                pass
-            del SESSION_SANDBOXES[sb_key]
+        # Tear down only this lesson's sandbox (and its bare remote), then re-seed.
+        with _registry_lock:
+            old = SESSION_SANDBOXES.pop(sb_key, None)
+        if old:
+            _remove_sandbox_dir(old["base_path"])
 
         _, session_obj = get_or_create_sandbox(session_id, data.lesson_id)
         temp_dir = session_obj["base_path"]
@@ -775,24 +870,28 @@ def write_sandbox_file(data: WriteFileRequest):
     """Writes edited file content into the user's sandbox workspace."""
     try:
         sb_key = sandbox_key(normalize_session_id(data.session_id), data.lesson_id)
-        if sb_key not in SESSION_SANDBOXES:
+        session_obj = SESSION_SANDBOXES.get(sb_key)
+        if not session_obj:
             raise HTTPException(status_code=404, detail="Session sandbox not found.")
 
-        base_path = SESSION_SANDBOXES[sb_key]["base_path"]
+        base_path = session_obj["base_path"]
 
         # Security: only allow simple filenames, no path traversal
         filename = os.path.basename(data.filename)
         if not filename or filename.startswith(".git"):
             raise HTTPException(status_code=400, detail="Invalid filename.")
 
-        file_path = os.path.join(base_path, filename)
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(data.content)
+        with session_obj["lock"]:
+            file_path = os.path.join(base_path, filename)
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(data.content)
+            sync_state = build_sync_state(base_path, session_obj["cwd_relative"])
+            touch_sandbox(session_obj)
 
         return {
             "status": "success",
             "message": f"File '{filename}' saved successfully.",
-            "sync_state": build_sync_state(base_path, SESSION_SANDBOXES[sb_key]["cwd_relative"])
+            "sync_state": sync_state
         }
     except HTTPException:
         raise
@@ -817,10 +916,11 @@ def execute_rebase_interactive(data: RebaseInteractiveRequest):
     import subprocess
     try:
         sb_key = sandbox_key(normalize_session_id(data.session_id), data.lesson_id)
-        if sb_key not in SESSION_SANDBOXES:
+        session_obj = SESSION_SANDBOXES.get(sb_key)
+        if not session_obj:
             raise HTTPException(status_code=404, detail="Session sandbox not found.")
 
-        base_path = SESSION_SANDBOXES[sb_key]["base_path"]
+        base_path = session_obj["base_path"]
         if not os.path.exists(os.path.join(base_path, ".git")):
             raise HTTPException(status_code=400, detail="Git repository not initialized.")
 
@@ -867,6 +967,9 @@ def execute_rebase_interactive(data: RebaseInteractiveRequest):
         env = os.environ.copy()
         env["GIT_SEQUENCE_EDITOR"] = editor_script
         env["GIT_CONFIG_NOSYSTEM"] = "1"
+        env["GIT_CONFIG_GLOBAL"] = verifier._ensure_managed_gitconfig()
+        env["GIT_TERMINAL_PROMPT"] = "0"
+        env["GIT_PAGER"] = "cat"
         env["GIT_AUTHOR_NAME"] = "Gitify Student"
         env["GIT_AUTHOR_EMAIL"] = "student@gitify.edu"
         env["GIT_COMMITTER_NAME"] = "Gitify Student"
@@ -874,26 +977,29 @@ def execute_rebase_interactive(data: RebaseInteractiveRequest):
         env["GIT_EDITOR"] = "true"  # accept default commit messages
 
         n = len(data.plan)
-        result = subprocess.run(
-            ["git", "rebase", "-i", f"HEAD~{n}"],
-            cwd=base_path,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            env=env,
-            timeout=15
-        )
+        with session_obj["lock"]:
+            result = subprocess.run(
+                ["git", "rebase", "-i", f"HEAD~{n}"],
+                cwd=base_path,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                env=env,
+                timeout=15
+            )
 
-        for _tmp in (todo_file.name, helper_file.name):
-            try:
-                os.unlink(_tmp)
-            except Exception:
-                pass
+            for _tmp in (todo_file.name, helper_file.name):
+                try:
+                    os.unlink(_tmp)
+                except Exception:
+                    pass
 
-        output = result.stdout or result.stderr or "Rebase complete."
-        success = result.returncode == 0
+            output = result.stdout or result.stderr or "Rebase complete."
+            success = result.returncode == 0
 
-        verified, v_msg, subtasks = verifier.check_sandbox_state(base_path, data.lesson_id)
+            verified, v_msg, subtasks = verifier.check_sandbox_state(base_path, data.lesson_id)
+            sync_state = build_sync_state(base_path, session_obj["cwd_relative"])
+            touch_sandbox(session_obj)
 
         return {
             "status": "success" if success else "error",
@@ -901,7 +1007,7 @@ def execute_rebase_interactive(data: RebaseInteractiveRequest):
             "verified": verified,
             "validation_message": v_msg,
             "subtasks": subtasks,
-            "sync_state": build_sync_state(base_path, SESSION_SANDBOXES[sb_key]["cwd_relative"])
+            "sync_state": sync_state
         }
     except HTTPException:
         raise

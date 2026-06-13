@@ -4,6 +4,15 @@ import tempfile
 os.environ.setdefault("GITIFY_DB_PATH", os.path.join(tempfile.gettempdir(), "gitify-test.db"))
 os.environ.setdefault("GITIFY_CORS_ORIGINS", "http://localhost:5173")
 
+# Run hermetically: this test solves lessons (which persists progress), so start from a
+# clean database every run, including the WAL sidecar files.
+_db = os.environ["GITIFY_DB_PATH"]
+for _f in (_db, _db + "-wal", _db + "-shm"):
+    try:
+        os.remove(_f)
+    except OSError:
+        pass
+
 import database
 import main
 
@@ -63,5 +72,35 @@ assert sh("touch .git/hooks/x")[0] == "error"
 assert sh("curl http://evil")[0] == "error"                    # command not allowlisted
 assert sh("git -c core.editor=evil status")[0] == "error"      # no -c injection
 assert sh("git config core.pager evil")[0] == "error"          # no dangerous config keys
+
+# --- Lesson 3 must be completable end-to-end (merge -> resolve -> add -> commit) ---
+l3 = "smoke-l3"
+main.enter_lesson(main.ResetRequest(lesson_id=3, session_id=l3))
+
+def l3run(cmd):
+    return main.execute_terminal_command(
+        main.TerminalExecuteRequest(command=cmd, session_id=l3, lesson_id=3))
+
+l3run("git merge feature/ui")  # triggers the conflict
+main.write_sandbox_file(main.WriteFileRequest(
+    session_id=l3, lesson_id=3, filename="config.js",
+    content="export const config = {\n  api: '/v1',\n  retries: 3,\n  theme: 'system'\n};\n"))
+l3run("git add config.js")
+res = l3run('git commit -m "resolve merge conflict"')
+assert res["verified"], f"Lesson 3 should verify after a resolved merge commit, got {res['subtasks']}"
+
+# --- Lesson 1 must be completable: init -> add -> commit -> push origin main ---
+l1 = "smoke-l1"
+main.enter_lesson(main.ResetRequest(lesson_id=1, session_id=l1))
+
+def l1run(cmd):
+    return main.execute_terminal_command(
+        main.TerminalExecuteRequest(command=cmd, session_id=l1, lesson_id=1))
+
+l1run("git init")
+l1run("git add .")
+l1run('git commit -m "first commit"')
+res1 = l1run("git push origin main")
+assert res1["verified"], f"Lesson 1 should verify after pushing to origin/main, got {res1['subtasks']}"
 
 print("backend smoke test passed")
