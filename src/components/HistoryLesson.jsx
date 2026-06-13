@@ -1,5 +1,7 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect, useRef } from 'react'
+import { Target, Check, AlertTriangle, CornerUpLeft, RotateCcw, Eye } from 'lucide-react'
 import PretextCanvas from './PretextCanvas.jsx'
+import { useToast } from './Toast.jsx'
 
 const baseCommits = [
   {
@@ -77,12 +79,16 @@ const matrixTargets = [
 
 const matrixLabels = ['revert', 'reset --soft', 'reset --hard']
 
-export default function HistoryLesson() {
-  const [selectedIndex, setSelectedIndex] = useState(4)
-  const [headIndex, setHeadIndex] = useState(7)
+const BAD_INDEX = baseCommits.findIndex((c) => c.bad)
+
+export default function HistoryLesson({ onSuccess } = {}) {
+  const toast = useToast()
+  const [selectedIndex, setSelectedIndex] = useState(BAD_INDEX)
+  const [headIndex, setHeadIndex] = useState(baseCommits.length - 1)
   const [hasReverted, setHasReverted] = useState(false)
-  const [resetIndex, setResetIndex] = useState(7)
+  const [resetIndex, setResetIndex] = useState(baseCommits.length - 1)
   const [resetMode, setResetMode] = useState('mixed')
+  const [triedHardReset, setTriedHardReset] = useState(false)
   const [matrixAnswers, setMatrixAnswers] = useState({})
 
   const commits = useMemo(() => {
@@ -101,19 +107,51 @@ export default function HistoryLesson() {
     ]
   }, [hasReverted])
 
-  const selected = commits[selectedIndex] || commits[4]
+  const selected = commits[selectedIndex] || commits[BAD_INDEX]
   const headCommit = commits[headIndex] || commits[commits.length - 1]
   const resetCommit = commits[Number(resetIndex)] || commits[commits.length - 1]
   const correctCount = matrixTargets.filter((target) => matrixAnswers[target.id] === target.answer).length
+  const matrixDone = correctCount === matrixTargets.length
+  const atTip = headIndex === commits.length - 1
+  const discarded = baseCommits.slice(Number(resetIndex) + 1)
+
+  // Live objective tracker — gives the lesson a clear goal & sense of progress
+  const objectives = [
+    { id: 'revert', label: 'Revert the broken commit safely', done: hasReverted },
+    { id: 'reset', label: 'See what a hard reset destroys', done: triedHardReset },
+    { id: 'matrix', label: 'Match all 3 situations in the Safety Matrix', done: matrixDone },
+  ]
+  const allDone = objectives.every((o) => o.done)
+
+  // Fire completion exactly once when every objective is met
+  const firedRef = useRef(false)
+  useEffect(() => {
+    if (allDone && !firedRef.current) {
+      firedRef.current = true
+      toast.success('You inspected, reverted, and learned when each undo is safe.', { title: 'Lesson 4 complete' })
+      if (onSuccess) onSuccess()
+    }
+  }, [allDone, onSuccess, toast])
 
   const jumpToCommit = () => {
     setHeadIndex(selectedIndex)
+    if (selectedIndex !== commits.length - 1) {
+      toast.info(`HEAD detached at ${commits[selectedIndex].hash}. You're viewing an old snapshot, not the branch tip.`, { title: 'Detached HEAD' })
+    }
   }
+
+  const returnToLatest = () => setHeadIndex(commits.length - 1)
 
   const revertBadCommit = () => {
     setHasReverted(true)
     setHeadIndex(baseCommits.length)
     setSelectedIndex(baseCommits.length)
+    toast.success('A new "Revert" commit was added on top — original history is preserved, so this is safe to push.', { title: 'Reverted safely' })
+  }
+
+  const pickResetMode = (mode) => {
+    setResetMode(mode)
+    if (mode === 'hard') setTriedHardReset(true)
   }
 
   const handleDrop = (event, targetId) => {
@@ -128,14 +166,37 @@ export default function HistoryLesson() {
         <h1>Git History & Time Travel</h1>
         <p>Every commit is a snapshot. Inspect it, jump to it, undo it, or rewrite it with care.</p>
       </header>
+
+      {/* Scenario + live objectives so the user always knows the goal */}
+      <div className="history-mission">
+        <div className="mission-text">
+          <div className="mission-tag"><Target size={15} strokeWidth={2.2} /> Your mission</div>
+          <p>
+            Commit <code>e17b90</code> (“Skip null metric check”) shipped to production and
+            <strong> broke the metrics dashboard</strong>. Work down the stages below to inspect what
+            went wrong, undo it <em>safely</em>, and learn when each kind of undo is the right tool.
+          </p>
+        </div>
+        <ul className="mission-objectives">
+          {objectives.map((o) => (
+            <li key={o.id} className={`objective ${o.done ? 'done' : ''}`}>
+              <span className="objective-check">{o.done ? <Check size={13} strokeWidth={3} /> : null}</span>
+              {o.label}
+            </li>
+          ))}
+        </ul>
+      </div>
+
       <PretextCanvas scene="historyLog" height={220} />
 
       <main className="history-layout">
         <section className="history-panel timeline-panel">
           <div className="panel-heading">
-            <span>Stage 1</span>
+            <span className="stage-num">1</span>
             <h2>The Timeline</h2>
           </div>
+
+          <p className="stage-instruction"><Eye size={14} strokeWidth={2} /> Click any commit to read its diff below. The red node is the commit that broke production.</p>
 
           <div className="timeline-scroller">
             <div className="history-track">
@@ -150,6 +211,8 @@ export default function HistoryLesson() {
                   <strong>{commit.hash}</strong>
                   <em>{commit.message}</em>
                   <small><Avatar name={commit.author} /> {commit.author} - {commit.time}</small>
+                  {commit.bad && <span className="commit-tag bad">broke prod</span>}
+                  {commit.revert && <span className="commit-tag revert">undo</span>}
                 </button>
               ))}
             </div>
@@ -160,16 +223,22 @@ export default function HistoryLesson() {
 
         <section className="history-panel checkout-panel">
           <div className="panel-heading">
-            <span>Stage 2</span>
+            <span className="stage-num">2</span>
             <h2>Detached HEAD</h2>
           </div>
 
+          <p className="stage-instruction">Select a commit in Stage 1, then jump to it. Watch the <strong>HEAD</strong> tag and the working directory below change to that snapshot.</p>
+
           <div className="snapshot-grid">
             <div>
-              <p>Click a commit, then jump to that snapshot. HEAD moves away from the branch tip.</p>
-              <button className="history-action" onClick={jumpToCommit}>
-                Jump to this commit
+              <button className="history-action" onClick={jumpToCommit} disabled={selectedIndex === headIndex}>
+                Jump to {selected.hash}
               </button>
+              {!atTip && (
+                <button className="history-action ghost" onClick={returnToLatest}>
+                  <CornerUpLeft size={14} strokeWidth={2} /> Return to latest
+                </button>
+              )}
             </div>
             <div className="working-snapshot">
               <h3>Working directory</h3>
@@ -178,48 +247,53 @@ export default function HistoryLesson() {
             </div>
           </div>
 
-          {headIndex !== commits.length - 1 && (
-            <div className="warning-badge" title="Detached HEAD means you are viewing a commit directly instead of working on a branch. New commits here can be hard to keep unless you create a branch.">
-              You're in detached HEAD state
+          {atTip ? (
+            <div className="detached-status ok">HEAD is on the branch tip — new commits attach normally.</div>
+          ) : (
+            <div className="detached-status warn">
+              <AlertTriangle size={14} strokeWidth={2.2} />
+              Detached HEAD: you're viewing <code>{headCommit.hash}</code> directly, not a branch. Commits made here are easy to lose — create a branch or return to the tip.
             </div>
           )}
         </section>
 
         <section className="history-panel revert-panel">
           <div className="panel-heading">
-            <span>Stage 3</span>
-            <h2>Safe Undo</h2>
+            <span className="stage-num">3</span>
+            <h2>Safe Undo — <code>git revert</code></h2>
           </div>
 
-          <p>The production break came from <code>e17b90</code>. Revert adds a new commit that undoes it while keeping history intact.</p>
+          <p className="stage-instruction">The break came from <code>e17b90</code>. <strong>Revert</strong> doesn't erase it — it adds a <em>new</em> commit that applies the opposite change, so the shared history stays intact.</p>
           <button className="history-action" onClick={revertBadCommit} disabled={hasReverted}>
-            Revert this commit
+            <RotateCcw size={14} strokeWidth={2} /> {hasReverted ? 'Reverted ✓' : 'Revert e17b90'}
           </button>
           <div className={`safe-badge ${hasReverted ? 'active' : ''}`}>
-            Safe for shared branches
+            {hasReverted ? 'Done — see the new "undo" commit at the end of Stage 1' : 'Safe for shared branches'}
           </div>
         </section>
 
         <section className="history-panel reset-panel">
           <div className="panel-heading">
-            <span>Stage 4</span>
-            <h2>Dangerous Undo</h2>
+            <span className="stage-num">4</span>
+            <h2>Dangerous Undo — <code>git reset</code></h2>
           </div>
+
+          <p className="stage-instruction">Drag the slider to move the branch pointer back in time, then compare the three modes. Unlike revert, reset <strong>rewrites</strong> history.</p>
 
           <div className="reset-tabs">
             {['soft', 'mixed', 'hard'].map((mode) => (
               <button
                 key={mode}
                 className={resetMode === mode ? `selected mode-${mode}` : ''}
-                onClick={() => setResetMode(mode)}
+                onClick={() => pickResetMode(mode)}
               >
-                --{mode}{mode === 'hard' ? ' skull' : ''}
+                --{mode}{mode === 'hard' ? <AlertTriangle size={12} strokeWidth={2.4} style={{ marginLeft: 4, verticalAlign: '-1px' }} /> : null}
               </button>
             ))}
           </div>
 
           <label className="reset-slider">
-            Reset pointer: <strong>{resetCommit.hash}</strong>
+            Move branch pointer to: <strong>{resetCommit.hash}</strong> — {resetCommit.message}
             <input
               type="range"
               min="0"
@@ -228,6 +302,24 @@ export default function HistoryLesson() {
               onChange={(event) => setResetIndex(event.target.value)}
             />
           </label>
+
+          {discarded.length > 0 && (
+            <div className="discarded-block">
+              <span className="discarded-label">{discarded.length} commit{discarded.length > 1 ? 's' : ''} after the pointer:</span>
+              <div className="discarded-list">
+                {discarded.map((c) => (
+                  <span key={c.hash} className={`discarded-commit mode-${resetMode}`}>{c.hash} {c.message}</span>
+                ))}
+              </div>
+              <small className="discarded-fate">
+                {resetMode === 'soft'
+                  ? 'kept and re-staged, ready to re-commit'
+                  : resetMode === 'mixed'
+                    ? 'kept in your files but unstaged'
+                    : 'permanently deleted from your working tree'}
+              </small>
+            </div>
+          )}
 
           <div className={`reset-state mode-${resetMode}`}>
             <div>
@@ -242,16 +334,18 @@ export default function HistoryLesson() {
 
           {resetMode === 'hard' && (
             <div className="danger-warning">
-              This cannot be undone. Remote history will diverge.
+              <AlertTriangle size={14} strokeWidth={2.2} /> This cannot be undone, and rewriting pushed history makes the remote diverge from teammates.
             </div>
           )}
         </section>
 
         <section className="history-panel safety-panel">
           <div className="panel-heading">
-            <span>Stage 5</span>
+            <span className="stage-num">5</span>
             <h2>The Safety Matrix</h2>
           </div>
+
+          <p className="stage-instruction">Now put it together: drag each command onto the situation where it's the right choice.</p>
 
           <div className="label-bank">
             {matrixLabels.map((label) => (
@@ -286,7 +380,9 @@ export default function HistoryLesson() {
             <strong>Key insight:</strong> revert adds to history. reset rewrites it. On shared branches,
             rewriting history breaks everyone else.
           </div>
-          <div className="matrix-score">{correctCount} of {matrixTargets.length} matched</div>
+          <div className={`matrix-score ${matrixDone ? 'complete' : ''}`}>
+            {matrixDone ? <><Check size={14} strokeWidth={3} /> All matched — you've got it</> : `${correctCount} of ${matrixTargets.length} matched`}
+          </div>
         </section>
       </main>
     </div>

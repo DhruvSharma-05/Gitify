@@ -2305,10 +2305,28 @@ header p {
 }
 
 /* History Lesson */
+/* Guided journey: numbered step cards. Content-rich stages span the
+   full row; the two sparse action stages pair up so no width is wasted. */
 .history-layout {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
+  gap: 24px;
+  align-items: stretch;
+}
+.timeline-panel,
+.reset-panel,
+.safety-panel {
+  grid-column: 1 / -1;
+}
+/* Let the shorter paired card fill its height so bottoms line up */
+.history-lesson .checkout-panel,
+.history-lesson .revert-panel {
+  display: flex;
+  flex-direction: column;
+}
+.history-lesson .revert-panel .safe-badge,
+.history-lesson .checkout-panel .detached-status {
+  margin-top: auto;
 }
 
 .history-panel {
@@ -2319,9 +2337,55 @@ header p {
   padding: 22px;
 }
 
-.timeline-panel,
-.safety-panel {
-  grid-column: 1 / -1;
+/* Per-stage accent — green = safe, amber = dangerous, etc. */
+.history-lesson .history-panel {
+  --stage-accent: #38bdf8;
+  position: relative;
+  padding: 22px 24px;
+  border-radius: 16px;
+  border-left: 3px solid var(--stage-accent);
+}
+.history-lesson .timeline-panel { --stage-accent: #38bdf8; }
+.history-lesson .checkout-panel { --stage-accent: #8b5cf6; }
+.history-lesson .revert-panel   { --stage-accent: #34d399; }
+.history-lesson .reset-panel    { --stage-accent: #fb923c; }
+.history-lesson .safety-panel   { --stage-accent: #f472b6; }
+
+/* Stage header: numbered circle badge + title on one row */
+.history-lesson .panel-heading {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-bottom: 16px;
+}
+.history-lesson .panel-heading .stage-num {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #0d1117;
+  background: var(--stage-accent);
+  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.04);
+}
+.history-lesson .panel-heading h2 {
+  margin: 0;
+  font-size: 1.18rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.history-lesson .panel-heading h2 code {
+  font-size: 0.78em;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1px 7px;
+  border-radius: 5px;
+  color: var(--stage-accent);
 }
 
 .timeline-scroller {
@@ -2521,6 +2585,235 @@ header p {
 .history-action:disabled {
   cursor: not-allowed;
   opacity: 0.5;
+}
+
+.history-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+/* Primary action adopts the stage accent for a cohesive look */
+.history-lesson .history-action:not(.ghost) {
+  border-color: var(--stage-accent);
+  color: var(--stage-accent);
+}
+.history-lesson .history-action:not(.ghost):hover:not(:disabled) {
+  background: var(--stage-accent);
+  color: #0d1117;
+}
+.history-action.ghost {
+  background: transparent;
+  margin-top: 8px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.history-action.ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-main);
+}
+
+/* ---- Lesson 4 clarity layer: mission, objectives, instructions ---- */
+.history-mission {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 18px;
+  align-items: center;
+  margin: 4px 0 18px;
+  padding: 16px 18px;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.08), rgba(139, 92, 246, 0.06));
+}
+.mission-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #38bdf8;
+  margin-bottom: 6px;
+}
+.mission-text p {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--text-main);
+}
+.mission-text code {
+  background: rgba(0, 0, 0, 0.35);
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-size: 0.85em;
+  color: #f472b6;
+}
+.mission-objectives {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mission-objectives .objective {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  transition: color 0.2s;
+}
+.mission-objectives .objective.done {
+  color: #34d399;
+  text-decoration: line-through;
+  text-decoration-color: rgba(52, 211, 153, 0.5);
+}
+.objective-check {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #0d1117;
+  transition: all 0.2s;
+}
+.objective.done .objective-check {
+  background: #34d399;
+  border-color: #34d399;
+}
+
+.stage-instruction {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 0 0 16px;
+  padding: 10px 13px;
+  background: rgba(255, 255, 255, 0.03);
+  border-left: 3px solid var(--stage-accent, rgba(56, 189, 248, 0.5));
+  border-radius: 0 8px 8px 0;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+.stage-instruction svg { flex-shrink: 0; margin-top: 2px; color: var(--stage-accent, #38bdf8); }
+.stage-instruction code {
+  background: rgba(0, 0, 0, 0.35);
+  padding: 0 5px;
+  border-radius: 4px;
+  color: #f472b6;
+}
+.stage-instruction strong { color: var(--text-main); }
+
+/* Commit tags on timeline nodes */
+.commit-tag {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 1px 7px;
+  border-radius: 20px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.commit-tag.bad {
+  background: rgba(248, 113, 113, 0.18);
+  color: #fca5a5;
+  border: 1px solid rgba(248, 113, 113, 0.4);
+}
+.commit-tag.revert {
+  background: rgba(52, 211, 153, 0.16);
+  color: #6ee7b7;
+  border: 1px solid rgba(52, 211, 153, 0.4);
+}
+
+/* Detached HEAD status */
+.detached-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+.detached-status svg { flex-shrink: 0; margin-top: 2px; }
+.detached-status code { background: rgba(0,0,0,0.35); padding: 0 5px; border-radius: 4px; }
+.detached-status.ok {
+  background: rgba(52, 211, 153, 0.1);
+  border: 1px solid rgba(52, 211, 153, 0.25);
+  color: #6ee7b7;
+}
+.detached-status.warn {
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  color: #fcd34d;
+}
+
+/* Reset discarded-commits preview */
+.discarded-block {
+  margin: 12px 0;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+.discarded-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.discarded-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+}
+.discarded-commit {
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 0.74rem;
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  border-left: 2px solid rgba(255, 255, 255, 0.15);
+}
+.discarded-commit.mode-hard {
+  color: #fca5a5;
+  border-left-color: #f87171;
+  text-decoration: line-through;
+  text-decoration-color: rgba(248, 113, 113, 0.5);
+}
+.discarded-commit.mode-soft { border-left-color: #34d399; color: #a7f3d0; }
+.discarded-commit.mode-mixed { border-left-color: #fbbf24; color: #fde68a; }
+.discarded-fate {
+  font-size: 0.76rem;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.danger-warning {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.matrix-score.complete {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #34d399;
+  font-weight: 800;
+}
+
+@media (max-width: 768px) {
+  .history-mission { grid-template-columns: 1fr; gap: 14px; }
 }
 
 .working-snapshot {
@@ -5315,15 +5608,24 @@ header p {
 }
 
 /* ============================================================
-   Responsive lesson layout
-   The 3-column split (visualizer + inspector + checklist) is
-   inline-styled as flex-row, so we override with !important to
-   stack it once the columns can no longer breathe.
+   Lesson layout: side panels follow the (often tall) lesson
+   content instead of leaving dead space beside it.
    ============================================================ */
+.lesson-container-split {
+  align-items: flex-start !important;
+}
+.lesson-middle-inspector,
+.lesson-right-sidebar {
+  position: sticky;
+  top: 16px;
+  align-self: flex-start;
+}
+
+/* The 3-column split is inline-styled as flex-row; override with
+   !important to stack it once the columns can no longer breathe. */
 @media (max-width: 1024px) {
   .lesson-container-split {
     flex-direction: column !important;
-    padding: 0 14px !important;
   }
   .lesson-left-content,
   .lesson-middle-inspector,
@@ -5333,6 +5635,7 @@ header p {
     min-width: 0 !important;
     max-width: none !important;
     max-height: none !important;
+    position: static !important;
   }
 }
 
