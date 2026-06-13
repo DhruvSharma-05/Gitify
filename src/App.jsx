@@ -14,7 +14,7 @@ import ExerciseGuide from './components/ExerciseGuide.jsx'
 import FileInspector from './components/FileInspector.jsx'
 import LiveCommitGraph from './components/LiveCommitGraph.jsx'
 import PretextCanvas from './components/PretextCanvas.jsx'
-import { apiUrl } from './api.js'
+import { apiUrl, getInitialOfflineState, getInitialSubtasks } from './api.js'
 
 const lessonOrder = [0, 1, 2, 3, 4, 5, 6, 7]
 
@@ -35,6 +35,8 @@ export default function App() {
   const [fileContents, setFileContents] = useState({})
   const [commitsGraph, setCommitsGraph] = useState([])
   const [workspaceFiles, setWorkspaceFiles] = useState([])
+  // Snapshot fed to the terminal so its prompt reflects this lesson's seeded branch/files
+  const [terminalHydration, setTerminalHydration] = useState(null)
 
   // Commit details inspection modal state
   const [selectedCommit, setSelectedCommit] = useState(null)
@@ -76,7 +78,9 @@ export default function App() {
       .catch(err => console.warn("Backend not running or progress unavailable:", err))
   }, [])
 
-  // Reset exercise state and scroll to top when moving lessons
+  // On entering a lesson: clear transient UI, then hydrate that lesson's own
+  // sandbox (its branch, files, commit DAG, checklist) from the backend. Each
+  // lesson keeps its own independent terminal/repo, seeded on first visit.
   useEffect(() => {
     setIsSolved(false)
     setSubtasks([])
@@ -84,8 +88,39 @@ export default function App() {
     setFileContents({})
     setCommitsGraph([])
     setWorkspaceFiles([])
+    setTerminalHydration(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [currentLesson])
+
+    if (!sessionId || currentLesson === 0) return
+
+    let cancelled = false
+    fetch(apiUrl('/api/lessons/enter'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lesson_id: currentLesson, session_id: sessionId, username: 'student' })
+    })
+      .then(res => { if (!res.ok) throw new Error(`enter ${res.status}`); return res.json() })
+      .then(data => {
+        if (cancelled || data.status !== 'success') return
+        const s = data.sync_state || {}
+        if (s.commits_graph) setCommitsGraph(s.commits_graph)
+        if (s.file_contents) setFileContents(s.file_contents)
+        if (s.files) setWorkspaceFiles(s.files)
+        if (data.subtasks) setSubtasks(data.subtasks)
+        setTerminalHydration({ branch: s.branch, files: s.files, pwd: s.pwd, nonce: Date.now() })
+      })
+      .catch(err => {
+        if (cancelled) return
+        console.warn('Lesson enter failed, using offline seed:', err)
+        const local = getInitialOfflineState(currentLesson)
+        setCommitsGraph(local.commits || [])
+        setFileContents(local.fileContents || {})
+        setWorkspaceFiles(local.files || [])
+        setSubtasks(getInitialSubtasks(currentLesson))
+        setTerminalHydration({ branch: local.branch, files: local.files, pwd: '', nonce: Date.now() })
+      })
+    return () => { cancelled = true }
+  }, [currentLesson, sessionId])
 
   const handleLessonSelect = (lessonId) => {
     setCurrentLesson(lessonId)
@@ -206,7 +241,8 @@ export default function App() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         commit_hash: commit.full_hash || commit.hash,
-        session_id: sessionId
+        session_id: sessionId,
+        lesson_id: currentLesson
       })
     })
       .then(res => {
@@ -327,6 +363,7 @@ export default function App() {
                 files={workspaceFiles}
                 fileContents={fileContents}
                 sessionId={sessionId}
+                lessonId={currentLesson}
                 onFileEdit={handleFileEdit}
               />
             </div>
@@ -354,10 +391,10 @@ export default function App() {
               }}
               isExerciseMode={isExerciseMode}
               onToggleMode={(mode) => {
+                // Unified model: learning and exercise share the same per-lesson
+                // sandbox. Toggling only reveals the grading overlay — it never
+                // wipes the terminal. Use "Reset Sandbox Baseline" for a clean slate.
                 setIsExerciseMode(mode)
-                if (mode) {
-                  setResetTrigger(prev => prev + 1)
-                }
               }}
               onResetExercise={() => {
                 setResetTrigger(prev => prev + 1)
@@ -388,6 +425,7 @@ export default function App() {
           onRebaseInteractive={handleRebaseInteractive}
           liveCommits={commitsGraph}
           onSessionChange={setSessionId}
+          hydration={terminalHydration}
         />
       )}
 

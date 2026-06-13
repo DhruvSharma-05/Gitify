@@ -21,7 +21,7 @@ function computeLineDiff(original, modified) {
   return result
 }
 
-export default function FileInspector({ files = [], fileContents = {}, sessionId, onFileEdit }) {
+export default function FileInspector({ files = [], fileContents = {}, sessionId, lessonId, onFileEdit }) {
   const [selectedFile, setSelectedFile] = useState('')
   const [isEditing, setIsEditing] = useState(false)
   const [editBuffer, setEditBuffer] = useState('')
@@ -72,6 +72,7 @@ export default function FileInspector({ files = [], fileContents = {}, sessionId
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           session_id: sessionId,
+          lesson_id: lessonId,
           filename: selectedFile,
           content: editBuffer
         })

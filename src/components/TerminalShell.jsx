@@ -83,7 +83,15 @@ function getSmartHint(command, output, lessonId) {
   return null
 }
 
-export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetTrigger, onRebaseInteractive, liveCommits, onSessionChange }) {
+function welcomeBanner(lessonId) {
+  return [
+    { type: 'system', text: `Welcome to Gitify Sandbox Console - Lesson ${lessonId}` },
+    { type: 'system', text: 'Type Git commands to solve the exercise tasks in real time.' },
+    { type: 'system', text: 'Try "git status", "git log", "git stash", or "ls". Type "clear" to empty console. Hit [Tab] to autocomplete!' }
+  ]
+}
+
+export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetTrigger, onRebaseInteractive, liveCommits, onSessionChange, hydration }) {
   const [pwd, setPwd] = useState('')
   const [branch, setBranch] = useState('main')
   const [history, setHistory] = useState([])
@@ -107,6 +115,13 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
   const historyRef = useRef(null)
   const inputRef = useRef(null)
 
+  // Per-lesson scrollback persistence: each lesson keeps its own terminal log so
+  // navigating between lessons doesn't wipe what you typed.
+  const scrollbackCache = useRef({})
+  const liveHistoryRef = useRef([])
+  const prevLessonRef = useRef(lessonId)
+  useEffect(() => { liveHistoryRef.current = history }, [history])
+
   // Autocomplete calculator
   const calculateSuggestions = (value) => {
     if (!value) {
@@ -118,7 +133,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
     const words = trimmed.split(/\s+/)
     const currentWord = words[words.length - 1]
 
-    const allowedBase = ['git', 'ls', 'cat', 'cd', 'touch', 'mkdir', 'rm', 'mv', 'cp', 'clear']
+    const allowedBase = ['git', 'ls', 'cat', 'cd', 'pwd', 'echo', 'touch', 'mkdir', 'rm', 'mv', 'cp', 'head', 'tail', 'grep', 'wc', 'clear']
     const gitSubcommands = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote']
 
     if (words.length === 1) {
@@ -127,7 +142,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
     } else if (words[0] === 'git' && words.length === 2) {
       const matches = gitSubcommands.filter(c => c.startsWith(currentWord.toLowerCase()) && c !== currentWord.toLowerCase())
       setSuggestions(matches)
-    } else if (words.length > 1 && (words[words.length - 2] === 'add' || words[0] === 'cat' || words[0] === 'rm' || words[0] === 'cd')) {
+    } else if (words.length > 1 && (words[words.length - 2] === 'add' || ['cat', 'rm', 'cd', 'head', 'tail', 'wc', 'cp', 'mv'].includes(words[0]))) {
       const matches = files.filter(f => f.toLowerCase().startsWith(currentWord.toLowerCase()) && f.toLowerCase() !== currentWord.toLowerCase())
       setSuggestions(matches)
     } else if (words.length > 1 && (words[words.length - 2] === 'checkout' || words[words.length - 2] === 'merge' || words[words.length - 2] === 'rebase')) {
@@ -158,19 +173,43 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
     setSessionId(activeSession)
   }, [])
 
-  // Handle lesson change or reset trigger
+  // Lesson change: stash the outgoing lesson's scrollback, restore this lesson's
+  // (or show a fresh welcome banner if it's the first visit).
   useEffect(() => {
-    setHistory([
-      { type: 'system', text: `Welcome to Gitify Sandbox Console - Lesson ${lessonId}` },
-      { type: 'system', text: 'Type Git commands to solve the exercise tasks in real time.' },
-      { type: 'system', text: 'Try "git status", "git log", "git stash", or "ls". Type "clear" to empty console. Hit [Tab] to autocomplete!' }
-    ])
+    const prev = prevLessonRef.current
+    if (prev !== lessonId) {
+      scrollbackCache.current[prev] = liveHistoryRef.current
+    }
+    prevLessonRef.current = lessonId
+
+    const cached = scrollbackCache.current[lessonId]
+    setHistory(cached && cached.length ? cached : welcomeBanner(lessonId))
     setPwd('')
     setBranch('main')
     setFiles([])
     setBranches(['main'])
     setOfflineState(getInitialOfflineState(lessonId))
-  }, [lessonId, resetTrigger])
+  }, [lessonId])
+
+  // Explicit reset: wipe this lesson's scrollback and start clean.
+  useEffect(() => {
+    scrollbackCache.current[lessonId] = null
+    setHistory(welcomeBanner(lessonId))
+    setPwd('')
+    setBranch('main')
+    setFiles([])
+    setBranches(['main'])
+    setOfflineState(getInitialOfflineState(lessonId))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetTrigger])
+
+  // Hydrate prompt (branch/files/cwd) from the lesson's seeded sandbox state.
+  useEffect(() => {
+    if (!hydration) return
+    if (hydration.branch !== undefined) setBranch(hydration.branch || 'main')
+    if (hydration.files) setFiles(hydration.files)
+    if (hydration.pwd !== undefined) setPwd(hydration.pwd || '')
+  }, [hydration])
 
   // Auto scroll to bottom of the terminal container (without scrolling the main window)
   useEffect(() => {
@@ -425,7 +464,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
 
     // Completing the base command
     if (words.length === 1) {
-      const allowedBase = ['git', 'ls', 'cat', 'cd', 'touch', 'mkdir', 'rm', 'mv', 'cp', 'clear']
+      const allowedBase = ['git', 'ls', 'cat', 'cd', 'pwd', 'echo', 'touch', 'mkdir', 'rm', 'mv', 'cp', 'head', 'tail', 'grep', 'wc', 'clear']
       const match = allowedBase.find(c => c.startsWith(text.toLowerCase()))
       if (match) {
         setInputValue(match + ' ')
@@ -444,7 +483,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
     }
 
     // Completing file names
-    if (words.length > 1 && (words[words.length - 2] === 'add' || words[0] === 'cat' || words[0] === 'rm' || words[0] === 'cd')) {
+    if (words.length > 1 && (words[words.length - 2] === 'add' || ['cat', 'rm', 'cd', 'head', 'tail', 'wc', 'cp', 'mv'].includes(words[0]))) {
       const match = files.find(f => f.toLowerCase().startsWith(currentWord.toLowerCase()))
       if (match) {
         words[words.length - 1] = match
