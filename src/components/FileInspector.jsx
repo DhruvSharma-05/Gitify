@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { FolderOpen, FileText, AlertTriangle, Pencil, Save, Loader } from 'lucide-react'
 import './FileInspector.css'
 import { apiUrl } from '../api.js'
 
@@ -128,7 +129,7 @@ export default function FileInspector({ files = [], fileContents = {}, sessionId
   return (
     <div className="file-inspector-panel glassmorphic">
       <div className="inspector-header">
-        <span>📂 Live Workspace Files</span>
+        <span><FolderOpen size={16} strokeWidth={2} /> Live Workspace Files</span>
       </div>
 
       {files.length === 0 ? (
@@ -144,7 +145,7 @@ export default function FileInspector({ files = [], fileContents = {}, sessionId
                 className={`tab-btn ${selectedFile === file ? 'active' : ''}`}
                 onClick={() => { setSelectedFile(file); setIsEditing(false); setSaveMsg('') }}
               >
-                📄 {file}
+                <FileText size={13} strokeWidth={2} /> {file}
               </button>
             ))}
           </div>
@@ -154,7 +155,7 @@ export default function FileInspector({ files = [], fileContents = {}, sessionId
               <span>{selectedFile}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {content.includes('<<<<<<<') && (
-                  <span className="conflict-badge">⚠️ MERGE CONFLICT</span>
+                  <span className="conflict-badge"><AlertTriangle size={13} strokeWidth={2.2} /> MERGE CONFLICT</span>
                 )}
                 {saveMsg && (
                   <span className={`save-status-msg ${saveMsg.startsWith('✓') ? 'save-ok' : 'save-err'}`}>
@@ -168,7 +169,7 @@ export default function FileInspector({ files = [], fileContents = {}, sessionId
                     title="Edit this file"
                     aria-label={`Edit ${selectedFile}`}
                   >
-                    ✏️ Edit
+                    <Pencil size={13} strokeWidth={2} /> Edit
                   </button>
                 ) : (
                   <div className="edit-actions-bar">
@@ -178,7 +179,7 @@ export default function FileInspector({ files = [], fileContents = {}, sessionId
                       aria-label="Toggle diff preview"
                       title="Preview changes"
                     >
-                      {showDiff ? '✏️ Edit' : '± Diff'}
+                      {showDiff ? <><Pencil size={13} strokeWidth={2} /> Edit</> : '± Diff'}
                     </button>
                     <button
                       className="save-btn"
@@ -186,7 +187,7 @@ export default function FileInspector({ files = [], fileContents = {}, sessionId
                       disabled={isSaving || showDiff}
                       aria-label="Save file changes"
                     >
-                      {isSaving ? '⏳' : '💾 Save'}
+                      {isSaving ? <Loader size={13} strokeWidth={2.4} className="spin-icon" /> : <><Save size={13} strokeWidth={2} /> Save</>}
                     </button>
                     <button
                       className="cancel-btn"

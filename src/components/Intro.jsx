@@ -1,4 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react'
+import {
+  Pencil, Package, HardDrive, Cloud, Flag,
+  GitBranch, Zap, ShieldCheck, HelpCircle, Lightbulb,
+  Copy, Play, Pause, RotateCw, FileText, Palette, Settings, Check
+} from 'lucide-react'
 import PretextCanvas from './PretextCanvas.jsx'
 
 const STEPS = [
@@ -6,7 +11,7 @@ const STEPS = [
     id: 'working',
     title: 'Workspace',
     subtitle: 'Step 1: Your Workspace (Working Directory)',
-    emoji: '✏️',
+    Icon: Pencil,
     color: '#38bdf8', // Light blue
     analogy: 'Your desk with all your draft paperwork scattered around.',
     description: 'This is your local computer directory where you create, edit, and modify code. Git does not track these changes automatically. They exist only as raw files on your hard drive until you stage them.',
@@ -16,7 +21,7 @@ const STEPS = [
     id: 'staging',
     title: 'Staging Area',
     subtitle: 'Step 2: Preparing to Save',
-    emoji: '📦',
+    Icon: Package,
     color: '#f59e0b', // Amber/Orange
     analogy: 'A shipping box where you select and pack specific items to be shipped.',
     description: 'The Staging Area is a preview zone where you prepare changes for your next save. It acts as a safety buffer, letting you stage some file changes while leaving others out of the snapshot.',
@@ -26,7 +31,7 @@ const STEPS = [
     id: 'commit',
     title: 'Local Repository',
     subtitle: 'Step 3: Save a Snapshot',
-    emoji: '💾',
+    Icon: HardDrive,
     color: '#10b981', // Green
     analogy: 'Taking a permanent, dated photo of your project at this exact moment.',
     description: 'Committing saves a permanent, compressed snapshot of your staged files in your Local Repository. Each commit has a description and a unique ID (hash), building an immutable history of your project.',
@@ -36,7 +41,7 @@ const STEPS = [
     id: 'push',
     title: 'Remote Repository',
     subtitle: 'Step 4: Share with the World',
-    emoji: '☁️',
+    Icon: Cloud,
     color: '#8b5cf6', // Purple
     analogy: 'Uploading your photo album to a cloud backup and sharing it with your team.',
     description: 'Pushing uploads your local commit history to a Remote Repository on a server like GitHub. This secures your work in the cloud and lets your collaborators download and merge your changes.',
@@ -46,7 +51,7 @@ const STEPS = [
     id: 'complete',
     title: 'Complete Flow',
     subtitle: 'The Unified Workflow',
-    emoji: '🏁',
+    Icon: Flag,
     color: '#a78bfa', // Lavender
     analogy: 'The continuous cycle of coding, staging, committing, and pushing.',
     description: 'This is the complete, core cycle of modern software development. You write edits, stage them, take a snapshot, and push them to share with your team.',
@@ -140,22 +145,16 @@ export default function Intro({ onComplete }) {
                 <path d="M 20 5 L 14 31" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round"/>
                 <path d="M 26 6 L 33 18 L 26 30" stroke="#38bdf8" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"/>
               </g>
-              {/* State 2: git branch graph */}
+              {/* State 2: clean git-branch mark (cyan main + purple feature) */}
               <g className="logo-state-git">
-                {/* Main track – cyan vertical */}
-                <line x1="11" y1="3" x2="11" y2="32" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round"/>
-                {/* Branch: one continuous path  split→feature→merge */}
-                <path d="M 11 12 L 24 17 L 24 23 L 11 28"
-                  stroke="#f472b6" strokeWidth="2" fill="none"
-                  strokeLinecap="round" strokeLinejoin="round"/>
-                {/* Main nodes */}
-                <circle cx="11" cy="5"  r="2.8" fill="#0D1117" stroke="#38bdf8" strokeWidth="2"/>
-                <circle cx="11" cy="12" r="2.5" fill="#0D1117" stroke="#f472b6" strokeWidth="2"/>
-                <circle cx="11" cy="20" r="2.5" fill="#0D1117" stroke="#38bdf8" strokeWidth="2"/>
-                <circle cx="11" cy="28" r="2.5" fill="#0D1117" stroke="#4ade80" strokeWidth="2"/>
-                {/* Feature nodes */}
-                <circle cx="24" cy="17" r="2.5" fill="#0D1117" stroke="#f472b6" strokeWidth="2"/>
-                <circle cx="24" cy="23" r="2.5" fill="#0D1117" stroke="#4ade80" strokeWidth="2"/>
+                {/* Main branch – cyan vertical */}
+                <line x1="12" y1="7" x2="12" y2="29" stroke="#38bdf8" strokeWidth="2.4" strokeLinecap="round"/>
+                {/* Feature branch – purple curve peeling off up-right */}
+                <path d="M 12 18 C 18 18, 24 16, 24 11" stroke="#8b5cf6" strokeWidth="2.4" fill="none" strokeLinecap="round"/>
+                {/* Nodes */}
+                <circle cx="12" cy="7"  r="3.1" fill="#0D1117" stroke="#38bdf8" strokeWidth="2.4"/>
+                <circle cx="12" cy="29" r="3.1" fill="#0D1117" stroke="#38bdf8" strokeWidth="2.4"/>
+                <circle cx="24" cy="10" r="3.1" fill="#0D1117" stroke="#8b5cf6" strokeWidth="2.4"/>
               </g>
             </svg>
           </div>
@@ -257,17 +256,17 @@ export default function Intro({ onComplete }) {
         </div>
         <div className="features-grid">
           <div className="feature-card">
-            <div className="feature-icon">🌿</div>
+            <div className="feature-icon"><GitBranch size={26} strokeWidth={2} /></div>
             <h3>Visual Branching</h3>
             <p>Watch branches diverge, merge, and rebase in a clear visual tree. No more guessing what HEAD points to.</p>
           </div>
           <div className="feature-card">
-            <div className="feature-icon">⚡</div>
+            <div className="feature-icon"><Zap size={26} strokeWidth={2} /></div>
             <h3>Instant Sandbox Feedback</h3>
             <p>Stage, commit, and push files in a sandbox and see them animate across the staging area and local repository immediately.</p>
           </div>
           <div className="feature-card">
-            <div className="feature-icon">🛡️</div>
+            <div className="feature-icon"><ShieldCheck size={26} strokeWidth={2} /></div>
             <h3>Risk-Free Practice</h3>
             <p>Revert commits, rebase commits, and resolve merge conflicts safely without fear of breaking a real-world repository.</p>
           </div>
@@ -302,7 +301,7 @@ export default function Intro({ onComplete }) {
               </div>
             </div>
             <div className="confusion-icons">
-              <span>❓</span>
+              <HelpCircle size={32} strokeWidth={2} />
             </div>
           </div>
         </div>
@@ -337,7 +336,7 @@ export default function Intro({ onComplete }) {
                 style={{ '--active-color': step.color }}
               >
                 <div className="step-circle">
-                  <span className="step-emoji">{step.emoji}</span>
+                  <span className="step-emoji"><step.Icon size={18} strokeWidth={2.2} /></span>
                   <span className="step-number">{idx + 1}</span>
                 </div>
                 <span className="step-node-label">{step.title}</span>
@@ -351,8 +350,8 @@ export default function Intro({ onComplete }) {
               
               {/* Left Side: Info & Controls */}
               <div className="tour-text-panel">
-                <div className="step-badge-indicator" style={{ backgroundColor: `${STEPS[activeStep].color}22`, color: STEPS[activeStep].color }}>
-                  {STEPS[activeStep].emoji} {STEPS[activeStep].title.toUpperCase()}
+                <div className="step-badge-indicator" style={{ backgroundColor: `${STEPS[activeStep].color}22`, color: STEPS[activeStep].color, display: 'inline-flex', alignItems: 'center', gap: '7px' }}>
+                  {React.createElement(STEPS[activeStep].Icon, { size: 16, strokeWidth: 2.2 })} {STEPS[activeStep].title.toUpperCase()}
                 </div>
                 
                 <h3 className="step-title-text">{STEPS[activeStep].subtitle}</h3>
@@ -360,7 +359,7 @@ export default function Intro({ onComplete }) {
                 <p className="step-desc-text">{STEPS[activeStep].description}</p>
                 
                 <div className="step-analogy-box">
-                  <span className="analogy-icon">💡</span>
+                  <span className="analogy-icon"><Lightbulb size={18} strokeWidth={2} /></span>
                   <div className="analogy-body">
                     <strong>Think of it as:</strong>
                     <p>{STEPS[activeStep].analogy}</p>
@@ -377,7 +376,7 @@ export default function Intro({ onComplete }) {
                         onClick={() => navigator.clipboard.writeText(STEPS[activeStep].command)}
                         title="Copy Command"
                       >
-                        📋
+                        <Copy size={16} strokeWidth={2} />
                       </button>
                     </div>
                   </div>
@@ -398,7 +397,9 @@ export default function Intro({ onComplete }) {
                     onClick={togglePlay}
                     title={isPlaying ? 'Pause Auto-Play' : 'Start Auto-Play'}
                   >
-                    {isPlaying ? '⏸ Pause Auto-Tour' : '▶ Play Auto-Tour'}
+                    {isPlaying
+                      ? <><Pause size={15} strokeWidth={2.2} /> Pause Auto-Tour</>
+                      : <><Play size={15} strokeWidth={2.2} /> Play Auto-Tour</>}
                   </button>
                 </div>
               </div>
@@ -412,7 +413,7 @@ export default function Intro({ onComplete }) {
                     onClick={() => setAnimationTrigger(Date.now())}
                     title="Replay Animation"
                   >
-                    🔄 Replay
+                    <RotateCw size={15} strokeWidth={2.2} /> Replay
                   </button>
                 </div>
                 <div className="visual-panel-body">
@@ -457,9 +458,9 @@ export default function Intro({ onComplete }) {
                             <div className="staging-columns">
                               <div className="stage-side">
                                 <h4>Workspace</h4>
-                                <div className="anim-file-card f-app sliding-1">📄 App.jsx</div>
-                                <div className="anim-file-card f-styles sliding-2">🎨 styles.css</div>
-                                <div className="anim-file-card f-config clean">⚙️ config.js</div>
+                                <div className="anim-file-card f-app sliding-1"><FileText size={14} strokeWidth={2} /> App.jsx</div>
+                                <div className="anim-file-card f-styles sliding-2"><Palette size={14} strokeWidth={2} /> styles.css</div>
+                                <div className="anim-file-card f-config clean"><Settings size={14} strokeWidth={2} /> config.js</div>
                               </div>
                               <div className="arrow-connector">
                                 <div className="arrow-line"></div>
@@ -468,8 +469,8 @@ export default function Intro({ onComplete }) {
                               <div className="stage-side">
                                 <h4>Staging Box</h4>
                                 <div className="staging-box-wrapper">
-                                  <div className="anim-staged-card staged-1">📦 App.jsx</div>
-                                  <div className="anim-staged-card staged-2">📦 styles.css</div>
+                                  <div className="anim-staged-card staged-1"><Package size={14} strokeWidth={2} /> App.jsx</div>
+                                  <div className="anim-staged-card staged-2"><Package size={14} strokeWidth={2} /> styles.css</div>
                                   <span className="staging-box-empty">Empty</span>
                                 </div>
                               </div>
@@ -536,9 +537,9 @@ export default function Intro({ onComplete }) {
                               <div className="remote-cloud-column">
                                 <h4>GitHub Cloud</h4>
                                 <div className="cloud-wrapper">
-                                  <div className="cloud-icon-large">☁️</div>
+                                  <div className="cloud-icon-large"><Cloud size={56} strokeWidth={1.6} /></div>
                                   <div className="cloud-pushed-status">
-                                    <span className="cloud-success-badge">✓ Updated</span>
+                                    <span className="cloud-success-badge"><Check size={13} strokeWidth={3} /> Updated</span>
                                     <div className="cloud-pushed-commit">Commit: 7c91a0c</div>
                                   </div>
                                 </div>
@@ -551,7 +552,7 @@ export default function Intro({ onComplete }) {
                           <div className="visual-container complete-anim-grid" key={animationTrigger}>
                             <div className="diagram-grid">
                               <div className="diagram-node node-working animate-node-1">
-                                <div className="d-icon">✏️</div>
+                                <div className="d-icon"><Pencil size={24} strokeWidth={2} /></div>
                                 <div className="d-label">Workspace</div>
                                 <div className="d-sub">Local Edits</div>
                               </div>
@@ -560,7 +561,7 @@ export default function Intro({ onComplete }) {
                                 <span className="c-text">git add</span>
                               </div>
                               <div className="diagram-node node-staging animate-node-2">
-                                <div className="d-icon">📦</div>
+                                <div className="d-icon"><Package size={24} strokeWidth={2} /></div>
                                 <div className="d-label">Staging Area</div>
                                 <div className="d-sub">Prepared Changes</div>
                               </div>
@@ -569,7 +570,7 @@ export default function Intro({ onComplete }) {
                                 <span className="c-text">git commit</span>
                               </div>
                               <div className="diagram-node node-commit animate-node-3">
-                                <div className="d-icon">💾</div>
+                                <div className="d-icon"><HardDrive size={24} strokeWidth={2} /></div>
                                 <div className="d-label">Local Repo</div>
                                 <div className="d-sub">Version History</div>
                               </div>
@@ -578,7 +579,7 @@ export default function Intro({ onComplete }) {
                                 <span className="c-text">git push</span>
                               </div>
                               <div className="diagram-node node-push animate-node-4">
-                                <div className="d-icon">☁️</div>
+                                <div className="d-icon"><Cloud size={24} strokeWidth={2} /></div>
                                 <div className="d-label">GitHub Cloud</div>
                                 <div className="d-sub">Remote Repo</div>
                               </div>

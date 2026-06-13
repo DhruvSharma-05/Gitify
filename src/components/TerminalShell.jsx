@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { Terminal, BookOpen } from 'lucide-react'
 import { apiUrl, getInitialOfflineState } from '../api.js'
 
 // Levenshtein distance matcher for typos suggestion
@@ -46,45 +47,45 @@ function getSmartHint(command, output, lessonId) {
   const cmd = command.toLowerCase()
 
   if (out.includes('fatal: not a git repository')) {
-    return "💡 Tip: You're not inside a git repo yet. Run 'git init' to initialize one."
+    return "Tip:You're not inside a git repo yet. Run 'git init' to initialize one."
   }
   if (out.includes('nothing to commit') && out.includes('working tree clean')) {
-    return "💡 Tip: Nothing to commit — your working tree is clean. Make a change or add a file first."
+    return "Tip:Nothing to commit — your working tree is clean. Make a change or add a file first."
   }
   if (out.includes('nothing added to commit') || out.includes('no changes added to commit')) {
-    return "💡 Tip: Changes exist but aren't staged. Run 'git add <filename>' or 'git add .' to stage them."
+    return "Tip:Changes exist but aren't staged. Run 'git add <filename>' or 'git add .' to stage them."
   }
   if (out.includes('pathspec') && out.includes('did not match')) {
     const fileGuess = (command.match(/\b([\w./]+\.[\w]+)\b/) || [])[1]
-    return `💡 Tip: File not found. Run 'ls' to see what's in the workspace${fileGuess ? ` — did you mean '${fileGuess}'?` : '.'}`
+    return `Tip: File not found. Run 'ls' to see what's in the workspace${fileGuess ? ` — did you mean '${fileGuess}'?` : '.'}`
   }
   if (out.includes('conflict') || out.includes('<<<<<<<')) {
-    return "💡 Tip: Merge conflict detected. Open the file in the inspector, edit out the conflict markers (<<<, ===, >>>), then 'git add <file>' and 'git commit'."
+    return "Tip:Merge conflict detected. Open the file in the inspector, edit out the conflict markers (<<<, ===, >>>), then 'git add <file>' and 'git commit'."
   }
   if (out.includes('your branch is behind') || out.includes('updates were rejected')) {
-    return "💡 Tip: Your local branch is behind the remote. Try 'git pull --rebase' to sync up."
+    return "Tip:Your local branch is behind the remote. Try 'git pull --rebase' to sync up."
   }
   if (out.includes('needs merge') || out.includes('unresolved conflicts')) {
-    return "💡 Tip: Unresolved conflicts exist. Resolve them in the editor, then 'git add' the file."
+    return "Tip:Unresolved conflicts exist. Resolve them in the editor, then 'git add' the file."
   }
   if (cmd.includes('git stash') && (out.includes('no local changes') || out.includes('nothing to stash'))) {
-    return "💡 Tip: There's nothing to stash. Make a change to a tracked file first."
+    return "Tip:There's nothing to stash. Make a change to a tracked file first."
   }
   if (out.includes('already up to date')) {
-    return "💡 Tip: Already up to date — no new commits to merge or pull."
+    return "Tip:Already up to date — no new commits to merge or pull."
   }
   if (out.includes('error: failed to push') || out.includes('rejected')) {
-    return "💡 Tip: Push rejected. Run 'git pull' first to integrate remote changes."
+    return "Tip:Push rejected. Run 'git pull' first to integrate remote changes."
   }
   if (out.includes('detached head')) {
-    return "💡 Tip: You're in detached HEAD state. Create a branch with 'git checkout -b <branch-name>' to keep your work."
+    return "Tip:You're in detached HEAD state. Create a branch with 'git checkout -b <branch-name>' to keep your work."
   }
   return null
 }
 
 function welcomeBanner(lessonId) {
   return [
-    { type: 'system', text: `📟 Welcome to Gitify Sandbox Console - Lesson ${lessonId}` },
+    { type: 'system', text: `Welcome to Gitify Sandbox Console - Lesson ${lessonId}` },
     { type: 'system', text: 'Type Git commands to solve the exercise tasks in real time.' },
     { type: 'system', text: 'Try "git status", "git log", "git stash", or "ls". Type "clear" to empty console. Hit [Tab] to autocomplete!' }
   ]
@@ -243,7 +244,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
 
         setHistory(prev => [...prev, {
         type: 'system',
-        text: '📟 Opening interactive rebase editor… (Use the modal to arrange commits, then click Save & Execute)'
+        text: 'Opening interactive rebase editor… (Use the modal to arrange commits, then click Save & Execute)'
       }])
       // Prefer live backend commits; fall back to offline seed only when server is unreachable
       const commitsForModal = (liveCommits && liveCommits.length > 0) ? liveCommits : (offlineState?.commits || [])
@@ -306,7 +307,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
             if (suggestion) {
               setHistory(prev => [...prev, {
                 type: 'system',
-                text: `💡 Gitify Hint: Did you mean "git ${suggestion}"?`
+                text: `Hint: Did you mean "git ${suggestion}"?`
               }])
             }
           }
@@ -352,7 +353,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
         if (data.verified) {
           setHistory(prev => [...prev, { 
             type: 'success', 
-            text: `🎉 EXERCISE SOLVED: ${data.validation_message}` 
+            text: `✓ EXERCISE SOLVED: ${data.validation_message}`
           }])
           if (onSuccess) onSuccess()
         }
@@ -379,7 +380,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
           },
           {
             type: 'system',
-            text: '📟 [Offline Fallback Mode — server unreachable, simulating in memory]'
+            text: '[Offline Fallback Mode — server unreachable, simulating in memory]'
           }
         ])
 
@@ -417,7 +418,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
         if (checkResult.verified) {
           setHistory(prev => [...prev, { 
             type: 'success', 
-            text: `🎉 EXERCISE SOLVED (Offline): ${checkResult.msg}` 
+            text: `✓ EXERCISE SOLVED (Offline): ${checkResult.msg}`
           }])
           if (onSuccess) onSuccess()
         }
@@ -530,7 +531,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
           zIndex: 9999
         }}
       >
-        <span>📟 Open Terminal Console</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Terminal size={15} strokeWidth={2} /> Open Terminal Console</span>
       </div>
     )
   }
@@ -618,7 +619,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
             }}
             className="cheatsheet-toggle-btn"
           >
-            📖 Cheatsheet
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}><BookOpen size={13} strokeWidth={2} /> Cheatsheet</span>
           </button>
           <button 
             onClick={(e) => {
@@ -779,7 +780,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
           {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '8px', marginBottom: '12px' }}>
             <h3 style={{ margin: 0, fontSize: '0.95rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span>📖</span> Git Command Cheatsheet
+              <BookOpen size={15} strokeWidth={2} /> Git Command Cheatsheet
             </h3>
             <button 
               onClick={() => setCheatsheetOpen(false)}

@@ -1,3 +1,19 @@
+/* lucide icon alignment */
+.mode-tab,
+.reset-sandbox-btn,
+.exercise-help h4 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.exercise-help h4 { display: flex; }
+.congrats-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fbbf24;
+}
+
 .exercise-guide-panel {
   position: relative;
   background: rgba(15, 23, 42, 0.4);

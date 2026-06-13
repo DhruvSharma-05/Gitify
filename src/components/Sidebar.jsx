@@ -1,4 +1,5 @@
 import React from 'react'
+import { CheckCircle } from 'lucide-react'
 
 const lessons = [
   { id: 0, title: 'Lesson 0: Git Basics', description: 'Interactive Tutorial' },
@@ -40,7 +41,7 @@ export default function Sidebar({ isOpen, onClose, currentLesson, onSelectLesson
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3>{lesson.title}</h3>
                 {completedLessons.includes(lesson.id) && (
-                  <span style={{ color: '#10b981', fontSize: '0.85rem', fontWeight: '700' }}>✓ Solved</span>
+                  <span style={{ color: '#10b981', fontSize: '0.85rem', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><CheckCircle size={14} strokeWidth={2.4} /> Solved</span>
                 )}
               </div>
               <p>{lesson.description}</p>

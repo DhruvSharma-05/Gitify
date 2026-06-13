@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react'
+import { Network } from 'lucide-react'
 
 export default function LiveCommitGraph({ commits = [], onSelectCommit }) {
   const [hoveredNode, setHoveredNode] = useState(null)
@@ -127,8 +128,8 @@ export default function LiveCommitGraph({ commits = [], onSelectCommit }) {
         backdropFilter: 'blur(8px)'
       }}
     >
-      <div style={{ fontSize: '0.8rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', marginBottom: '8px' }}>
-        🌲 Live Git History DAG
+      <div style={{ fontSize: '0.8rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <Network size={14} strokeWidth={2} /> Live Git History DAG
       </div>
       <svg 
         width={width} 
