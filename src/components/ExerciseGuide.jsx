@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { GraduationCap, Swords, Lightbulb, RotateCw, Trophy } from 'lucide-react'
 import './ExerciseGuide.css'
 import { apiUrl, getInitialSubtasks, getInitialOfflineState } from '../api.js'
 
@@ -184,13 +185,13 @@ export default function ExerciseGuide({
           className={`mode-tab ${!isExerciseMode ? 'active' : ''}`}
           onClick={() => handleModeToggle('learning')}
         >
-          🎓 Learning Mode
+          <GraduationCap size={16} strokeWidth={2} /> Learning Mode
         </button>
-        <button 
+        <button
           className={`mode-tab ${isExerciseMode ? 'active' : ''}`}
           onClick={() => handleModeToggle('exercise')}
         >
-          ⚔️ Exercise Mode
+          <Swords size={16} strokeWidth={2} /> Exercise Mode
         </button>
       </div>
 
@@ -246,7 +247,7 @@ export default function ExerciseGuide({
           </div>
 
           <div className="exercise-help">
-            <h4>💡 Student Tip</h4>
+            <h4><Lightbulb size={15} strokeWidth={2} /> Student Tip</h4>
             <p>{details.tips}</p>
           </div>
 
@@ -258,14 +259,14 @@ export default function ExerciseGuide({
               onClick={handleResetClick}
               disabled={loading}
             >
-              🔄 Reset Sandbox Baseline
+              <RotateCw size={15} strokeWidth={2} /> Reset Sandbox Baseline
             </button>
           </div>
 
           {isSolved && (
             <div className="celebration-overlay glassmorphic">
               <div className="celebration-card">
-                <div className="congrats-icon">🏆</div>
+                <div className="congrats-icon"><Trophy size={48} strokeWidth={1.8} /></div>
                 <h2>Lesson Completed!</h2>
                 <p>You have successfully cleared all verification checkpoints on the Git sandbox directory.</p>
                 <button className="next-lesson-nav-btn" onClick={nextLessonTrigger}>

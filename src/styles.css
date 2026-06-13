@@ -3532,10 +3532,10 @@ header p {
   color: #fff;
 }
 
-/* Morphing symbol logo: </> ↔ git branch graph */
+/* Morphing symbol logo: </> ↔ git branch mark */
 .logo-morph-wrap {
   flex-shrink: 0;
-  animation: logo-float 3s ease-in-out infinite, logo-morph-glow 5s ease-in-out infinite;
+  animation: logo-float 3.4s ease-in-out infinite, logo-morph-glow 7s ease-in-out infinite;
 }
 
 @keyframes logo-float {
@@ -3544,9 +3544,9 @@ header p {
 }
 
 @keyframes logo-morph-glow {
-  0%, 25%   { filter: drop-shadow(0 0 7px rgba(56, 189, 248, 0.75)); }
-  50%, 75%  { filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.6)); }
-  95%, 100% { filter: drop-shadow(0 0 7px rgba(56, 189, 248, 0.75)); }
+  0%, 40%   { filter: drop-shadow(0 0 7px rgba(56, 189, 248, 0.75)); }
+  55%, 90%  { filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.7)); }
+  100%      { filter: drop-shadow(0 0 7px rgba(56, 189, 248, 0.75)); }
 }
 
 .logo-state-code,
@@ -3555,24 +3555,24 @@ header p {
   transform-origin: center;
 }
 
-/* </> state */
+/* </> state — holds, then flips out */
 .logo-state-code {
-  animation: show-code 5s ease-in-out infinite;
+  animation: show-code 7s cubic-bezier(0.65, 0, 0.35, 1) infinite;
 }
 @keyframes show-code {
-  0%, 30%   { opacity: 1; transform: scale(1); }
-  50%, 75%  { opacity: 0; transform: scale(0.75); }
-  95%, 100% { opacity: 1; transform: scale(1); }
+  0%, 40%   { opacity: 1; transform: scale(1) rotate(0deg); }
+  52%, 90%  { opacity: 0; transform: scale(0.88) rotate(-12deg); }
+  100%      { opacity: 1; transform: scale(1) rotate(0deg); }
 }
 
-/* git graph state */
+/* git branch state — flips in, holds */
 .logo-state-git {
-  animation: show-git 5s ease-in-out infinite;
+  animation: show-git 7s cubic-bezier(0.65, 0, 0.35, 1) infinite;
 }
 @keyframes show-git {
-  0%, 30%   { opacity: 0; transform: scale(0.75); }
-  50%, 75%  { opacity: 1; transform: scale(1); }
-  95%, 100% { opacity: 0; transform: scale(0.75); }
+  0%, 40%   { opacity: 0; transform: scale(0.88) rotate(12deg); }
+  52%, 90%  { opacity: 1; transform: scale(1) rotate(0deg); }
+  100%      { opacity: 0; transform: scale(0.88) rotate(12deg); }
 }
 
 .intro-logo:hover .logo-morph-wrap,
@@ -3752,13 +3752,50 @@ header p {
 }
 
 .feature-icon {
-  font-size: 2.2rem;
   margin-bottom: 20px;
   background: rgba(255, 255, 255, 0.03);
-  padding: 10px;
+  padding: 12px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.05);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #38bdf8;
 }
+
+/* lucide icon alignment ---------------------------------------- */
+/* Box-style holders: center the SVG */
+.d-icon,
+.step-emoji,
+.analogy-icon,
+.cloud-icon-large,
+.confusion-icons {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.cloud-icon-large { color: #8b5cf6; }
+.analogy-icon { color: #fbbf24; }
+.confusion-icons { color: #f472b6; }
+/* Inline-with-text icons: nudge onto the text baseline */
+.anim-file-card svg,
+.anim-staged-card svg,
+.cloud-success-badge svg,
+.copy-cmd-btn svg,
+.tour-play-btn svg,
+.replay-btn svg,
+.step-badge-indicator svg {
+  vertical-align: -0.16em;
+}
+.tour-play-btn,
+.replay-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+}
+.spin-icon { animation: spin-icon-rot 0.9s linear infinite; }
+@keyframes spin-icon-rot { to { transform: rotate(360deg); } }
 
 .feature-card h3 {
   font-size: 1.25rem;

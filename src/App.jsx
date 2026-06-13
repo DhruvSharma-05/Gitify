@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { Search, Settings, Lightbulb, Loader, CheckCircle, GripVertical } from 'lucide-react'
 import Flow from './components/Flow.jsx'
 import Intro from './components/Intro.jsx'
 import Sidebar from './components/Sidebar.jsx'
@@ -429,7 +430,7 @@ export default function App() {
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '12px', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ fontSize: '1.5rem' }}>🔍</span>
+                <Search size={22} strokeWidth={2} color="#38bdf8" />
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#fff' }}>Commit Inspection</h3>
                   <code style={{ fontSize: '0.8rem', color: '#38bdf8' }}>{selectedCommit.full_hash || selectedCommit.hash}</code>
@@ -523,7 +524,7 @@ export default function App() {
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '12px' }}>
               <div>
-                <h3 style={{ margin: 0, color: '#fff', fontSize: '1.1rem' }}>⚙️ Interactive Rebase Editor</h3>
+                <h3 style={{ margin: 0, color: '#fff', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}><Settings size={18} strokeWidth={2} /> Interactive Rebase Editor</h3>
                 <code style={{ fontSize: '0.78rem', color: '#38bdf8' }}>git rebase -i HEAD~{rebasePlan.length}</code>
               </div>
               <button onClick={() => setRebaseModalOpen(false)} aria-label="Close rebase editor"
@@ -531,8 +532,8 @@ export default function App() {
             </div>
 
             {/* Info banner */}
-            <div style={{ background: 'rgba(56,189,248,0.07)', border: '1px solid rgba(56,189,248,0.2)', borderRadius: '8px', padding: '8px 12px', marginBottom: '14px', fontSize: '0.78rem', color: '#94a3b8' }}>
-              💡 Set each commit's action: <strong style={{color:'#38bdf8'}}>pick</strong> = keep, <strong style={{color:'#a78bfa'}}>squash</strong> = merge into previous, <strong style={{color:'#f87171'}}>drop</strong> = delete, <strong style={{color:'#fbbf24'}}>reword</strong> = rename
+            <div style={{ background: 'rgba(56,189,248,0.07)', border: '1px solid rgba(56,189,248,0.2)', borderRadius: '8px', padding: '8px 12px', marginBottom: '14px', fontSize: '0.78rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Lightbulb size={15} strokeWidth={2} style={{ flexShrink: 0, color: '#fbbf24' }} /> <span>Set each commit's action: <strong style={{color:'#38bdf8'}}>pick</strong> = keep, <strong style={{color:'#a78bfa'}}>squash</strong> = merge into previous, <strong style={{color:'#f87171'}}>drop</strong> = delete, <strong style={{color:'#fbbf24'}}>reword</strong> = rename</span>
             </div>
 
             {/* Commit rows */}
@@ -552,7 +553,7 @@ export default function App() {
                     transition: 'background 0.15s, border-color 0.15s'
                   }}
                 >
-                  <span style={{ color: '#475569', fontSize: '1rem', cursor: 'grab', userSelect: 'none', lineHeight: 1 }} title="Drag to reorder">⠿</span>
+                  <span style={{ color: '#475569', cursor: 'grab', userSelect: 'none', lineHeight: 1, display: 'inline-flex' }} title="Drag to reorder"><GripVertical size={16} strokeWidth={2} /></span>
                   <span style={{ color: '#475569', fontSize: '0.75rem', minWidth: '16px' }}>{idx + 1}</span>
                   <select
                     value={commit.action}
@@ -584,8 +585,10 @@ export default function App() {
                 Cancel
               </button>
               <button onClick={submitRebasePlan} disabled={isRebasing}
-                style={{ background: 'linear-gradient(90deg,#38bdf8,#6366f1)', border: 'none', color: '#fff', padding: '8px 22px', borderRadius: '7px', cursor: isRebasing ? 'not-allowed' : 'pointer', fontWeight: '700', opacity: isRebasing ? 0.6 : 1 }}>
-                {isRebasing ? '⏳ Rebasing…' : '✅ Save & Execute'}
+                style={{ background: 'linear-gradient(90deg,#38bdf8,#6366f1)', border: 'none', color: '#fff', padding: '8px 22px', borderRadius: '7px', cursor: isRebasing ? 'not-allowed' : 'pointer', fontWeight: '700', opacity: isRebasing ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', gap: '7px' }}>
+                {isRebasing
+                  ? <><Loader size={15} strokeWidth={2.4} className="spin-icon" /> Rebasing…</>
+                  : <><CheckCircle size={15} strokeWidth={2.4} /> Save & Execute</>}
               </button>
             </div>
           </div>

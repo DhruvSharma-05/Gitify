@@ -142,13 +142,26 @@ function drawGitBasics(ctx, width, height, t, data) {
   ctx.textBaseline = 'top'
   ctx.fillStyle = '#c9d1d9'
 
+  let lastLine = null
+  let lastY = y
   while (true) {
     const range = layoutNextLineRange(prepared, cursor, width - 44)
     if (range === null) break
     const line = materializeLineRange(prepared, range)
     ctx.fillText(line.text, x, y)
     cursor = range.end
+    lastLine = line
+    lastY = y
     y += 26
+  }
+
+  // Blinking terminal cursor at the end of the typed text
+  const cursorX = lastLine ? x + measureNaturalWidth(getPrepared(lastLine.text, monoFont)) + 3 : x
+  const cursorY = lastLine ? lastY : 36
+  if (Math.floor(t * 2) % 2 === 0) {
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.9)'
+    roundRect(ctx, cursorX, cursorY, 8, 17, 1.5)
+    ctx.fill()
   }
 
   const keywords = ['git', 'add', 'commit']
@@ -227,6 +240,17 @@ function drawHistoryLog(ctx, width, height, t, data) {
   const rowHeight = 42
   const totalHeight = data.commits.length * rowHeight
   const scroll = (t * 32) % totalHeight
+  const laneX = 18
+  const bubbleX = 36
+
+  // Continuous git-graph spine running the full height
+  ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)'
+  ctx.lineWidth = 2.5
+  ctx.beginPath()
+  ctx.moveTo(laneX, 10)
+  ctx.lineTo(laneX, height - 8)
+  ctx.stroke()
+
   const preparedRows = data.commits.map((commit) => getPrepared(commit, labelFont))
   preparedRows.forEach((prepared, index) => {
     // Place each row within [0, totalHeight) so it wraps seamlessly: a row
@@ -234,16 +258,45 @@ function drawHistoryLog(ctx, width, height, t, data) {
     const y = 24 + ((index * rowHeight - scroll) % totalHeight + totalHeight) % totalHeight - rowHeight
     if (y < -rowHeight || y > height + 20) return
     let maxLineWidth = 0
-    walkLineRanges(prepared, width - 80, (line) => { maxLineWidth = Math.max(maxLineWidth, line.width) })
+    walkLineRanges(prepared, width - 90, (line) => { maxLineWidth = Math.max(maxLineWidth, line.width) })
     const bubbleWidth = maxLineWidth + 28
-    ctx.fillStyle = index === 4 ? 'rgba(239,68,68,0.22)' : 'rgba(59,130,246,0.18)'
-    roundRect(ctx, 22, y, bubbleWidth, 30, 15)
+    const highlight = index === 4
+    const nodeY = y + 15
+
+    ctx.fillStyle = highlight ? 'rgba(239,68,68,0.22)' : 'rgba(59,130,246,0.18)'
+    roundRect(ctx, bubbleX, y, bubbleWidth, 30, 15)
     ctx.fill()
-    const line = layoutWithLines(prepared, width - 80, 20).lines[0]
+    const line = layoutWithLines(prepared, width - 90, 20).lines[0]
     ctx.font = labelFont
     ctx.fillStyle = '#f0f6fc'
     ctx.textBaseline = 'middle'
-    ctx.fillText(line.text, 36, y + 15)
+    ctx.fillText(line.text, bubbleX + 14, nodeY)
+
+    // Forked branch stub on the highlighted commit
+    if (highlight) {
+      ctx.strokeStyle = 'rgba(244, 114, 182, 0.9)'
+      ctx.lineWidth = 2.5
+      ctx.beginPath()
+      ctx.moveTo(laneX, nodeY)
+      ctx.lineTo(laneX + 11, nodeY - 13)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.arc(laneX + 13, nodeY - 15, 3.5, 0, Math.PI * 2)
+      ctx.fillStyle = '#0b0f17'
+      ctx.fill()
+      ctx.lineWidth = 2
+      ctx.strokeStyle = '#f472b6'
+      ctx.stroke()
+    }
+
+    // Commit node sitting on the spine
+    ctx.beginPath()
+    ctx.arc(laneX, nodeY, 4.5, 0, Math.PI * 2)
+    ctx.fillStyle = '#0b0f17'
+    ctx.fill()
+    ctx.lineWidth = 2.5
+    ctx.strokeStyle = highlight ? '#f472b6' : '#38bdf8'
+    ctx.stroke()
   })
 }
 
@@ -279,9 +332,24 @@ function drawRemotePackets(ctx, width, height, t, data) {
     const packetWidth = 128
     const x = 32 + ((t * 95 + index * 150) % (width - 96))
     const display = fitLabel(label, labelFont, packetWidth - 18)
-    ctx.fillStyle = 'rgba(59,130,246,0.85)'
+
+    // Glowing motion trail — fading ghost copies behind the packet
+    for (let k = 4; k >= 1; k--) {
+      ctx.globalAlpha = 0.08 * (5 - k)
+      ctx.fillStyle = 'rgba(56, 189, 248, 1)'
+      roundRect(ctx, x - k * 13, y - 24, packetWidth, 48, 24)
+      ctx.fill()
+    }
+    ctx.globalAlpha = 1
+
+    // Packet body with neon glow
+    ctx.shadowColor = 'rgba(56, 189, 248, 0.85)'
+    ctx.shadowBlur = 16
+    ctx.fillStyle = 'rgba(59,130,246,0.9)'
     roundRect(ctx, x, y - 24, packetWidth, 48, 24)
     ctx.fill()
+    ctx.shadowBlur = 0
+
     ctx.font = labelFont
     ctx.fillStyle = '#fff'
     ctx.textBaseline = 'middle'
@@ -426,7 +494,7 @@ function drawPlaygroundFlow(ctx, width, height, t, data) {
   ctx.beginPath()
   ctx.arc(x, y, 12, 0, Math.PI * 2)
   ctx.fill()
-  
+
   // Outer glowing pulse ring
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'
   ctx.lineWidth = 2
@@ -434,8 +502,44 @@ function drawPlaygroundFlow(ctx, width, height, t, data) {
   ctx.arc(x, y, 12 + 6 * Math.sin(t * 5), 0, Math.PI * 2)
   ctx.stroke()
 
-  ctx.font = monoFont
+  drawDocGlyph(ctx, x, y)
+}
+
+// A crisp document icon drawn with paths (folded-corner page + text lines)
+function drawDocGlyph(ctx, cx, cy) {
+  const w = 9
+  const h = 12
+  const fold = 3.5
+  const x = cx - w / 2
+  const y = cy - h / 2
+  ctx.save()
+  ctx.strokeStyle = '#0f172a'
   ctx.fillStyle = '#0f172a'
-  ctx.textBaseline = 'middle'
-  ctx.fillText('📄', x - 7, y)
+  ctx.lineWidth = 1.4
+  ctx.lineJoin = 'round'
+  // page outline with folded top-right corner
+  ctx.beginPath()
+  ctx.moveTo(x, y)
+  ctx.lineTo(x + w - fold, y)
+  ctx.lineTo(x + w, y + fold)
+  ctx.lineTo(x + w, y + h)
+  ctx.lineTo(x, y + h)
+  ctx.closePath()
+  ctx.stroke()
+  // fold crease
+  ctx.beginPath()
+  ctx.moveTo(x + w - fold, y)
+  ctx.lineTo(x + w - fold, y + fold)
+  ctx.lineTo(x + w, y + fold)
+  ctx.stroke()
+  // text lines
+  ctx.lineWidth = 1
+  for (let i = 0; i < 3; i++) {
+    const ly = y + 5 + i * 2.4
+    ctx.beginPath()
+    ctx.moveTo(x + 2, ly)
+    ctx.lineTo(x + w - 2, ly)
+    ctx.stroke()
+  }
+  ctx.restore()
 }

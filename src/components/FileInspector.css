@@ -1,3 +1,16 @@
+/* lucide icon alignment within inspector controls */
+.inspector-header span,
+.tab-btn,
+.conflict-badge,
+.edit-toggle-btn,
+.diff-toggle-btn,
+.save-btn,
+.cancel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
 .file-inspector-panel {
   display: flex;
   flex-direction: column;
