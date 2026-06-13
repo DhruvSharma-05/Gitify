@@ -134,17 +134,29 @@ export default function Intro({ onComplete }) {
         <div className="intro-logo">
           <div className="logo-morph-wrap">
             <svg viewBox="0 0 36 36" width="38" height="38" fill="none">
-              {/* Path 1: left bracket < → main branch | */}
-              <path className="logo-mp1" d="M 11 7 L 4 18 L 11 29" stroke="#38bdf8" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.3"/>
-              {/* Path 2: slash / → diagonal feature branch */}
-              <path className="logo-mp2" d="M 21 6 L 15 30" stroke="#38bdf8" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.1"/>
-              {/* Path 3: right bracket > → fades out */}
-              <path className="logo-mp3" d="M 25 7 L 32 18 L 25 29" stroke="#38bdf8" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.3"/>
-              {/* Commit nodes — scale in when git branch is visible */}
-              <circle className="logo-mn logo-mn1" cx="14" cy="7"  r="3" fill="#0D1117" stroke="#8B5CF6" strokeWidth="2"/>
-              <circle className="logo-mn logo-mn2" cx="14" cy="19" r="3" fill="#0D1117" stroke="#8B5CF6" strokeWidth="2"/>
-              <circle className="logo-mn logo-mn3" cx="14" cy="29" r="3" fill="#0D1117" stroke="#8B5CF6" strokeWidth="2"/>
-              <circle className="logo-mn logo-mn4" cx="24" cy="9"  r="3" fill="#0D1117" stroke="#8B5CF6" strokeWidth="2"/>
+              {/* State 1: </> code brackets */}
+              <g className="logo-state-code">
+                <path d="M 10 6 L 3 18 L 10 30" stroke="#38bdf8" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M 20 5 L 14 31" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round"/>
+                <path d="M 26 6 L 33 18 L 26 30" stroke="#38bdf8" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"/>
+              </g>
+              {/* State 2: git branch graph */}
+              <g className="logo-state-git">
+                {/* Main track – cyan vertical */}
+                <line x1="11" y1="3" x2="11" y2="32" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round"/>
+                {/* Branch: one continuous path  split→feature→merge */}
+                <path d="M 11 12 L 24 17 L 24 23 L 11 28"
+                  stroke="#f472b6" strokeWidth="2" fill="none"
+                  strokeLinecap="round" strokeLinejoin="round"/>
+                {/* Main nodes */}
+                <circle cx="11" cy="5"  r="2.8" fill="#0D1117" stroke="#38bdf8" strokeWidth="2"/>
+                <circle cx="11" cy="12" r="2.5" fill="#0D1117" stroke="#f472b6" strokeWidth="2"/>
+                <circle cx="11" cy="20" r="2.5" fill="#0D1117" stroke="#38bdf8" strokeWidth="2"/>
+                <circle cx="11" cy="28" r="2.5" fill="#0D1117" stroke="#4ade80" strokeWidth="2"/>
+                {/* Feature nodes */}
+                <circle cx="24" cy="17" r="2.5" fill="#0D1117" stroke="#f472b6" strokeWidth="2"/>
+                <circle cx="24" cy="23" r="2.5" fill="#0D1117" stroke="#4ade80" strokeWidth="2"/>
+              </g>
             </svg>
           </div>
           <span className="logo-text">Gitify</span>
@@ -196,13 +208,13 @@ export default function Intro({ onComplete }) {
                       </linearGradient>
                     </defs>
 
-                    {/* Track lines */}
-                    {/* Blue track: main branch */}
-                    <path d="M12 16v256" stroke="url(#blue-grad)" strokeWidth="2.5" strokeLinecap="round" />
-                    {/* Pink track: feature branch */}
-                    <path d="M12 48 C 24 64, 24 80, 24 112 C 24 144, 12 160, 12 176" stroke="url(#pink-grad)" strokeWidth="2.5" strokeLinecap="round" fill="none" />
-                    {/* Green track: bugfix branch */}
-                    <path d="M24 112 C 36 128, 36 144, 36 208 C 36 224, 12 240, 12 240" stroke="url(#green-grad)" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+                    {/* Track lines — every endpoint lands exactly on a node center */}
+                    {/* Blue track: main branch, continuous through (12,16)(12,208)(12,272) */}
+                    <path d="M12 16 V272" stroke="url(#blue-grad)" strokeWidth="2.5" strokeLinecap="round" />
+                    {/* Pink track: forks main at (12,16) → feature lane (24,48)→(24,176) → merges back to main (12,208) */}
+                    <path d="M12 16 C 12 32, 24 32, 24 48 L24 176 C 24 192, 12 192, 12 208" stroke="url(#pink-grad)" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+                    {/* Green track: forks feature at (24,80) → bugfix lane (36,112)→(36,240) → merges to main (12,272) */}
+                    <path d="M24 80 C 24 96, 36 96, 36 112 L36 240 C 36 256, 12 256, 12 272" stroke="url(#green-grad)" strokeWidth="2.5" strokeLinecap="round" fill="none" />
 
                     {/* Nodes (aligning center heights with commit rows: center of each row is 32 * index + 16px) */}
                     <circle cx="12" cy="16" r="4.5" fill="#fff" stroke="#38bdf8" strokeWidth="2.5" />
