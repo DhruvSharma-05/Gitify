@@ -81,52 +81,11 @@ export default function ExerciseGuide({
   }
 
   const handleModeToggle = (mode) => {
-    if (mode === 'exercise') {
-      onToggleMode(true)
-      // Automatically trigger reset/setup when switching to exercise mode
-      setLoading(true)
-      fetch(apiUrl('/api/exercises/reset'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          lesson_id: lessonId,
-          session_id: sessionId,
-          username: 'student'
-        })
-      })
-        .then(res => res.json())
-        .then(data => {
-          setLoading(false)
-          if (data.status === 'success') {
-            if (data.subtasks) {
-              onSubtasksChange(data.subtasks, data.sync_state)
-            }
-            if (onResetExercise) {
-              onResetExercise()
-            }
-          }
-        })
-        .catch(err => {
-          setLoading(false)
-          console.warn("Backend unavailable, initializing exercise locally:", err)
-          const localTasks = getInitialSubtasks(lessonId)
-          const localState = getInitialOfflineState(lessonId)
-          onSubtasksChange(localTasks, {
-            branch: localState.branch,
-            files: localState.files,
-            stashes: localState.stashes,
-            picked: [],
-            pwd: localState.pwd,
-            commits_graph: localState.commits,
-            file_contents: localState.fileContents
-          })
-          if (onResetExercise) {
-            onResetExercise()
-          }
-        })
-    } else {
-      onToggleMode(false)
-    }
+    // Unified model: learning and exercise share the same per-lesson sandbox
+    // (already seeded when the lesson was opened). Switching to exercise only
+    // reveals the grading checklist — saved progress is loaded by the checkpoints
+    // effect above. For a clean restart, use "Reset Sandbox Baseline".
+    onToggleMode(mode === 'exercise')
   }
 
   // Get specific instructions for each lesson

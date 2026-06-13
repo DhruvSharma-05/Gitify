@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import os
+import glob
 import shlex
 import database
 import verifier
@@ -53,8 +54,11 @@ def get_progress(username: str = "student"):
     try:
         data = database.get_user_progress(username)
         return {"status": "success", "progress": data}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[gitify] internal error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error.")
 
 @app.post("/api/progress")
 def update_progress(data: ProgressUpdate):
@@ -63,8 +67,11 @@ def update_progress(data: ProgressUpdate):
         if success:
             return {"status": "success", "message": "Progress updated successfully"}
         raise HTTPException(status_code=400, detail="User not found")
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[gitify] internal error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error.")
 
 @app.post("/api/exercises/verify")
 def verify_exercise(data: VerifyRequest):
@@ -108,8 +115,11 @@ def verify_exercise(data: VerifyRequest):
             "message": message
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[gitify] internal error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error.")
 
 class TerminalExecuteRequest(BaseModel):
     command: str
@@ -126,12 +136,83 @@ import tempfile
 import uuid
 import shutil
 
+# Per-lesson sandboxes: each (session_id, lesson_id) pair gets its own isolated
+# git repository on disk, seeded once with that lesson's baseline. This keeps every
+# lesson's terminal independent — its own branch, files and history.
 SESSION_SANDBOXES = {}
 SESSION_ROOT = Path(os.environ.get("GITIFY_SESSION_ROOT", os.path.join(tempfile.gettempdir(), "gitify-sessions"))).resolve()
 SESSION_ROOT.mkdir(parents=True, exist_ok=True)
 
 def create_session_dir() -> str:
     return tempfile.mkdtemp(prefix="gitify_session_", dir=str(SESSION_ROOT))
+
+def normalize_session_id(session_id: str) -> str:
+    """Returns a usable session id, generating one when the client sent a blank/placeholder."""
+    sid = session_id.strip() if session_id else ""
+    if not sid or sid in ("null", "undefined"):
+        sid = str(uuid.uuid4())
+    return sid
+
+def sandbox_key(session_id: str, lesson_id: int) -> str:
+    return f"{session_id}::L{lesson_id}"
+
+def get_or_create_sandbox(session_id: str, lesson_id: int):
+    """Resolves the sandbox for (session, lesson), creating and seeding it on first use
+    or if its directory has gone missing. Returns (key, session_obj)."""
+    key = sandbox_key(session_id, lesson_id)
+    session_obj = SESSION_SANDBOXES.get(key)
+    if not session_obj or not os.path.exists(session_obj["base_path"]):
+        temp_dir = create_session_dir()
+        SESSION_SANDBOXES[key] = {"base_path": temp_dir, "cwd_relative": ""}
+        verifier.initialize_sandbox(temp_dir, lesson_id)
+        session_obj = SESSION_SANDBOXES[key]
+    return key, session_obj
+
+def build_sync_state(base_path: str, cwd_rel: str = "") -> Dict[str, Any]:
+    """Inspects the sandbox on disk and builds the state-sync payload that drives the
+    frontend visualizers (branch, files, stashes, commit DAG, file contents)."""
+    current_branch = "main"
+    files_list = []
+    stashes_list = []
+    picked_commits = []
+
+    if os.path.exists(os.path.join(base_path, ".git")):
+        _, branch_out, _ = verifier.run_git_command(base_path, ["rev-parse", "--abbrev-ref", "HEAD"])
+        if branch_out.strip():
+            current_branch = branch_out.strip()
+
+        _, stash_out, _ = verifier.run_git_command(base_path, ["stash", "list"])
+        if stash_out.strip():
+            for idx, line in enumerate(stash_out.strip().split("\n")):
+                label = line.split(":", 2)[-1].strip() if ":" in line else line
+                stashes_list.append({
+                    "id": idx,
+                    "name": f"stash@{{{idx}}}",
+                    "label": label,
+                    "files": ["Checkout.jsx", "styles.css"]
+                })
+
+        _, log_out, _ = verifier.run_git_command(base_path, ["log", "--oneline", "-n", "10"])
+        if log_out.strip():
+            for line in log_out.strip().split("\n"):
+                picked_commits.append(line.split()[0])
+
+    try:
+        for item in os.listdir(base_path):
+            if item != ".git" and os.path.isfile(os.path.join(base_path, item)):
+                files_list.append(item)
+    except Exception:
+        pass
+
+    return {
+        "branch": current_branch,
+        "files": files_list,
+        "stashes": stashes_list,
+        "picked": picked_commits,
+        "pwd": cwd_rel,
+        "commits_graph": verifier.get_live_commit_graph(base_path),
+        "file_contents": verifier.get_workspace_files_content(base_path),
+    }
 
 def resolve_sandbox_path(base_path: str, cwd_rel: str, user_path: str = "") -> str:
     base = Path(base_path).resolve()
@@ -140,58 +221,188 @@ def resolve_sandbox_path(base_path: str, cwd_rel: str, user_path: str = "") -> s
         raise ValueError("Access denied: Cannot access outside sandbox.")
     return str(candidate)
 
-def run_sandbox_command(base_path: str, cwd_rel: str, parts: List[str]):
+def resolve_writable_path(base_path: str, cwd_rel: str, user_path: str) -> str:
+    """Like resolve_sandbox_path, but additionally forbids writing anywhere inside the
+    .git directory — prevents planting hooks/config that git would later execute."""
+    target = resolve_sandbox_path(base_path, cwd_rel, user_path)
+    git_dir = os.path.join(str(Path(base_path).resolve()), ".git")
+    rp = os.path.realpath(target)
+    if rp == git_dir or rp.startswith(git_dir + os.sep):
+        raise ValueError("Access denied: cannot modify the .git directory.")
+    return target
+
+def expand_file_args(base_path: str, cwd_rel: str, args: List[str]) -> List[str]:
+    """Expands shell globs (*, ?, []) in file arguments against the current directory.
+    Tokens without glob chars (or with no matches) are returned unchanged."""
+    base_dir = resolve_sandbox_path(base_path, cwd_rel)
+    out = []
+    for a in args:
+        if any(c in a for c in "*?["):
+            matches = sorted(glob.glob(os.path.join(base_dir, a)))
+            if matches:
+                out.extend(os.path.relpath(m, base_dir) for m in matches)
+                continue
+        out.append(a)
+    return out
+
+def _read_source(base_path, cwd_rel, file_args, stdin):
+    """Returns (text, error). Reads concatenated file args (glob-expanded) when given,
+    otherwise falls back to piped stdin."""
+    files = expand_file_args(base_path, cwd_rel, file_args)
+    if files:
+        chunks = []
+        for fn in files:
+            target = resolve_sandbox_path(base_path, cwd_rel, fn)
+            if not os.path.exists(target):
+                return None, f"{fn}: No such file or directory"
+            if os.path.isdir(target):
+                return None, f"{fn}: Is a directory"
+            with open(target, "r", encoding="utf-8", errors="ignore") as fh:
+                chunks.append(fh.read())
+        return "".join(chunks), None
+    return (stdin or ""), None
+
+def run_sandbox_command(base_path: str, cwd_rel: str, parts: List[str], stdin=None):
+    """Runs a single non-git builtin. `stdin` carries piped input from a previous stage."""
     base_cmd = parts[0]
     args = parts[1:]
 
     try:
-        if base_cmd in ["ls", "dir"]:
-            target = resolve_sandbox_path(base_path, cwd_rel, args[0] if args else "")
+        if base_cmd == "pwd":
+            disp = "/workspace" + (("/" + cwd_rel.replace("\\", "/")) if cwd_rel else "")
+            return 0, disp, ""
+
+        if base_cmd in ("ls", "dir"):
+            path_args = [a for a in args if not a.startswith("-")]
+            show_all = any(a.startswith("-") and "a" in a for a in args)
+            target = resolve_sandbox_path(base_path, cwd_rel, path_args[0] if path_args else "")
             if not os.path.exists(target):
-                return -1, "", f"{base_cmd}: no such file or directory"
+                return -1, "", f"{base_cmd}: cannot access '{path_args[0] if path_args else ''}': No such file or directory"
             if os.path.isdir(target):
-                return 0, "\n".join(sorted(os.listdir(target))), ""
+                entries = sorted(os.listdir(target))
+                if not show_all:
+                    entries = [e for e in entries if not e.startswith(".")]
+                return 0, "\n".join(entries), ""
             return 0, os.path.basename(target), ""
 
-        if base_cmd in ["cat", "type"]:
-            if not args:
-                return -1, "", f"{base_cmd}: missing file operand"
-            target = resolve_sandbox_path(base_path, cwd_rel, args[0])
-            with open(target, "r", encoding="utf-8", errors="ignore") as file:
-                return 0, file.read(), ""
+        if base_cmd in ("cat", "type"):
+            text, err = _read_source(base_path, cwd_rel, args, stdin)
+            if err:
+                return -1, "", f"{base_cmd}: {err}"
+            return 0, text, ""
 
         if base_cmd == "echo":
-            return 0, " ".join(args), ""
+            words = [a for a in args if a not in ("-n", "-e")]
+            return 0, " ".join(words), ""
+
+        if base_cmd in ("head", "tail"):
+            n = 10
+            file_args = []
+            i = 0
+            while i < len(args):
+                a = args[i]
+                if a == "-n" and i + 1 < len(args):
+                    try: n = int(args[i + 1])
+                    except ValueError: pass
+                    i += 2; continue
+                if a.startswith("-n") and a[2:].isdigit():
+                    n = int(a[2:]); i += 1; continue
+                if a.startswith("-") and a[1:].isdigit():
+                    n = int(a[1:]); i += 1; continue
+                file_args.append(a); i += 1
+            text, err = _read_source(base_path, cwd_rel, file_args, stdin)
+            if err:
+                return -1, "", f"{base_cmd}: {err}"
+            lines = text.splitlines()
+            sel = lines[:n] if base_cmd == "head" else lines[-n:]
+            return 0, "\n".join(sel), ""
+
+        if base_cmd == "wc":
+            flags = [a for a in args if a.startswith("-")]
+            file_args = [a for a in args if not a.startswith("-")]
+            text, err = _read_source(base_path, cwd_rel, file_args, stdin)
+            if err:
+                return -1, "", f"wc: {err}"
+            nl, nw, nc = len(text.splitlines()), len(text.split()), len(text)
+            if "-l" in flags: return 0, str(nl), ""
+            if "-w" in flags: return 0, str(nw), ""
+            if "-c" in flags: return 0, str(nc), ""
+            return 0, f"{nl} {nw} {nc}", ""
+
+        if base_cmd == "grep":
+            flags = [a for a in args if a.startswith("-") and a != "-"]
+            rest = [a for a in args if not (a.startswith("-") and a != "-")]
+            if not rest:
+                return -1, "", "grep: missing pattern"
+            pattern = rest[0]
+            text, err = _read_source(base_path, cwd_rel, rest[1:], stdin)
+            if err:
+                return -1, "", f"grep: {err}"
+            ignore = any("i" in f for f in flags)
+            invert = any("v" in f for f in flags)
+            countonly = any("c" in f for f in flags)
+            number = any("n" in f for f in flags)
+            import re as _re
+            try:
+                rx = _re.compile(pattern, _re.IGNORECASE if ignore else 0)
+            except _re.error:
+                rx = None
+            matched = []
+            for idx, line in enumerate(text.splitlines(), 1):
+                if rx is not None:
+                    hit = rx.search(line) is not None
+                elif ignore:
+                    hit = pattern.lower() in line.lower()
+                else:
+                    hit = pattern in line
+                if invert:
+                    hit = not hit
+                if hit:
+                    matched.append(f"{idx}:{line}" if number else line)
+            if countonly:
+                return 0, str(len(matched)), ""
+            return (0 if matched else 1), "\n".join(matched), ""
 
         if base_cmd == "touch":
-            if not args:
+            pos = [a for a in args if not a.startswith("-")]
+            if not pos:
                 return -1, "", "touch: missing file operand"
-            target = resolve_sandbox_path(base_path, cwd_rel, args[0])
-            os.makedirs(os.path.dirname(target), exist_ok=True)
-            Path(target).touch()
+            for a in pos:
+                target = resolve_writable_path(base_path, cwd_rel, a)
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                Path(target).touch()
             return 0, "", ""
 
         if base_cmd == "mkdir":
-            if not args:
+            pos = [a for a in args if not a.startswith("-")]
+            if not pos:
                 return -1, "", "mkdir: missing operand"
-            os.makedirs(resolve_sandbox_path(base_path, cwd_rel, args[0]), exist_ok=True)
+            for a in pos:
+                os.makedirs(resolve_writable_path(base_path, cwd_rel, a), exist_ok=True)
             return 0, "", ""
 
         if base_cmd == "rm":
-            if not args:
+            pos = [a for a in args if not a.startswith("-")]
+            if not pos:
                 return -1, "", "rm: missing operand"
-            target = resolve_sandbox_path(base_path, cwd_rel, args[-1])
-            if os.path.isdir(target):
-                shutil.rmtree(target)
-            else:
-                os.remove(target)
+            for t in expand_file_args(base_path, cwd_rel, pos):
+                target = resolve_writable_path(base_path, cwd_rel, t)
+                if os.path.isdir(target):
+                    shutil.rmtree(target)
+                elif os.path.exists(target):
+                    os.remove(target)
+                else:
+                    return -1, "", f"rm: cannot remove '{t}': No such file or directory"
             return 0, "", ""
 
-        if base_cmd in ["mv", "cp"]:
-            if len(args) < 2:
+        if base_cmd in ("mv", "cp"):
+            pos = [a for a in args if not a.startswith("-")]
+            if len(pos) < 2:
                 return -1, "", f"{base_cmd}: missing file operand"
-            source = resolve_sandbox_path(base_path, cwd_rel, args[0])
-            target = resolve_sandbox_path(base_path, cwd_rel, args[1])
+            source = resolve_sandbox_path(base_path, cwd_rel, pos[0])
+            target = resolve_writable_path(base_path, cwd_rel, pos[1])
+            if not os.path.exists(source):
+                return -1, "", f"{base_cmd}: cannot stat '{pos[0]}': No such file or directory"
             if base_cmd == "mv":
                 shutil.move(source, target)
             elif os.path.isdir(source):
@@ -204,77 +415,181 @@ def run_sandbox_command(base_path: str, cwd_rel: str, parts: List[str]):
 
     return -1, "", f"Command '{base_cmd}' is not supported."
 
+
+# --- Command line engine: sequencing (&& ;), pipes (|), redirection (> >>) ---
+
+ALLOWED_CMDS = {
+    "git", "ls", "dir", "cat", "type", "echo", "clear", "cd", "pwd",
+    "touch", "mkdir", "rm", "mv", "cp", "head", "tail", "wc", "grep",
+}
+
+_GIT_DANGEROUS_CONFIG = ("pager", "editor", "sshcommand", "fsmonitor", "hookspath", "askpass", "alias.")
+
+def git_flag_violation(git_args: List[str]):
+    """Returns an error string if git args try to inject code execution, else None."""
+    if not git_args:
+        return None
+    for a in git_args:
+        al = a.lower()
+        if a == "-c" or al.startswith("--exec") or al.startswith("--upload-pack") or al.startswith("--receive-pack"):
+            return "This git option is disabled in the sandbox for security."
+    sub = git_args[0].lower()
+    if sub in ("daemon", "credential"):
+        return f"'git {sub}' is disabled in the sandbox."
+    if sub == "config":
+        for a in git_args[1:]:
+            if any(k in a.lower() for k in _GIT_DANGEROUS_CONFIG):
+                return "Editing that git config key is disabled in the sandbox."
+    return None
+
+def split_unquoted(s: str, separators: List[str]) -> List[str]:
+    """Splits s on the given separators, ignoring any inside single/double quotes.
+    Separators are kept as their own entries, so the result alternates seg, sep, seg…"""
+    seps = sorted(separators, key=len, reverse=True)
+    out, buf, i, quote = [], "", 0, None
+    while i < len(s):
+        ch = s[i]
+        if quote:
+            buf += ch
+            if ch == quote:
+                quote = None
+            i += 1
+            continue
+        if ch in ("'", '"'):
+            quote = ch; buf += ch; i += 1; continue
+        hit = next((sep for sep in seps if s.startswith(sep, i)), None)
+        if hit:
+            out.append(buf); out.append(hit); buf = ""; i += len(hit)
+        else:
+            buf += ch; i += 1
+    out.append(buf)
+    return out
+
+def run_cd(base_path, cwd_state, parts):
+    cwd_rel = cwd_state["rel"]
+    target = parts[1] if len(parts) > 1 else ""
+    if not target or target == "~":
+        cwd_state["rel"] = ""
+        return 0, "", ""
+    if target == "..":
+        if cwd_rel:
+            nxt = os.path.dirname(cwd_rel)
+            cwd_state["rel"] = "" if nxt in (".", "/", "\\") else nxt
+        else:
+            cwd_state["rel"] = ""
+        return 0, "", ""
+    candidate = os.path.normpath(os.path.join(cwd_rel, target))
+    if candidate.startswith("..") or candidate.startswith("/..") or candidate.startswith("\\.."):
+        return 1, "", "Access denied: Cannot traverse outside sandbox root directory."
+    full_path = resolve_sandbox_path(base_path, "", candidate)
+    if os.path.exists(full_path) and os.path.isdir(full_path):
+        cwd_state["rel"] = candidate
+        return 0, "", ""
+    return 1, "", f"cd: {target}: No such file or directory"
+
+def run_single(base_path, cwd_state, parts, stdin=None):
+    """Dispatches one command (after pipe/redirection parsing)."""
+    base_cmd = parts[0]
+    if base_cmd not in ALLOWED_CMDS:
+        return 127, "", f"Command '{base_cmd}' is blocked. Use git or standard file utilities (ls, cat, grep, …)."
+    if base_cmd == "clear":
+        return 0, "", ""   # no-op inside chains; whole-line clear is handled separately
+    if base_cmd == "cd":
+        return run_cd(base_path, cwd_state, parts)
+    if base_cmd == "git":
+        violation = git_flag_violation(parts[1:])
+        if violation:
+            return 128, "", violation
+        exec_cwd = resolve_sandbox_path(base_path, cwd_state["rel"])
+        code, out, err = verifier.run_git_command(exec_cwd, parts[1:])
+        # Surface git's informational messages (it writes many to stderr at exit 0)
+        if code == 0 and not out.strip() and err.strip():
+            return code, err, ""
+        return code, out, err
+    return run_sandbox_command(base_path, cwd_state["rel"], parts, stdin=stdin)
+
+def run_pipeline(base_path, cwd_state, segment):
+    """Runs one pipeline segment: stages joined by '|', with optional trailing
+    '>'/'>>' redirection of the final stdout to a file."""
+    redir_tokens = split_unquoted(segment, [">>", ">"])
+    cmd_part = redir_tokens[0]
+    redir = None
+    if len(redir_tokens) >= 3:
+        mode = redir_tokens[1]
+        try:
+            tgt = shlex.split(redir_tokens[2].strip(), posix=os.name != "nt")
+        except ValueError:
+            tgt = []
+        if not tgt:
+            return -1, "", "syntax error near redirection: expected filename"
+        redir = (mode, tgt[0])
+
+    stages = [s for s in split_unquoted(cmd_part, ["|"]) if s != "|"]
+    stdin = None
+    code, out, err = 0, "", ""
+    ran = False
+    for stage in stages:
+        stage = stage.strip()
+        if not stage:
+            continue
+        try:
+            parts = shlex.split(stage, posix=os.name != "nt")
+        except ValueError as exc:
+            return -1, "", f"Could not parse command: {exc}"
+        if not parts:
+            continue
+        ran = True
+        code, out, err = run_single(base_path, cwd_state, parts, stdin=stdin)
+        stdin = out
+    if not ran:
+        return 0, "", ""
+
+    if redir is not None and code == 0:
+        mode, fname = redir
+        try:
+            tgt_path = resolve_writable_path(base_path, cwd_state["rel"], fname)
+            parent = os.path.dirname(tgt_path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+            payload = out if (out == "" or out.endswith("\n")) else out + "\n"
+            with open(tgt_path, "a" if mode == ">>" else "w", encoding="utf-8") as fh:
+                fh.write(payload)
+        except Exception as exc:
+            return -1, "", str(exc)
+        return code, "", err
+    return code, out, err
+
+def run_command_line(base_path, cwd_state, cmd_string):
+    """Top-level: runs '&&'/';'-separated pipelines, short-circuiting '&&' on failure.
+    Returns (exit_code, combined_stdout, combined_stderr)."""
+    tokens = split_unquoted(cmd_string, ["&&", ";"])
+    segments = tokens[0::2]
+    ops = tokens[1::2]   # operator that precedes segments[i+1]
+    agg_out, agg_err, last_code = [], [], 0
+    for i, seg in enumerate(segments):
+        if i > 0 and ops[i - 1] == "&&" and last_code != 0:
+            continue   # short-circuit the rest of an && chain
+        if not seg.strip():
+            continue
+        last_code, out, err = run_pipeline(base_path, cwd_state, seg)
+        if out:
+            agg_out.append(out)
+        if err:
+            agg_err.append(err)
+    return last_code, "\n".join(agg_out), "\n".join(agg_err)
+
 @app.post("/api/terminal/execute")
 def execute_terminal_command(data: TerminalExecuteRequest):
     try:
-        # 1. Resolve or establish unique sandbox path dict
-        session_id = data.session_id.strip() if data.session_id else ""
-        if not session_id or session_id == "null" or session_id == "undefined":
-            session_id = str(uuid.uuid4())
-            
-        if session_id not in SESSION_SANDBOXES:
-            temp_dir = create_session_dir()
-            SESSION_SANDBOXES[session_id] = {
-                "base_path": temp_dir,
-                "cwd_relative": ""
-            }
-            # Seed default structures
-            verifier.initialize_sandbox(temp_dir, data.lesson_id)
-            
-        session_obj = SESSION_SANDBOXES[session_id]
+        # 1. Resolve or establish the per-lesson sandbox for this (session, lesson)
+        session_id = normalize_session_id(data.session_id)
+        sb_key, session_obj = get_or_create_sandbox(session_id, data.lesson_id)
         base_path = session_obj["base_path"]
         cwd_rel = session_obj["cwd_relative"]
-        exec_cwd = resolve_sandbox_path(base_path, cwd_rel)
-        
-        # Ensure temp folder exists
-        if not os.path.exists(base_path):
-            temp_dir = create_session_dir()
-            SESSION_SANDBOXES[session_id] = {
-                "base_path": temp_dir,
-                "cwd_relative": ""
-            }
-            verifier.initialize_sandbox(temp_dir, data.lesson_id)
-            session_obj = SESSION_SANDBOXES[session_id]
-            base_path = session_obj["base_path"]
-            cwd_rel = ""
-            exec_cwd = base_path
-        
-        # 2. Strict command verification & security check
+
+        # 2. Whole-line console clear stays a UI signal, not an executed command
         cmd_string = data.command.strip()
-        try:
-            parts = shlex.split(cmd_string, posix=os.name != "nt")
-        except ValueError as exc:
-            return {
-                "status": "error",
-                "output": f"Could not parse command: {exc}",
-                "session_id": session_id,
-                "verified": False,
-                "validation_message": "",
-                "sync_state": {"branch": "main", "files": [], "stashes": [], "picked": [], "pwd": cwd_rel}
-            }
-        if not parts:
-            return {
-                "status": "success",
-                "output": "",
-                "session_id": session_id,
-                "verified": False,
-                "validation_message": "",
-                "sync_state": {"branch": "main", "files": [], "stashes": [], "picked": [], "pwd": cwd_rel}
-            }
-            
-        base_cmd = parts[0]
-        allowed_cmds = ["git", "ls", "dir", "cat", "type", "echo", "clear", "cd", "touch", "mkdir", "rm", "mv", "cp"]
-        if base_cmd not in allowed_cmds:
-            return {
-                "status": "error",
-                "output": f"Command '{base_cmd}' is blocked. Please only run standard Git commands or inspect/file utilities (git, ls, cat, cd, touch, mkdir, rm).",
-                "session_id": session_id,
-                "verified": False,
-                "validation_message": "",
-                "sync_state": {"branch": "main", "files": [], "stashes": [], "picked": [], "pwd": cwd_rel}
-            }
-            
-        if base_cmd == "clear":
+        if cmd_string == "clear":
             return {
                 "status": "success",
                 "output": "CLEAR_CONSOLE",
@@ -283,123 +598,35 @@ def execute_terminal_command(data: TerminalExecuteRequest):
                 "validation_message": "",
                 "sync_state": {"branch": "main", "files": [], "stashes": [], "picked": [], "pwd": cwd_rel}
             }
-            
-        # 2b. Natively resolve directory traversals (cd)
-        if base_cmd == "cd":
-            target = parts[1] if len(parts) > 1 else ""
-            if not target or target == "~":
-                new_cwd_rel = ""
-            elif target == "..":
-                if cwd_rel:
-                    new_cwd_rel = os.path.dirname(cwd_rel)
-                    if new_cwd_rel == "." or new_cwd_rel == "/" or new_cwd_rel == "\\":
-                        new_cwd_rel = ""
-                else:
-                    new_cwd_rel = ""
-            else:
-                candidate = os.path.normpath(os.path.join(cwd_rel, target))
-                if candidate.startswith("..") or candidate.startswith("/..") or candidate.startswith("\\.."):
-                    return {
-                        "status": "error",
-                        "output": "Access denied: Cannot traverse outside sandbox root directory.",
-                        "session_id": session_id,
-                        "verified": False,
-                        "validation_message": "",
-                        "sync_state": {"branch": "main", "files": [], "stashes": [], "picked": [], "pwd": cwd_rel}
-                    }
-                
-                full_path = resolve_sandbox_path(base_path, "", candidate)
-                if os.path.exists(full_path) and os.path.isdir(full_path):
-                    new_cwd_rel = candidate
-                else:
-                    return {
-                        "status": "error",
-                        "output": f"cd: {target}: No such file or directory",
-                        "session_id": session_id,
-                        "verified": False,
-                        "validation_message": "",
-                        "sync_state": {"branch": "main", "files": [], "stashes": [], "picked": [], "pwd": cwd_rel}
-                    }
-            
-            # Save CWD status
-            SESSION_SANDBOXES[session_id]["cwd_relative"] = new_cwd_rel
-            
-            # Fetch current branch
-            current_branch = "main"
-            if os.path.exists(os.path.join(base_path, ".git")):
-                _, branch_out, _ = verifier.run_git_command(base_path, ["rev-parse", "--abbrev-ref", "HEAD"])
-                if branch_out.strip():
-                    current_branch = branch_out.strip()
-                    
+        if not cmd_string:
             return {
                 "status": "success",
                 "output": "",
                 "session_id": session_id,
                 "verified": False,
                 "validation_message": "",
-                "sync_state": {
-                    "branch": current_branch,
-                    "files": [],
-                    "stashes": [],
-                    "picked": [],
-                    "pwd": new_cwd_rel
-                }
+                "sync_state": build_sync_state(base_path, cwd_rel)
             }
-            
-        # 3. Execute command
-        if base_cmd == "git":
-            code, stdout, stderr = verifier.run_git_command(exec_cwd, parts[1:])
-        else:
-            code, stdout, stderr = run_sandbox_command(base_path, cwd_rel, parts)
-                
+
+        # 3. Run the full command line (supports && / ; sequencing, | pipes, > >> redirection)
+        cwd_state = {"rel": cwd_rel}
+        code, stdout, stderr = run_command_line(base_path, cwd_state, cmd_string)
+        # Persist any working-directory change made by `cd`
+        SESSION_SANDBOXES[sb_key]["cwd_relative"] = cwd_state["rel"]
+        cwd_rel = cwd_state["rel"]
+
         # 4. Check exercise checklist checkpoints state on disk!
         verified, v_msg, subtasks = verifier.check_sandbox_state(base_path, data.lesson_id)
-        
+
         # Save checkpoints state into SQLite database!
         for task in subtasks:
             database.save_user_checkpoint(data.lesson_id, task["id"], task["completed"], data.username)
-            
+
         if verified:
             database.update_user_progress(data.lesson_id, True, 100, data.username)
-            
+
         # 5. Build state-sync package to animate frontend React components
-        current_branch = "main"
-        files_list = []
-        stashes_list = []
-        picked_commits = []
-        
-        if os.path.exists(os.path.join(base_path, ".git")):
-            _, branch_out, _ = verifier.run_git_command(base_path, ["rev-parse", "--abbrev-ref", "HEAD"])
-            if branch_out.strip():
-                current_branch = branch_out.strip()
-                
-            _, stash_out, _ = verifier.run_git_command(base_path, ["stash", "list"])
-            if stash_out.strip():
-                for idx, line in enumerate(stash_out.strip().split("\n")):
-                    label = line.split(":", 2)[-1].strip() if ":" in line else line
-                    stashes_list.append({
-                        "id": idx,
-                        "name": f"stash@{{{idx}}}",
-                        "label": label,
-                        "files": ["Checkout.jsx", "styles.css"]
-                    })
-                    
-            _, log_out, _ = verifier.run_git_command(base_path, ["log", "--oneline", "-n", "10"])
-            if log_out.strip():
-                for line in log_out.strip().split("\n"):
-                    picked_commits.append(line.split()[0])
-                    
-        # Inspect files on disk
-        try:
-            for item in os.listdir(base_path):
-                if item != ".git" and os.path.isfile(os.path.join(base_path, item)):
-                    files_list.append(item)
-        except Exception:
-            pass
-            
-        # Get live git commit DAG and file contents
-        commits_graph = verifier.get_live_commit_graph(base_path)
-        file_contents = verifier.get_workspace_files_content(base_path)
+        sync_state = build_sync_state(base_path, cwd_rel)
 
         return {
             "status": "success" if code == 0 else "error",
@@ -409,46 +636,33 @@ def execute_terminal_command(data: TerminalExecuteRequest):
             "verified": verified,
             "validation_message": v_msg,
             "subtasks": subtasks,
-            "sync_state": {
-                "branch": current_branch,
-                "files": files_list,
-                "stashes": stashes_list,
-                "picked": picked_commits,
-                "pwd": cwd_rel,
-                "commits_graph": commits_graph,
-                "file_contents": file_contents
-            }
+            "sync_state": sync_state
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[execute] internal error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error while running command.")
 
 @app.post("/api/exercises/reset")
 def reset_exercise_sandbox(data: ResetRequest):
     try:
-        session_id = data.session_id.strip() if data.session_id else ""
-        if not session_id or session_id == "null" or session_id == "undefined":
-            session_id = str(uuid.uuid4())
-            
-        if session_id in SESSION_SANDBOXES:
-            old_path = SESSION_SANDBOXES[session_id]["base_path"]
+        session_id = normalize_session_id(data.session_id)
+        sb_key = sandbox_key(session_id, data.lesson_id)
+
+        # Tear down only this lesson's sandbox, then re-seed it from baseline.
+        if sb_key in SESSION_SANDBOXES:
             try:
-                shutil.rmtree(old_path, ignore_errors=True)
+                shutil.rmtree(SESSION_SANDBOXES[sb_key]["base_path"], ignore_errors=True)
             except Exception:
                 pass
-                
-        temp_dir = create_session_dir()
-        SESSION_SANDBOXES[session_id] = {
-            "base_path": temp_dir,
-            "cwd_relative": ""
-        }
-        
-        # Run baseline setups
-        verifier.initialize_sandbox(temp_dir, data.lesson_id)
-        
-        # Wipe database checkpoints for this lesson to start fresh!
-        # Get user progress from db to verify baseline
+            del SESSION_SANDBOXES[sb_key]
+
+        _, session_obj = get_or_create_sandbox(session_id, data.lesson_id)
+        temp_dir = session_obj["base_path"]
+
+        # Wipe database progress + checkpoints for this lesson to start fresh!
         database.update_user_progress(data.lesson_id, False, 0, data.username)
-        # Clear out checkpoints in database
         conn = database.get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT id FROM users WHERE username = ?", (data.username,))
@@ -458,64 +672,75 @@ def reset_exercise_sandbox(data: ResetRequest):
             cursor.execute("DELETE FROM checkpoints WHERE user_id = ? AND lesson_id = ?", (user_id, data.lesson_id))
             conn.commit()
         conn.close()
-        
-        # Load baseline checklists from verifier
+
+        # Load baseline checklists + sync state from the freshly seeded sandbox
         _, _, subtasks = verifier.check_sandbox_state(temp_dir, data.lesson_id)
-        
-        # Calculate baseline commits graph and file contents
-        commits_graph = verifier.get_live_commit_graph(temp_dir)
-        file_contents = verifier.get_workspace_files_content(temp_dir)
-        
-        files_list = []
-        try:
-            for item in os.listdir(temp_dir):
-                if item != ".git" and os.path.isfile(os.path.join(temp_dir, item)):
-                    files_list.append(item)
-        except Exception:
-            pass
-            
-        current_branch = "main"
-        if data.lesson_id == 5:
-            current_branch = "feature/payments"
-            
+
         return {
             "status": "success",
             "message": "Exercise sandbox reset successfully.",
             "session_id": session_id,
             "subtasks": subtasks,
-            "sync_state": {
-                "branch": current_branch,
-                "files": files_list,
-                "stashes": [],
-                "picked": [],
-                "pwd": "",
-                "commits_graph": commits_graph,
-                "file_contents": file_contents
-            }
+            "sync_state": build_sync_state(temp_dir)
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[gitify] internal error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error.")
+
+
+@app.post("/api/lessons/enter")
+def enter_lesson(data: ResetRequest):
+    """Get-or-create the per-lesson sandbox on lesson entry, returning its live state
+    without running any command. Seeds the lesson baseline on first visit and leaves
+    an already-in-progress sandbox untouched so each lesson's terminal persists."""
+    try:
+        session_id = normalize_session_id(data.session_id)
+        _, session_obj = get_or_create_sandbox(session_id, data.lesson_id)
+        base_path = session_obj["base_path"]
+        cwd_rel = session_obj["cwd_relative"]
+
+        verified, v_msg, subtasks = verifier.check_sandbox_state(base_path, data.lesson_id)
+
+        return {
+            "status": "success",
+            "session_id": session_id,
+            "verified": verified,
+            "validation_message": v_msg,
+            "subtasks": subtasks,
+            "sync_state": build_sync_state(base_path, cwd_rel)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[gitify] internal error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error.")
 
 @app.get("/api/exercises/checkpoints")
 def load_checkpoints(lesson_id: int, username: str = "student"):
     try:
         data = database.get_user_checkpoints(lesson_id, username)
         return {"status": "success", "checkpoints": data}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[gitify] internal error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error.")
 
 class CommitDetailsRequest(BaseModel):
     commit_hash: str
     session_id: str
+    lesson_id: int
 
 @app.post("/api/terminal/commit-details")
 def get_commit_details(data: CommitDetailsRequest):
     try:
-        session_id = data.session_id.strip()
-        if session_id not in SESSION_SANDBOXES:
+        sb_key = sandbox_key(normalize_session_id(data.session_id), data.lesson_id)
+        if sb_key not in SESSION_SANDBOXES:
             raise HTTPException(status_code=404, detail="Session sandbox not found.")
-            
-        base_path = SESSION_SANDBOXES[session_id]["base_path"]
+
+        base_path = SESSION_SANDBOXES[sb_key]["base_path"]
         if not os.path.exists(os.path.join(base_path, ".git")):
             raise HTTPException(status_code=400, detail="Git repository not initialized in sandbox.")
 
@@ -532,12 +757,16 @@ def get_commit_details(data: CommitDetailsRequest):
             "status": "success",
             "details": stdout
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[gitify] internal error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error.")
 
 
 class WriteFileRequest(BaseModel):
     session_id: str
+    lesson_id: int
     filename: str
     content: str
 
@@ -545,11 +774,11 @@ class WriteFileRequest(BaseModel):
 def write_sandbox_file(data: WriteFileRequest):
     """Writes edited file content into the user's sandbox workspace."""
     try:
-        session_id = data.session_id.strip()
-        if session_id not in SESSION_SANDBOXES:
+        sb_key = sandbox_key(normalize_session_id(data.session_id), data.lesson_id)
+        if sb_key not in SESSION_SANDBOXES:
             raise HTTPException(status_code=404, detail="Session sandbox not found.")
 
-        base_path = SESSION_SANDBOXES[session_id]["base_path"]
+        base_path = SESSION_SANDBOXES[sb_key]["base_path"]
 
         # Security: only allow simple filenames, no path traversal
         filename = os.path.basename(data.filename)
@@ -560,29 +789,16 @@ def write_sandbox_file(data: WriteFileRequest):
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(data.content)
 
-        # Return updated workspace state
-        files_list = []
-        try:
-            for item in os.listdir(base_path):
-                if item != ".git" and os.path.isfile(os.path.join(base_path, item)):
-                    files_list.append(item)
-        except Exception:
-            pass
-
-        file_contents = verifier.get_workspace_files_content(base_path)
-        commits_graph = verifier.get_live_commit_graph(base_path)
-
         return {
             "status": "success",
             "message": f"File '{filename}' saved successfully.",
-            "sync_state": {
-                "files": files_list,
-                "file_contents": file_contents,
-                "commits_graph": commits_graph
-            }
+            "sync_state": build_sync_state(base_path, SESSION_SANDBOXES[sb_key]["cwd_relative"])
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[gitify] internal error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error.")
 
 
 class RebasePlanItem(BaseModel):
@@ -600,11 +816,11 @@ def execute_rebase_interactive(data: RebaseInteractiveRequest):
     """Applies an interactive rebase plan to the sandbox repository."""
     import subprocess
     try:
-        session_id = data.session_id.strip()
-        if session_id not in SESSION_SANDBOXES:
+        sb_key = sandbox_key(normalize_session_id(data.session_id), data.lesson_id)
+        if sb_key not in SESSION_SANDBOXES:
             raise HTTPException(status_code=404, detail="Session sandbox not found.")
 
-        base_path = SESSION_SANDBOXES[session_id]["base_path"]
+        base_path = SESSION_SANDBOXES[sb_key]["base_path"]
         if not os.path.exists(os.path.join(base_path, ".git")):
             raise HTTPException(status_code=400, detail="Git repository not initialized.")
 
@@ -678,16 +894,6 @@ def execute_rebase_interactive(data: RebaseInteractiveRequest):
         success = result.returncode == 0
 
         verified, v_msg, subtasks = verifier.check_sandbox_state(base_path, data.lesson_id)
-        commits_graph = verifier.get_live_commit_graph(base_path)
-        file_contents = verifier.get_workspace_files_content(base_path)
-
-        files_list = []
-        try:
-            for item in os.listdir(base_path):
-                if item != ".git" and os.path.isfile(os.path.join(base_path, item)):
-                    files_list.append(item)
-        except Exception:
-            pass
 
         return {
             "status": "success" if success else "error",
@@ -695,14 +901,13 @@ def execute_rebase_interactive(data: RebaseInteractiveRequest):
             "verified": verified,
             "validation_message": v_msg,
             "subtasks": subtasks,
-            "sync_state": {
-                "files": files_list,
-                "file_contents": file_contents,
-                "commits_graph": commits_graph
-            }
+            "sync_state": build_sync_state(base_path, SESSION_SANDBOXES[sb_key]["cwd_relative"])
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[gitify] internal error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error.")
 
 
 @app.get("/health")
