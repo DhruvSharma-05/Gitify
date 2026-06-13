@@ -3532,6 +3532,91 @@ header p {
   color: #fff;
 }
 
+/* Morphing symbol logo: </> ↔ git branch */
+.logo-morph-wrap {
+  flex-shrink: 0;
+  animation: logo-float 3s ease-in-out infinite, logo-morph-glow 6s ease-in-out infinite;
+}
+
+@keyframes logo-float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-3px); }
+}
+
+@keyframes logo-morph-glow {
+  0%, 25%  { filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.7)); }
+  50%, 75% { filter: drop-shadow(0 0 9px rgba(139, 92, 246, 0.75)); }
+  95%, 100% { filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.7)); }
+}
+
+/* Path 1: left bracket < → main branch vertical | */
+.logo-mp1 {
+  animation: mp1-path 6s ease-in-out infinite, mp1-stroke 6s ease-in-out infinite;
+}
+@keyframes mp1-path {
+  0%, 30%   { d: path("M 11 7 L 4 18 L 11 29"); }
+  50%, 75%  { d: path("M 14 7 L 14 18 L 14 29"); }
+  95%, 100% { d: path("M 11 7 L 4 18 L 11 29"); }
+}
+@keyframes mp1-stroke {
+  0%, 30%   { stroke: #38bdf8; }
+  50%, 75%  { stroke: #8B5CF6; }
+  95%, 100% { stroke: #38bdf8; }
+}
+
+/* Path 2: slash / → diagonal feature branch */
+.logo-mp2 {
+  animation: mp2-path 6s ease-in-out infinite, mp2-stroke 6s ease-in-out infinite;
+}
+@keyframes mp2-path {
+  0%, 30%   { d: path("M 21 6 L 15 30"); }
+  50%, 75%  { d: path("M 14 16 L 25 8"); }
+  95%, 100% { d: path("M 21 6 L 15 30"); }
+}
+@keyframes mp2-stroke {
+  0%, 30%   { stroke: #38bdf8; }
+  50%, 75%  { stroke: #8B5CF6; }
+  95%, 100% { stroke: #38bdf8; }
+}
+
+/* Path 3: right bracket > → collapses to center and fades */
+.logo-mp3 {
+  animation: mp3-path 6s ease-in-out infinite, mp3-fade 6s ease-in-out infinite;
+}
+@keyframes mp3-path {
+  0%, 30%   { d: path("M 25 7 L 32 18 L 25 29"); }
+  50%, 75%  { d: path("M 18 18 L 18 18 L 18 18"); }
+  95%, 100% { d: path("M 25 7 L 32 18 L 25 29"); }
+}
+@keyframes mp3-fade {
+  0%, 25%   { opacity: 1; }
+  48%, 80%  { opacity: 0; }
+  95%, 100% { opacity: 1; }
+}
+
+/* Commit nodes: pop in during git branch state */
+.logo-mn {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mn-appear 6s ease-in-out infinite;
+}
+@keyframes mn-appear {
+  0%, 40%   { transform: scale(0); opacity: 0; }
+  60%, 75%  { transform: scale(1); opacity: 1; }
+  93%, 100% { transform: scale(0); opacity: 0; }
+}
+
+/* Hover: pause morph, highlight */
+.intro-logo:hover .logo-morph-wrap {
+  animation-play-state: paused;
+}
+.intro-logo:hover .logo-mp1,
+.intro-logo:hover .logo-mp2,
+.intro-logo:hover .logo-mp3,
+.intro-logo:hover .logo-mn {
+  animation-play-state: paused;
+}
+
 /* Hero Section Enhancements */
 .intro-hero {
   background-image: radial-gradient(circle at 80% 20%, rgba(56, 189, 248, 0.08) 0%, transparent 50%),
