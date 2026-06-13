@@ -132,21 +132,21 @@ export default function Intro({ onComplete }) {
       {/* Premium Navbar with Logo */}
       <header className="intro-navbar">
         <div className="intro-logo">
-          <svg className="logo-icon-svg" viewBox="0 0 32 32" fill="none">
-            <defs>
-              <linearGradient id="logo-grad" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#38bdf8" />
-                <stop offset="50%" stopColor="#c084fc" />
-                <stop offset="100%" stopColor="#818cf8" />
-              </linearGradient>
-            </defs>
-            <rect x="6" y="6" width="20" height="20" rx="5" transform="rotate(45 16 16)" fill="url(#logo-grad)" stroke="rgba(255, 255, 255, 0.2)" strokeWidth="1.5" />
-            <line x1="12" y1="20" x2="12" y2="12" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
-            <circle cx="12" cy="20" r="2.5" fill="#fff" />
-            <circle cx="12" cy="12" r="2.5" fill="#fff" />
-            <path d="M12 16 C 18 16, 20 15, 20 12" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" fill="none" />
-            <circle cx="20" cy="12" r="2.5" fill="#fff" />
-          </svg>
+          <div className="logo-morph-wrap">
+            <svg viewBox="0 0 36 36" width="38" height="38" fill="none">
+              {/* Path 1: left bracket < → main branch | */}
+              <path className="logo-mp1" d="M 11 7 L 4 18 L 11 29" stroke="#38bdf8" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.3"/>
+              {/* Path 2: slash / → diagonal feature branch */}
+              <path className="logo-mp2" d="M 21 6 L 15 30" stroke="#38bdf8" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.1"/>
+              {/* Path 3: right bracket > → fades out */}
+              <path className="logo-mp3" d="M 25 7 L 32 18 L 25 29" stroke="#38bdf8" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.3"/>
+              {/* Commit nodes — scale in when git branch is visible */}
+              <circle className="logo-mn logo-mn1" cx="14" cy="7"  r="3" fill="#0D1117" stroke="#8B5CF6" strokeWidth="2"/>
+              <circle className="logo-mn logo-mn2" cx="14" cy="19" r="3" fill="#0D1117" stroke="#8B5CF6" strokeWidth="2"/>
+              <circle className="logo-mn logo-mn3" cx="14" cy="29" r="3" fill="#0D1117" stroke="#8B5CF6" strokeWidth="2"/>
+              <circle className="logo-mn logo-mn4" cx="24" cy="9"  r="3" fill="#0D1117" stroke="#8B5CF6" strokeWidth="2"/>
+            </svg>
+          </div>
           <span className="logo-text">Gitify</span>
         </div>
       </header>

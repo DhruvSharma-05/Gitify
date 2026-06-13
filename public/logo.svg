@@ -1,0 +1,39 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" fill="#0D1117"/>
+
+  <!-- Left code bracket — sky blue accent -->
+  <path d="M150 140 L80 220 L150 300"
+        stroke="#38bdf8"
+        stroke-width="22"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <!-- Right code bracket — sky blue accent -->
+  <path d="M362 140 L432 220 L362 300"
+        stroke="#38bdf8"
+        stroke-width="22"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <!-- Graduation cap — white -->
+  <polygon points="256,80 340,120 256,160 172,120" fill="white"/>
+  <path d="M200 145 H312 V175 C312 190 285 200 256 200 C227 200 200 190 200 175 Z" fill="white"/>
+  <line x1="340" y1="120" x2="340" y2="175" stroke="white" stroke-width="8"/>
+  <circle cx="340" cy="182" r="8" fill="white"/>
+  <path d="M340 190 L334 208 H346 Z" fill="white"/>
+
+  <!-- Git branch — purple accent -->
+  <g stroke="#8B5CF6" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="256" y1="220" x2="256" y2="340"/>
+    <line x1="256" y1="280" x2="320" y2="320"/>
+  </g>
+  <circle cx="256" cy="220" r="18" fill="#0D1117" stroke="#8B5CF6" stroke-width="12"/>
+  <circle cx="256" cy="280" r="18" fill="#0D1117" stroke="#8B5CF6" stroke-width="12"/>
+  <circle cx="256" cy="340" r="18" fill="#0D1117" stroke="#8B5CF6" stroke-width="12"/>
+  <circle cx="320" cy="320" r="18" fill="#0D1117" stroke="#8B5CF6" stroke-width="12"/>
+
+  <!-- Book — white -->
+  <path d="M140 390 C175 375 215 375 248 390 V430 C215 415 175 415 140 430 Z" fill="white"/>
+  <path d="M264 390 C297 375 337 375 372 390 V430 C337 415 297 415 264 430 Z" fill="white"/>
+  <line x1="256" y1="390" x2="256" y2="438" stroke="#0D1117" stroke-width="4"/>
+</svg>
