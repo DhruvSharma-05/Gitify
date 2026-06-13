@@ -4114,6 +4114,7 @@ header p {
   background: none;
   border: none;
   cursor: pointer;
+  position: relative;
   z-index: 2;
   gap: 12px;
   width: 110px;
@@ -4134,8 +4135,11 @@ header p {
 }
 
 .step-emoji {
-  font-size: 1.3rem;
+  color: var(--active-color);
   transition: transform 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .step-number {
@@ -4173,7 +4177,7 @@ header p {
 
 .step-node.active .step-circle {
   border-color: var(--active-color);
-  background: rgba(15, 23, 42, 0.95);
+  background: #0f172a;
   box-shadow: 0 0 20px var(--active-color);
 }
 
@@ -4193,7 +4197,7 @@ header p {
 
 .step-node.completed .step-circle {
   border-color: rgba(139, 92, 246, 0.5);
-  background: rgba(139, 92, 246, 0.08);
+  background: #191d3a; /* opaque purple-tinted dark so the connector line stays hidden behind */
 }
 
 .step-node.completed .step-node-label {
