@@ -6,14 +6,19 @@ import shutil
 def run_git_command(repo_path, args):
     """Executes a git command inside the specified repository path."""
     try:
-        # Enable git config safeties for temp folders
+        # Enable git config safeties for temp folders. We deliberately ignore the
+        # system AND global config so a malicious ~/.gitconfig (e.g. shell aliases
+        # or core.pager/editor pointing at arbitrary programs) can't run on the host.
         env = os.environ.copy()
         env["GIT_CONFIG_NOSYSTEM"] = "1"
+        env["GIT_CONFIG_GLOBAL"] = os.devnull
+        env["GIT_TERMINAL_PROMPT"] = "0"   # never block waiting for credentials
+        env["GIT_PAGER"] = "cat"           # never invoke an interactive pager
         env["GIT_AUTHOR_NAME"] = "Gitify Student"
         env["GIT_AUTHOR_EMAIL"] = "student@gitify.edu"
         env["GIT_COMMITTER_NAME"] = "Gitify Student"
         env["GIT_COMMITTER_EMAIL"] = "student@gitify.edu"
-        
+
         result = subprocess.run(
             ["git"] + args,
             cwd=repo_path,
@@ -296,13 +301,21 @@ def initialize_sandbox(repo_path, lesson_id):
         # Lesson 5: Stash & Cherry-Pick
         elif lesson_id == 5:
             run_git_command(repo_path, ["init", "-b", "feature/payments"])
+            # Born feature/payments with a base commit so we can branch off it and
+            # later return to it (an unborn branch can't be checked out back into).
+            with open(os.path.join(repo_path, "payments.js"), "w") as f:
+                f.write("// Payments module base\n")
+            run_git_command(repo_path, ["add", "."])
+            run_git_command(repo_path, ["commit", "-m", "Base payments setup"])
+
+            # Hotfix branch carries the commit the student will cherry-pick
             run_git_command(repo_path, ["checkout", "-b", "hotfix/invoice"])
             with open(os.path.join(repo_path, "Invoice.jsx"), "w") as f:
                 f.write("// Invoice calculations\nconst tax = 0.15;")
             run_git_command(repo_path, ["add", "."])
             run_git_command(repo_path, ["commit", "-m", "Fix tax rounding"])
-            
-            # Switch back and leave dirty work
+
+            # Back to the working branch, leave dirty WIP to stash
             run_git_command(repo_path, ["checkout", "feature/payments"])
             with open(os.path.join(repo_path, "Checkout.jsx"), "w") as f:
                 f.write("// WIP Payments module\n")
