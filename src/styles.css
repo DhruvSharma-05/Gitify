@@ -5314,5 +5314,70 @@ header p {
   }
 }
 
+/* ============================================================
+   Responsive lesson layout
+   The 3-column split (visualizer + inspector + checklist) is
+   inline-styled as flex-row, so we override with !important to
+   stack it once the columns can no longer breathe.
+   ============================================================ */
+@media (max-width: 1024px) {
+  .lesson-container-split {
+    flex-direction: column !important;
+    padding: 0 14px !important;
+  }
+  .lesson-left-content,
+  .lesson-middle-inspector,
+  .lesson-right-sidebar {
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    max-height: none !important;
+  }
+}
+
+/* ============================================================
+   A11y & micro-polish
+   ============================================================ */
+/* Keyboard focus rings (only for keyboard users, not mouse clicks) */
+:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+/* Don't double up rings on elements that already glow on focus */
+input:focus-visible,
+textarea:focus-visible {
+  outline-offset: 0;
+}
+
+/* Consistent interactive feedback for buttons & links */
+button,
+a,
+.step-node,
+.tab-btn {
+  transition: transform 0.12s ease, opacity 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+button:not(:disabled):active {
+  transform: translateY(1px);
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Respect users who prefer less motion: kill the looping logo/canvas
+   flourishes and long transitions, keep functional fades short. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 
 

@@ -122,6 +122,18 @@ export default function App() {
     return () => { cancelled = true }
   }, [currentLesson, sessionId])
 
+  // Close whichever modal is open on Escape (rebase stays open mid-run)
+  useEffect(() => {
+    if (!selectedCommit && !rebaseModalOpen) return
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return
+      if (selectedCommit) setSelectedCommit(null)
+      if (rebaseModalOpen && !isRebasing) setRebaseModalOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selectedCommit, rebaseModalOpen, isRebasing])
+
   const handleLessonSelect = (lessonId) => {
     setCurrentLesson(lessonId)
   }
@@ -448,8 +460,11 @@ export default function App() {
             padding: '20px'
           }}
         >
-          <div 
-            className="modal-content glassmorphic" 
+          <div
+            className="modal-content glassmorphic"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Commit inspection"
             onClick={(e) => e.stopPropagation()}
             style={{
               background: 'rgba(22, 27, 34, 0.9)',
@@ -551,6 +566,9 @@ export default function App() {
           }}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Interactive rebase editor"
             onClick={e => e.stopPropagation()}
             style={{
               background: 'rgba(22, 27, 34, 0.97)', border: '1px solid rgba(255,255,255,0.12)',
