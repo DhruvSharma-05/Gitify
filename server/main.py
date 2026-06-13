@@ -168,6 +168,20 @@ def get_or_create_sandbox(session_id: str, lesson_id: int):
         session_obj = SESSION_SANDBOXES[key]
     return key, session_obj
 
+def ensure_lesson_remote(base_path: str, lesson_id: int):
+    """Lesson 1 ships a bare remote on disk; once the student runs `git init`, wire it
+    up as `origin` so the taught `git push origin main` actually works."""
+    if lesson_id not in (0, 1):
+        return
+    if not os.path.exists(os.path.join(base_path, ".git")):
+        return
+    remote_dir = base_path + "_remote.git"
+    if not os.path.isdir(remote_dir):
+        return
+    _, remotes, _ = verifier.run_git_command(base_path, ["remote"])
+    if "origin" not in remotes.split():
+        verifier.run_git_command(base_path, ["remote", "add", "origin", remote_dir])
+
 def build_sync_state(base_path: str, cwd_rel: str = "") -> Dict[str, Any]:
     """Inspects the sandbox on disk and builds the state-sync payload that drives the
     frontend visualizers (branch, files, stashes, commit DAG, file contents)."""
@@ -614,6 +628,9 @@ def execute_terminal_command(data: TerminalExecuteRequest):
         # Persist any working-directory change made by `cd`
         SESSION_SANDBOXES[sb_key]["cwd_relative"] = cwd_state["rel"]
         cwd_rel = cwd_state["rel"]
+
+        # Wire up the lesson's remote once the repo exists (e.g. after `git init`)
+        ensure_lesson_remote(base_path, data.lesson_id)
 
         # 4. Check exercise checklist checkpoints state on disk!
         verified, v_msg, subtasks = verifier.check_sandbox_state(base_path, data.lesson_id)

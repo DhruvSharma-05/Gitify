@@ -3,6 +3,20 @@ import tempfile
 import subprocess
 import shutil
 
+# A controlled global git config: we ignore the user's real ~/.gitconfig (which could
+# carry shell aliases / pager / editor hooks) but still set safe sandbox defaults like
+# a 'main' default branch so the lessons' `git init` matches what they teach.
+_MANAGED_GITCONFIG = os.path.join(tempfile.gettempdir(), "gitify-gitconfig")
+
+def _ensure_managed_gitconfig():
+    try:
+        if not os.path.exists(_MANAGED_GITCONFIG):
+            with open(_MANAGED_GITCONFIG, "w", encoding="utf-8") as f:
+                f.write("[init]\n\tdefaultBranch = main\n")
+    except Exception:
+        pass
+    return _MANAGED_GITCONFIG
+
 def run_git_command(repo_path, args):
     """Executes a git command inside the specified repository path."""
     try:
@@ -11,7 +25,7 @@ def run_git_command(repo_path, args):
         # or core.pager/editor pointing at arbitrary programs) can't run on the host.
         env = os.environ.copy()
         env["GIT_CONFIG_NOSYSTEM"] = "1"
-        env["GIT_CONFIG_GLOBAL"] = os.devnull
+        env["GIT_CONFIG_GLOBAL"] = _ensure_managed_gitconfig()
         env["GIT_TERMINAL_PROMPT"] = "0"   # never block waiting for credentials
         env["GIT_PAGER"] = "cat"           # never invoke an interactive pager
         env["GIT_AUTHOR_NAME"] = "Gitify Student"
@@ -539,10 +553,14 @@ def check_sandbox_state(repo_path, lesson_id):
                 # If conflict_triggered and config.js is in porcelain status without U (Unmerged)
                 staged = conflict_triggered and resolved and ("UU config.js" not in status_out and "M  config.js" in status_out)
                 
-                # 4. Committed: MERGE_HEAD is gone, and log has a merge commit
-                code_log, log_out, _ = run_git_command(repo_path, ["log", "--oneline", "-n", "3"])
-                has_merge_msg = "merge" in log_out.lower() or "auth config" in log_out.lower() and "ui polish" in log_out.lower()
-                committed = not os.path.exists(os.path.join(repo_path, ".git", "MERGE_HEAD")) and has_merge_msg and len(log_out.splitlines()) >= 4
+                # 4. Committed: MERGE_HEAD is gone, and the merge commit unites both
+                #    branch histories (Base + main edit + feature/ui edit + merge = 4 commits).
+                code_log, log_out, _ = run_git_command(repo_path, ["log", "--oneline"])
+                log_lower = log_out.lower()
+                has_merge_msg = ("merge" in log_lower) or ("auth config" in log_lower and "ui polish" in log_lower)
+                committed = (not os.path.exists(os.path.join(repo_path, ".git", "MERGE_HEAD"))
+                             and has_merge_msg
+                             and len(log_out.splitlines()) >= 4)
                 
                 # Allow fallback: if they fully committed, trigger, resolve, and stage are also marked true
                 if committed:
