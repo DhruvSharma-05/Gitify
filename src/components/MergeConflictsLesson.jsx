@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react'
 import PretextCanvas from './PretextCanvas.jsx'
+import { useToast } from './Toast.jsx'
 import { apiUrl } from '../api.js'
 
 const resolutionText = {
@@ -15,6 +16,7 @@ const resolutionLabels = {
 }
 
 export default function MergeConflictsLesson({ onSuccess, setTerminalSyncListener }) {
+  const toast = useToast()
   const [stage, setStage] = useState(0)
   const [resolution, setResolution] = useState(null)
   const [manualValue, setManualValue] = useState('  theme: "system"')
@@ -53,19 +55,19 @@ export default function MergeConflictsLesson({ onSuccess, setTerminalSyncListene
       .then(res => res.json())
       .then(data => {
         if (data.verified) {
-          alert("✓ " + data.message)
+          toast.success(data.message, { title: 'Lesson complete' })
           if (onSuccess) onSuccess()
         } else {
-          alert("✗ Verification failed: " + data.message)
+          toast.error(data.message, { title: 'Verification failed' })
         }
       })
       .catch(err => {
         console.warn("Backend verifier offline, validating locally:", err)
         if (isCommitted && resolution) {
-          alert("✓ Lesson successfully completed (offline)!")
+          toast.success('Lesson successfully completed (offline)!', { title: 'Lesson complete' })
           if (onSuccess) onSuccess()
         } else {
-          alert("✗ Offline validation: Please resolve the merge conflict and commit it first.")
+          toast.warning('Please resolve the merge conflict and commit it first.', { title: 'Not yet resolved' })
         }
       })
   }
