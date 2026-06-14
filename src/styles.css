@@ -6040,3 +6040,71 @@ button:disabled {
   border: 1px dashed rgba(255, 255, 255, 0.14);
 }
 .fork-terminal-hint svg { flex-shrink: 0; color: #38bdf8; }
+
+/* ============================================================
+   "Command for this step" — show the real git command in every
+   visual walkthrough so learners connect the picture to the CLI.
+   ============================================================ */
+.command-box {
+  background: #090d16;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-top: 14px;
+}
+.command-box-label {
+  display: block;
+  font-size: 0.68rem;
+  color: #64748b;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+.command-box-line {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.command-box-line .cmd-prompt {
+  color: #34d399;
+  font-weight: 800;
+  font-family: 'Fira Code', Consolas, monospace;
+  flex-shrink: 0;
+}
+.command-box-line code {
+  flex: 1;
+  color: #7ee0ff;
+  font-family: 'Fira Code', Consolas, monospace;
+  font-size: 0.92rem;
+  word-break: break-all;
+}
+
+/* Compact inline echo of the command an action runs */
+.git-cmd-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: #090d16;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  max-width: 100%;
+}
+.git-cmd-line .label {
+  font-size: 0.64rem;
+  color: #64748b;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.git-cmd-line .cmd-prompt { color: #34d399; font-weight: 800; font-family: 'Fira Code', Consolas, monospace; }
+.git-cmd-line code {
+  color: #7ee0ff;
+  background: none;
+  padding: 0;
+  font-family: 'Fira Code', Consolas, monospace;
+  font-size: 0.82rem;
+  word-break: break-all;
+}

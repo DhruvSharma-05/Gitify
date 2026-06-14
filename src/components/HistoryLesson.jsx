@@ -239,6 +239,11 @@ export default function HistoryLesson({ onSuccess } = {}) {
                   <CornerUpLeft size={14} strokeWidth={2} /> Return to latest
                 </button>
               )}
+              <div className="git-cmd-line">
+                <span className="label">runs</span>
+                <span className="cmd-prompt">$</span>
+                <code>git checkout {selected.hash}</code>
+              </div>
             </div>
             <div className="working-snapshot">
               <h3>Working directory</h3>
@@ -267,6 +272,11 @@ export default function HistoryLesson({ onSuccess } = {}) {
           <button className="history-action" onClick={revertBadCommit} disabled={hasReverted}>
             <RotateCcw size={14} strokeWidth={2} /> {hasReverted ? 'Reverted ✓' : 'Revert e17b90'}
           </button>
+          <div className="git-cmd-line">
+            <span className="label">runs</span>
+            <span className="cmd-prompt">$</span>
+            <code>git revert e17b90</code>
+          </div>
           <div className={`safe-badge ${hasReverted ? 'active' : ''}`}>
             {hasReverted ? 'Done — see the new "undo" commit at the end of Stage 1' : 'Safe for shared branches'}
           </div>
@@ -302,6 +312,12 @@ export default function HistoryLesson({ onSuccess } = {}) {
               onChange={(event) => setResetIndex(event.target.value)}
             />
           </label>
+
+          <div className="git-cmd-line">
+            <span className="label">runs</span>
+            <span className="cmd-prompt">$</span>
+            <code>git reset --{resetMode} {resetCommit.hash}</code>
+          </div>
 
           {discarded.length > 0 && (
             <div className="discarded-block">
