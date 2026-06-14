@@ -17,6 +17,16 @@ def _ensure_managed_gitconfig():
         pass
     return _MANAGED_GITCONFIG
 
+def seed_env():
+    """Env for raw subprocess git calls during sandbox seeding. Forces our managed
+    config (default branch = main) so seeding is deterministic regardless of the host's
+    ambient git defaults — without this, hosts that default to 'master' (e.g. CI/Linux)
+    create bare remotes on the wrong branch and break the remote-collaboration lesson."""
+    env = os.environ.copy()
+    env["GIT_CONFIG_NOSYSTEM"] = "1"
+    env["GIT_CONFIG_GLOBAL"] = _ensure_managed_gitconfig()
+    return env
+
 def run_git_command(repo_path, args):
     """Executes a git command inside the specified repository path."""
     try:
@@ -243,8 +253,8 @@ def initialize_sandbox(repo_path, lesson_id):
             if os.path.exists(remote_dir):
                 shutil.rmtree(remote_dir, ignore_errors=True)
             os.makedirs(remote_dir, exist_ok=True)
-            subprocess.run(["git", "init", "--bare"], cwd=remote_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                
+            subprocess.run(["git", "init", "--bare", "-b", "main"], cwd=remote_dir, env=seed_env(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
         # Lesson 2: Branching
         elif lesson_id == 2:
             run_git_command(repo_path, ["init", "-b", "main"])
@@ -343,35 +353,40 @@ def initialize_sandbox(repo_path, lesson_id):
             if os.path.exists(remote_dir):
                 shutil.rmtree(remote_dir, ignore_errors=True)
             os.makedirs(remote_dir, exist_ok=True)
-            subprocess.run(["git", "init", "--bare"], cwd=remote_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            
+            subprocess.run(["git", "init", "--bare", "-b", "main"], cwd=remote_dir, env=seed_env(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
             # Init user sandbox
             run_git_command(repo_path, ["init", "-b", "main"])
             run_git_command(repo_path, ["remote", "add", "origin", remote_dir])
-            
+
             with open(os.path.join(repo_path, "README.md"), "w") as f:
                 f.write("# Gitify Collab Project\n")
             run_git_command(repo_path, ["add", "."])
             run_git_command(repo_path, ["commit", "-m", "Init project"])
             run_git_command(repo_path, ["push", "-u", "origin", "main"])
-            
-            # Simulate classmate pushing 2 commits on remote
+
+            # Simulate classmate pushing 2 commits on remote. seed_env keeps everything on
+            # 'main' regardless of the host's default-branch config; per-commit identity is
+            # supplied with -c so the teammate authorship still shows as Sam/Priya.
+            env = seed_env()
             with tempfile.TemporaryDirectory() as teammate_dir:
-                subprocess.run(["git", "clone", remote_dir, teammate_dir], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                
+                subprocess.run(["git", "clone", remote_dir, teammate_dir], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                # Guarantee the teammate checkout is on main even on quirky git versions
+                subprocess.run(["git", "checkout", "-B", "main"], cwd=teammate_dir, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
                 # Commit 1
                 with open(os.path.join(teammate_dir, "ui.js"), "w") as f:
                     f.write("// Sam: UI navbar polish\n")
-                subprocess.run(["git", "add", "."], cwd=teammate_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                subprocess.run(["git", "-c", "user.name=Sam", "-c", "user.email=sam@gitify.edu", "commit", "-m", "nav polish"], cwd=teammate_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                
+                subprocess.run(["git", "add", "."], cwd=teammate_dir, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                subprocess.run(["git", "-c", "user.name=Sam", "-c", "user.email=sam@gitify.edu", "commit", "-m", "nav polish"], cwd=teammate_dir, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
                 # Commit 2
                 with open(os.path.join(teammate_dir, "api.js"), "w") as f:
                     f.write("// Priya: endpoint cache retry logic\n")
-                subprocess.run(["git", "add", "."], cwd=teammate_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                subprocess.run(["git", "-c", "user.name=Priya", "-c", "user.email=priya@gitify.edu", "commit", "-m", "retry logic"], cwd=teammate_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                
-                subprocess.run(["git", "push", "origin", "main"], cwd=teammate_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                subprocess.run(["git", "add", "."], cwd=teammate_dir, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                subprocess.run(["git", "-c", "user.name=Priya", "-c", "user.email=priya@gitify.edu", "commit", "-m", "retry logic"], cwd=teammate_dir, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+                subprocess.run(["git", "push", "origin", "main"], cwd=teammate_dir, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 
             # Create a conflicting local commit in the user sandbox so they have to rebase/pull!
             with open(os.path.join(repo_path, "auth.js"), "w") as f:
