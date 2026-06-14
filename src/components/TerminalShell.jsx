@@ -408,7 +408,9 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
           file_contents: updatedOfflineState.fileContents,
           subtasks: checkResult.subtasks,
           verified: checkResult.verified,
-          validation_message: checkResult.msg
+          validation_message: checkResult.msg,
+          staged: updatedOfflineState.staged || [],
+          pushed_offline: updatedOfflineState.pushed_offline || false
         }
 
         if (onSyncState) {

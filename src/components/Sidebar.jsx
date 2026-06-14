@@ -1,5 +1,5 @@
 import React from 'react'
-import { CheckCircle } from 'lucide-react'
+import { CheckCircle, Users } from 'lucide-react'
 
 const lessons = [
   { id: 0, title: 'Lesson 0: Git Basics', description: 'Interactive Tutorial' },
@@ -49,12 +49,48 @@ export default function Sidebar({ isOpen, onClose, currentLesson, onSelectLesson
           ))}
         </div>
 
-        <div className="sidebar-footer">
+        <div className="sidebar-footer" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <button
+            onClick={() => {
+              onSelectLesson('contributors')
+              onClose()
+            }}
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              color: 'white',
+              padding: '10px 16px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontWeight: '600',
+              fontSize: '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              transition: 'all 0.2s',
+              width: '100%'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)'
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+            }}
+          >
+            <Users size={16} />
+            Project Contributors
+          </button>
           <a
             href="https://docs.github.com/en/get-started"
             target="_blank"
             rel="noopener noreferrer"
             className="sidebar-link"
+            style={{ textAlign: 'center', display: 'block', fontSize: '0.85rem', color: '#8b949e', textDecoration: 'none', transition: 'color 0.2s' }}
+            onMouseOver={(e) => e.currentTarget.style.color = '#f0f6fc'}
+            onMouseOut={(e) => e.currentTarget.style.color = '#8b949e'}
           >
             GitHub Documentation
           </a>

@@ -78,15 +78,69 @@ export default function Flow({ onSuccess, setTerminalSyncListener }) {
 
   useLayoutEffect(() => {
     updateLayouts()
+    
+    let observer
+    if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
+      observer = new ResizeObserver(() => {
+        updateLayouts()
+      })
+      observer.observe(containerRef.current)
+      boardRefs.forEach(ref => {
+        if (ref.current) observer.observe(ref.current)
+      })
+    }
+    
     window.addEventListener('resize', updateLayouts)
-    return () => window.removeEventListener('resize', updateLayouts)
+    
+    return () => {
+      if (observer) {
+        observer.disconnect()
+      }
+      window.removeEventListener('resize', updateLayouts)
+    }
   }, [])
 
   // Sync listener setup
   useEffect(() => {
     if (setTerminalSyncListener) {
       setTerminalSyncListener(() => (syncState) => {
-        // Flow handles its own state, but registers listener to align with App.jsx
+        if (!syncState) return
+        
+        const workspaceFilesList = syncState.files || []
+        const stagedList = syncState.staged || []
+        const unstagedList = syncState.unstaged || []
+        const commits = syncState.commits_graph || []
+        const pushedOffline = syncState.pushed_offline || false
+        
+        const hasPushedCommits = commits.some(c => 
+          c.branches && c.branches.some(b => b.startsWith('origin/'))
+        )
+        
+        setFiles(prev => {
+          return workspaceFilesList.map(filename => {
+            const existing = prev.find(f => f.name === filename)
+            const id = existing ? existing.id : Math.random()
+            
+            let status = 'working'
+            if (stagedList.includes(filename)) {
+              status = 'staged'
+            } else if (unstagedList.includes(filename)) {
+              status = 'working'
+            } else if (hasPushedCommits || pushedOffline) {
+              status = 'pushed'
+            } else if (commits.length > 0) {
+              status = 'committed'
+            } else {
+              status = 'working'
+            }
+            
+            return {
+              id,
+              name: filename,
+              status
+            }
+          })
+        })
       })
     }
     return () => {
