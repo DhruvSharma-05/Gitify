@@ -15,9 +15,10 @@ import ExerciseGuide from './components/ExerciseGuide.jsx'
 import FileInspector from './components/FileInspector.jsx'
 import LiveCommitGraph from './components/LiveCommitGraph.jsx'
 import PretextCanvas from './components/PretextCanvas.jsx'
+import ForkLesson from './components/ForkLesson.jsx'
 import { apiUrl, getInitialOfflineState, getInitialSubtasks } from './api.js'
 
-const lessonOrder = [0, 1, 2, 3, 4, 5, 6, 7]
+const lessonOrder = [0, 1, 2, 3, 4, 5, 6, 7, 8]
 
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -120,7 +121,7 @@ export default function App() {
     setTerminalHydration(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
 
-    if (!sessionId || currentLesson === 0 || currentLesson === 'contributors') return
+    if (!sessionId || currentLesson === 0 || currentLesson === 8 || currentLesson === 'contributors') return
 
     let cancelled = false
     fetch(apiUrl('/api/lessons/enter'), {
@@ -352,6 +353,10 @@ export default function App() {
         <Intro onComplete={handleIntroComplete} />
       ) : currentLesson === 'contributors' ? (
         <ContributorsPage onBack={() => setCurrentLesson(lastActiveLesson)} />
+      ) : currentLesson === 8 ? (
+        <div className="lesson-standalone">
+          <ForkLesson onComplete={() => handleVerifySuccess(8)} />
+        </div>
       ) : (
         <div className="lesson-container-split" style={{ display: 'flex', gap: '24px', minHeight: '520px', alignItems: 'stretch', width: '100%', padding: '0 10px' }}>
           
@@ -459,7 +464,7 @@ export default function App() {
         </nav>
       )}
 
-      {currentLesson !== 0 && currentLesson !== 'contributors' && (
+      {currentLesson !== 0 && currentLesson !== 8 && currentLesson !== 'contributors' && (
         <TerminalShell
           lessonId={currentLesson}
           onSyncState={handleTerminalSync}

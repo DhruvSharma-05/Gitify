@@ -5758,3 +5758,154 @@ button:disabled {
 
 
 
+
+/* ============================================================
+   Lesson 8 — Fork & Contribute (interactive visual)
+   ============================================================ */
+.lesson-standalone {
+  width: 100%;
+  padding: 0 10px;
+}
+
+.fork-lesson { width: 100%; }
+
+.fork-stage-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(260px, 0.85fr);
+  gap: 24px;
+  align-items: start;
+  margin-top: 8px;
+}
+
+.fork-diagram {
+  width: 100%;
+  height: auto;
+  max-width: 540px;
+  display: block;
+  margin: 0 auto;
+}
+
+/* Nodes */
+.fork-node rect {
+  fill: rgba(22, 27, 34, 0.92);
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 1.5;
+  transition: stroke 0.3s ease, filter 0.3s ease;
+}
+.fork-node.active rect {
+  stroke: #38bdf8;
+  filter: drop-shadow(0 0 9px rgba(56, 189, 248, 0.45));
+}
+.fork-node-title { fill: #f0f6fc; font-size: 15px; font-weight: 800; }
+.fork-node-sub { fill: #8b949e; font-size: 11px; }
+.fork-node-empty { fill: rgba(255, 255, 255, 0.25); font-size: 12px; font-style: italic; }
+
+.fork-commit {
+  stroke: #0d1117;
+  stroke-width: 2;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: fork-commit-pop 0.4s ease-out;
+}
+.fork-commit.kind-base { fill: #8b949e; }
+.fork-commit.kind-feature { fill: #a78bfa; }
+.fork-commit.kind-mate { fill: #34d399; }
+@keyframes fork-commit-pop {
+  from { transform: scale(0); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+/* Connectors */
+.fork-conn {
+  stroke: rgba(255, 255, 255, 0.18);
+  stroke-width: 2.5;
+  transition: stroke 0.25s ease, stroke-width 0.25s ease;
+}
+.fork-conn.active { stroke: #38bdf8; stroke-width: 3.5; filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.7)); }
+.fork-conn.up.active { stroke: #a78bfa; filter: drop-shadow(0 0 4px rgba(167, 139, 250, 0.7)); }
+.fork-conn-label { fill: #8b949e; font-size: 11px; font-weight: 700; }
+.fork-conn-label.end { text-anchor: end; }
+
+/* Animated packet travelling a connector */
+.fork-packet {
+  fill: #38bdf8;
+  filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.85));
+  animation: fork-pkt 0.95s ease-in-out forwards;
+}
+.fork-packet.feat {
+  fill: #a78bfa;
+  filter: drop-shadow(0 0 5px rgba(167, 139, 250, 0.85));
+}
+@keyframes fork-pkt {
+  0%   { transform: translateY(0); opacity: 0; }
+  12%  { opacity: 1; }
+  88%  { opacity: 1; }
+  100% { transform: translateY(var(--dist)); opacity: 0; }
+}
+
+/* Side panel */
+.fork-side { display: flex; flex-direction: column; gap: 16px; }
+
+.fork-current {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--glass-border);
+  border-left: 3px solid #38bdf8;
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.fork-current.done { border-left-color: #34d399; }
+.fork-current-head { display: flex; align-items: center; gap: 9px; margin-bottom: 6px; color: #f0f6fc; }
+.fork-step-badge {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.fork-current p { margin: 0; font-size: 0.85rem; line-height: 1.55; color: var(--text-muted); }
+
+/* Pull request card */
+.fork-pr-card {
+  background: rgba(13, 17, 23, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 14px;
+  animation: toast-in 0.3s ease;
+}
+.fork-pr-card.merged { border-color: rgba(167, 139, 250, 0.5); }
+.fork-pr-top { display: flex; align-items: center; gap: 8px; color: #f0f6fc; font-weight: 700; }
+.fork-pr-top svg { color: #34d399; flex-shrink: 0; }
+.fork-pr-card.merged .fork-pr-top svg { color: #a78bfa; }
+.fork-pr-title { flex: 1; font-size: 0.86rem; }
+.fork-pr-status { font-size: 0.62rem; font-weight: 800; text-transform: uppercase; padding: 2px 8px; border-radius: 20px; }
+.fork-pr-status.open { background: rgba(52, 211, 153, 0.18); color: #6ee7b7; }
+.fork-pr-status.merged { background: rgba(167, 139, 250, 0.2); color: #c4b5fd; }
+.fork-pr-branches { margin: 11px 0; font-size: 0.78rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px; }
+.fork-pr-branches code { background: rgba(255, 255, 255, 0.06); padding: 2px 7px; border-radius: 5px; color: #e6edf3; }
+.fork-merge-btn {
+  width: 100%;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 9px; border-radius: 8px; border: none;
+  background: linear-gradient(90deg, #8b5cf6, #6366f1);
+  color: #fff; font-weight: 700; cursor: pointer;
+}
+.fork-merge-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.fork-pr-merged { display: flex; align-items: center; justify-content: center; gap: 7px; color: #c4b5fd; font-weight: 700; font-size: 0.85rem; }
+
+/* Legend */
+.fork-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 0.76rem; color: var(--text-muted); }
+.fork-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.fork-legend .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+.fork-legend .dot.base { background: #8b949e; }
+.fork-legend .dot.feature { background: #a78bfa; }
+.fork-legend .dot.mate { background: #34d399; }
+
+/* Step controls (reuses .controls; tweak done state) */
+.fork-steps { margin-top: 26px; }
+.fork-steps button.is-done { color: #6ee7b7; border-color: rgba(52, 211, 153, 0.4); background: rgba(52, 211, 153, 0.08); }
+.fork-steps button.is-done:disabled { opacity: 0.85; }
+
+@media (max-width: 860px) {
+  .fork-stage-wrap { grid-template-columns: 1fr; }
+}
