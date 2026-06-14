@@ -266,6 +266,8 @@ def build_sync_state(base_path: str, cwd_rel: str = "") -> Dict[str, Any]:
     files_list = []
     stashes_list = []
     picked_commits = []
+    staged_files = []
+    unstaged_files = []
 
     if os.path.exists(os.path.join(base_path, ".git")):
         _, branch_out, _ = verifier.run_git_command(base_path, ["rev-parse", "--abbrev-ref", "HEAD"])
@@ -288,6 +290,22 @@ def build_sync_state(base_path: str, cwd_rel: str = "") -> Dict[str, Any]:
             for line in log_out.strip().split("\n"):
                 picked_commits.append(line.split()[0])
 
+        # Get staged / unstaged files from porcelain status
+        code, status_out, _ = verifier.run_git_command(base_path, ["status", "--porcelain"])
+        if code == 0 and status_out.strip():
+            for line in status_out.strip().split("\n"):
+                if len(line) >= 4:
+                    xy = line[:2]
+                    filepath = line[3:].strip().strip('"')
+                    if " -> " in filepath:
+                        filepath = filepath.split(" -> ")[1].strip().strip('"')
+                    
+                    x, y = xy[0], xy[1]
+                    if x in ('M', 'A', 'D', 'R', 'C'):
+                        staged_files.append(filepath)
+                    if y in ('M', 'D') or xy == '??':
+                        unstaged_files.append(filepath)
+
     try:
         for item in os.listdir(base_path):
             if item != ".git" and os.path.isfile(os.path.join(base_path, item)):
@@ -303,6 +321,8 @@ def build_sync_state(base_path: str, cwd_rel: str = "") -> Dict[str, Any]:
         "pwd": cwd_rel,
         "commits_graph": verifier.get_live_commit_graph(base_path),
         "file_contents": verifier.get_workspace_files_content(base_path),
+        "staged": staged_files,
+        "unstaged": unstaged_files,
     }
 
 def resolve_sandbox_path(base_path: str, cwd_rel: str, user_path: str = "") -> str:

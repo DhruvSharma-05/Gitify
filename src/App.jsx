@@ -3,6 +3,7 @@ import { Search, Settings, Lightbulb, Loader, CheckCircle, GripVertical } from '
 import Flow from './components/Flow.jsx'
 import Intro from './components/Intro.jsx'
 import Sidebar from './components/Sidebar.jsx'
+import ContributorsPage from './components/ContributorsPage.jsx'
 import BranchingLesson from './components/BranchingLesson.jsx'
 import MergeConflictsLesson from './components/MergeConflictsLesson.jsx'
 import HistoryLesson from './components/HistoryLesson.jsx'
@@ -20,8 +21,36 @@ const lessonOrder = [0, 1, 2, 3, 4, 5, 6, 7]
 
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [currentLesson, setCurrentLesson] = useState(0)
+  const [currentLesson, setCurrentLesson] = useState(() => {
+    const saved = localStorage.getItem('gitify_current_lesson')
+    if (saved !== null) {
+      const parsed = parseInt(saved, 10)
+      if (!isNaN(parsed)) return parsed
+    }
+    return 0
+  })
   const [completedLessons, setCompletedLessons] = useState([])
+
+  useEffect(() => {
+    localStorage.setItem('gitify_current_lesson', currentLesson)
+  }, [currentLesson])
+
+  const [lastActiveLesson, setLastActiveLesson] = useState(() => {
+    const saved = localStorage.getItem('gitify_last_active_lesson')
+    if (saved !== null) {
+      const parsed = parseInt(saved, 10)
+      if (!isNaN(parsed)) return parsed
+    }
+    return 1
+  })
+
+  useEffect(() => {
+    if (currentLesson !== 'contributors') {
+      setLastActiveLesson(currentLesson)
+      localStorage.setItem('gitify_last_active_lesson', currentLesson)
+    }
+  }, [currentLesson])
+
   const [terminalSyncListener, setTerminalSyncListener] = useState(null)
   
   // Exercise and Verification State
@@ -91,7 +120,7 @@ export default function App() {
     setTerminalHydration(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
 
-    if (!sessionId || currentLesson === 0) return
+    if (!sessionId || currentLesson === 0 || currentLesson === 'contributors') return
 
     let cancelled = false
     fetch(apiUrl('/api/lessons/enter'), {
@@ -321,6 +350,8 @@ export default function App() {
 
       {currentLesson === 0 ? (
         <Intro onComplete={handleIntroComplete} />
+      ) : currentLesson === 'contributors' ? (
+        <ContributorsPage onBack={() => setCurrentLesson(lastActiveLesson)} />
       ) : (
         <div className="lesson-container-split" style={{ display: 'flex', gap: '24px', minHeight: '520px', alignItems: 'stretch', width: '100%', padding: '0 10px' }}>
           
@@ -419,7 +450,7 @@ export default function App() {
         </div>
       )}
 
-      {nextLesson !== undefined && (
+      {nextLesson !== undefined && currentLesson !== 0 && currentLesson !== 'contributors' && (
         <nav className="lesson-next-nav" aria-label="Lesson navigation">
           <button className="lesson-next-btn" onClick={handleNextLesson}>
             Next lesson
@@ -428,7 +459,7 @@ export default function App() {
         </nav>
       )}
 
-      {currentLesson !== 0 && (
+      {currentLesson !== 0 && currentLesson !== 'contributors' && (
         <TerminalShell
           lessonId={currentLesson}
           onSyncState={handleTerminalSync}
