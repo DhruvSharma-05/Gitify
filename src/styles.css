@@ -5909,3 +5909,134 @@ button:disabled {
 @media (max-width: 860px) {
   .fork-stage-wrap { grid-template-columns: 1fr; }
 }
+
+/* Lesson 8 — exercise (Challenge mode + knowledge check) */
+.fork-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 18px;
+}
+.fork-mode-toggle button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.fork-mode-toggle button.active {
+  color: #fff;
+  border-color: rgba(56, 189, 248, 0.6);
+  background: rgba(56, 189, 248, 0.14);
+}
+.fork-mistakes {
+  margin-left: auto;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+.fork-mistakes strong { color: #fca5a5; }
+
+/* Shake a wrong step pick */
+.fork-steps button.shake { animation: fork-shake 0.45s; border-color: rgba(248, 113, 113, 0.6) !important; }
+@keyframes fork-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-5px); }
+  40%, 80% { transform: translateX(5px); }
+}
+
+/* Challenge result + stars */
+.fork-result {
+  text-align: center;
+  padding: 18px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+}
+.fork-result strong { display: block; color: #f0f6fc; margin: 6px 0; }
+.fork-result p { margin: 0 0 14px; font-size: 0.84rem; color: var(--text-muted); line-height: 1.5; }
+.fork-stars { display: flex; justify-content: center; gap: 6px; color: #4b5563; }
+.fork-stars .lit { color: #fbbf24; filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.5)); }
+
+/* Knowledge check */
+.fork-quiz {
+  margin-top: 26px;
+  padding: 22px;
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  background: var(--glass-bg);
+}
+.fork-quiz h3 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 18px;
+  font-size: 1.1rem;
+  color: #f0f6fc;
+}
+.quiz-q { margin-bottom: 18px; }
+.quiz-prompt { margin: 0 0 10px; font-weight: 700; color: var(--text-main); font-size: 0.92rem; }
+.quiz-options { display: grid; gap: 8px; }
+.quiz-opt {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-align: left;
+  padding: 10px 13px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-main);
+  font-size: 0.86rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.quiz-opt:hover:not(:disabled) { border-color: rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.06); }
+.quiz-opt.picked { border-color: #38bdf8; background: rgba(56, 189, 248, 0.1); }
+.quiz-opt.correct { border-color: #34d399; background: rgba(52, 211, 153, 0.12); color: #d1fae5; }
+.quiz-opt.wrong { border-color: #f87171; background: rgba(248, 113, 113, 0.12); color: #fecaca; }
+.quiz-opt:disabled { cursor: default; }
+.quiz-mark {
+  width: 16px; height: 16px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.quiz-opt.correct .quiz-mark { color: #34d399; }
+.quiz-opt.wrong .quiz-mark { color: #f87171; }
+.quiz-score {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin-top: 6px; padding: 8px 14px; border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05); color: var(--text-main); font-weight: 700;
+}
+.quiz-score.perfect { background: rgba(251, 191, 36, 0.14); color: #fcd34d; }
+
+/* Lesson 8 — terminal-driven hints */
+.fork-cmd {
+  display: block;
+  margin-top: 6px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: #0d1117;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #7ee0ff;
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  word-break: break-all;
+}
+.fork-terminal-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+}
+.fork-terminal-hint svg { flex-shrink: 0; color: #38bdf8; }

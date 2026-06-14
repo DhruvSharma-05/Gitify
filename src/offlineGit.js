@@ -118,8 +118,88 @@ export function checkOfflineProgress(state, lessonId) {
     verified = rebase_started && commits_squashed && timeline_clean
     msg = verified ? "Commits squashed and timeline clean!" : "Organize commits using 'pick', 'squash', or 'drop' in rebase."
   }
+  else if (lessonId === 8) {
+    const f = state.fork || {}
+    subtasks = [
+      { id: "fork", title: "Fork the upstream repo ('gh repo fork')", completed: !!f.fork },
+      { id: "clone", title: "Clone your fork ('git clone')", completed: !!f.clone },
+      { id: "commit", title: "Branch & commit your fix ('git commit')", completed: !!f.commit },
+      { id: "push", title: "Push to your fork ('git push origin')", completed: !!f.push },
+      { id: "pr", title: "Open a pull request ('gh pr create')", completed: !!f.pr },
+      { id: "merge", title: "Merge the pull request ('gh pr merge')", completed: !!f.merge }
+    ]
+    verified = !!(f.fork && f.clone && f.commit && f.push && f.pr && f.merge)
+    msg = verified
+      ? "You completed the full fork-and-contribute workflow!"
+      : "Follow the steps: fork → clone → branch+commit → push → open PR → merge."
+  }
 
   return { verified, msg, subtasks }
+}
+
+// Lesson 8 is a simulated GitHub fork/PR workflow (fork & PRs aren't real local-git
+// commands), so it has its own tiny interpreter covering git + the GitHub CLI (gh).
+function simulateForkCommand(commandText, state) {
+  const next = JSON.parse(JSON.stringify(state))
+  if (!next.fork) next.fork = { fork: false, clone: false, commit: false, push: false, pr: false, merge: false, sync: false }
+  const f = next.fork
+  const cmd = commandText.trim()
+  const lower = cmd.toLowerCase()
+  const parts = cmd.split(/\s+/)
+  let output = ""
+  let status = "success"
+
+  const fail = (msg) => { output = msg; status = "error" }
+
+  if (cmd === "clear") {
+    return { nextState: next, output: "CLEAR_CONSOLE", status: "success" }
+  } else if (parts[0] === "ls") {
+    output = f.clone ? "README.md   index.js   bug.js" : "(nothing here yet — fork and clone the repo first)"
+  } else if (lower.startsWith("gh repo fork")) {
+    if (f.fork) output = "You already have a fork: you/awesome-lib"
+    else { f.fork = true; output = "Forking octo/awesome-lib...\n✓ Created fork you/awesome-lib on your GitHub account." }
+  } else if (parts[0] === "git" && parts[1] === "clone") {
+    if (!f.fork) fail("Nothing to clone yet. Fork the project first:  gh repo fork octo/awesome-lib")
+    else {
+      f.clone = true
+      next.initialized = true
+      next.files = ["README.md", "index.js", "bug.js"]
+      next.branch = "main"
+      output = "Cloning into 'awesome-lib'...\nremote: Enumerating objects: 12, done.\n✓ Cloned your fork to your computer."
+    }
+  } else if (parts[0] === "git" && parts[1] === "checkout" && parts[2] === "-b") {
+    if (!f.clone) fail("Clone your fork first:  git clone https://github.com/you/awesome-lib")
+    else { next.branch = parts[3] || "fix-bug"; output = `Switched to a new branch '${next.branch}'` }
+  } else if (parts[0] === "git" && parts[1] === "add") {
+    output = f.clone ? "" : "Clone your fork first."
+    if (!f.clone) status = "error"
+  } else if (parts[0] === "git" && parts[1] === "commit") {
+    if (!f.clone) fail("Clone your fork first.")
+    else if (next.branch === "main") fail("Work on a feature branch, not main:  git checkout -b fix-bug")
+    else { f.commit = true; const h = Math.random().toString(16).slice(2, 9); output = `[${next.branch} ${h}] fix the bug\n 1 file changed, 2 insertions(+)` }
+  } else if (parts[0] === "git" && parts[1] === "push") {
+    if (!f.commit) fail("Commit your change before pushing.")
+    else { f.push = true; output = `Enumerating objects: 5, done.\nTo https://github.com/you/awesome-lib\n * [new branch]      ${next.branch} -> ${next.branch}\n✓ Pushed your branch to your fork.` }
+  } else if (lower.startsWith("gh pr create")) {
+    if (!f.push) fail("Push your branch before opening a pull request.")
+    else { f.pr = true; output = "Creating pull request for you:fix-bug into octo:main\n✓ https://github.com/octo/awesome-lib/pull/42" }
+  } else if (lower.startsWith("gh pr merge")) {
+    if (!f.pr) fail("Open a pull request first:  gh pr create")
+    else { f.merge = true; output = "✓ Merged pull request #42 into octo/awesome-lib. Your contribution is now part of the project!" }
+  } else if (lower.startsWith("gh repo sync") || (parts[0] === "git" && parts[1] === "fetch") || (parts[0] === "git" && parts[1] === "merge" && lower.includes("upstream"))) {
+    if (!f.merge) fail("Nothing new to sync yet.")
+    else { f.sync = true; output = "✓ Synced your fork with upstream — you now have everyone's latest changes." }
+  } else if (parts[0] === "git" && parts[1] === "status") {
+    output = !f.clone ? "fatal: not a git repository (clone your fork first)" : `On branch ${next.branch}\nnothing to commit, working tree clean`
+    if (!f.clone) status = "error"
+  } else if (parts[0] === "git" && parts[1] === "log") {
+    if (!f.clone) fail("fatal: not a git repository")
+    else output = "a1c2d3 (HEAD) base project commit"
+  } else {
+    fail("That command isn't part of this lesson. Type the suggested command shown on the left, or open the Cheatsheet.")
+  }
+
+  return { nextState: next, output, status }
 }
 
 // Commands the in-memory simulator can faithfully reproduce. Anything else — shell
@@ -128,6 +208,11 @@ export function checkOfflineProgress(state, lessonId) {
 const OFFLINE_SUPPORTED_CMDS = ['ls', 'cat', 'touch', 'rm', 'clear', 'git']
 
 export function simulateCommandOffline(commandText, state, lessonId) {
+  // Lesson 8 (fork & contribute) is a GitHub-workflow simulation with its own interpreter.
+  if (lessonId === 8 || state.scenario === 'fork') {
+    return simulateForkCommand(commandText, state)
+  }
+
   const parts = commandText.trim().split(/\s+/)
   const baseCmd = parts[0]
   let output = ""

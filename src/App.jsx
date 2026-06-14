@@ -121,7 +121,15 @@ export default function App() {
     setTerminalHydration(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
 
-    if (!sessionId || currentLesson === 0 || currentLesson === 8 || currentLesson === 'contributors') return
+    if (!sessionId || currentLesson === 0 || currentLesson === 'contributors') return
+
+    // Lesson 8 is a self-contained, simulated GitHub workflow — seed its checklist
+    // locally and let the terminal drive it (no backend sandbox).
+    if (currentLesson === 8) {
+      setSubtasks(getInitialSubtasks(8))
+      setTerminalHydration({ branch: 'main', files: [], pwd: '', nonce: Date.now() })
+      return
+    }
 
     let cancelled = false
     fetch(apiUrl('/api/lessons/enter'), {
@@ -353,10 +361,6 @@ export default function App() {
         <Intro onComplete={handleIntroComplete} />
       ) : currentLesson === 'contributors' ? (
         <ContributorsPage onBack={() => setCurrentLesson(lastActiveLesson)} />
-      ) : currentLesson === 8 ? (
-        <div className="lesson-standalone">
-          <ForkLesson onComplete={() => handleVerifySuccess(8)} />
-        </div>
       ) : (
         <div className="lesson-container-split" style={{ display: 'flex', gap: '24px', minHeight: '520px', alignItems: 'stretch', width: '100%', padding: '0 10px' }}>
           
@@ -380,6 +384,8 @@ export default function App() {
               <RemoteCollaborationLesson onSuccess={() => handleVerifySuccess(6)} setTerminalSyncListener={setTerminalSyncListener} />
             ) : currentLesson === 7 ? (
               <RebaseLesson onSuccess={() => handleVerifySuccess(7)} setTerminalSyncListener={setTerminalSyncListener} />
+            ) : currentLesson === 8 ? (
+              <ForkLesson setTerminalSyncListener={setTerminalSyncListener} />
             ) : (
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '18px' }}>
                 <div style={{ marginBottom: '8px' }}>
@@ -464,7 +470,7 @@ export default function App() {
         </nav>
       )}
 
-      {currentLesson !== 0 && currentLesson !== 8 && currentLesson !== 'contributors' && (
+      {currentLesson !== 0 && currentLesson !== 'contributors' && (
         <TerminalShell
           lessonId={currentLesson}
           onSyncState={handleTerminalSync}
