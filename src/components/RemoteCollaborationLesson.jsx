@@ -104,7 +104,11 @@ export default function RemoteCollaborationLesson() {
           </div>
           <div className={`drift-badge ${trackingSynced ? 'synced' : ''}`}>{drift}</div>
           <button className="remote-full-button" onClick={runPull}>Sync tracking branch</button>
-          <code className="remote-command">git remote -v</code>
+          <div className="git-cmd-line">
+            <span className="label">runs</span>
+            <span className="cmd-prompt">$</span>
+            <code>git pull origin feature/auth</code>
+          </div>
         </section>
 
         <section className="remote-panel pr-panel">

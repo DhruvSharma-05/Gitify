@@ -187,6 +187,11 @@ export default function StashCherryPickLesson({ onSuccess, setTerminalSyncListen
             <button onClick={createStash} disabled={dirtyFiles.length === 0}>git stash push -m</button>
             <button onClick={switchBranch}>Switch branch</button>
           </div>
+          <div className="git-cmd-line">
+            <span className="label">switch runs</span>
+            <span className="cmd-prompt">$</span>
+            <code>git checkout {branch === 'feature/payments' ? 'hotfix/invoice' : 'feature/payments'}</code>
+          </div>
           <div className="stash-note">{appliedNote}</div>
         </section>
 
