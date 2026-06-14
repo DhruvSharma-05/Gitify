@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { Copy } from 'lucide-react'
 import PretextCanvas from './PretextCanvas.jsx'
 
 const steps = [
@@ -259,7 +260,18 @@ export default function BranchingLesson() {
           <p className="step-description">{step.description}</p>
           {step.command && (
             <div className="command-box">
-              <code>{step.command}</code>
+              <span className="command-box-label">Command for this step</span>
+              <div className="command-box-line">
+                <span className="cmd-prompt">$</span>
+                <code>{step.command}</code>
+                <button
+                  className="copy-cmd-btn"
+                  title="Copy command"
+                  onClick={() => navigator.clipboard?.writeText(step.command)}
+                >
+                  <Copy size={15} strokeWidth={2} />
+                </button>
+              </div>
             </div>
           )}
         </div>

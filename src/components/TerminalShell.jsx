@@ -85,6 +85,13 @@ function getSmartHint(command, output, lessonId) {
 }
 
 function welcomeBanner(lessonId) {
+  if (lessonId === 8) {
+    return [
+      { type: 'system', text: 'Welcome — Lesson 8: Fork & Contribute (simulated GitHub workflow)' },
+      { type: 'system', text: 'Goal: fork a project, clone it, commit a fix, push, then open and merge a pull request.' },
+      { type: 'system', text: 'Start by forking the repo:  gh repo fork octo/awesome-lib   (open the Cheatsheet for every command)' }
+    ]
+  }
   return [
     { type: 'system', text: `Welcome to Gitify Sandbox Console - Lesson ${lessonId}` },
     { type: 'system', text: 'Type Git commands to solve the exercise tasks in real time.' },
@@ -134,7 +141,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
     const words = trimmed.split(/\s+/)
     const currentWord = words[words.length - 1]
 
-    const allowedBase = ['git', 'ls', 'cat', 'cd', 'pwd', 'echo', 'touch', 'mkdir', 'rm', 'mv', 'cp', 'head', 'tail', 'grep', 'wc', 'clear']
+    const allowedBase = ['git', 'gh', 'ls', 'cat', 'cd', 'pwd', 'echo', 'touch', 'mkdir', 'rm', 'mv', 'cp', 'head', 'tail', 'grep', 'wc', 'clear']
     const gitSubcommands = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote']
 
     if (words.length === 1) {
@@ -236,6 +243,27 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
     setInputValue('')
     setSuggestions([])
     setIsExecuting(true)
+
+    // Lesson 8 (Fork & Contribute) is a pure GitHub-workflow simulation — fork and
+    // pull requests aren't real local-git commands, so we run it entirely in-browser.
+    if (lessonId === 8) {
+      setIsExecuting(false)
+      setBackendOnline(true)
+      const result = simulateCommandOffline(rawCmd, offlineState, 8)
+      const ns = result.nextState
+      setOfflineState(ns)
+      if (result.output === 'CLEAR_CONSOLE') { setHistory([]); return }
+      setHistory(prev => [...prev, { type: result.status === 'success' ? 'output' : 'error', text: result.output || '(No output)' }])
+      const check = checkOfflineProgress(ns, 8)
+      if (onSyncState) {
+        onSyncState({ fork: ns.fork, subtasks: check.subtasks, verified: check.verified, validation_message: check.msg })
+      }
+      if (check.verified) {
+        setHistory(prev => [...prev, { type: 'success', text: `✓ EXERCISE SOLVED: ${check.msg}` }])
+        if (onSuccess) onSuccess()
+      }
+      return
+    }
 
     // Intercept: git rebase -i — open modal instead of sending to backend
     const rebaseInteractiveMatch = rawCmd.match(/^git\s+rebase\s+-i/i)
@@ -467,7 +495,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
 
     // Completing the base command
     if (words.length === 1) {
-      const allowedBase = ['git', 'ls', 'cat', 'cd', 'pwd', 'echo', 'touch', 'mkdir', 'rm', 'mv', 'cp', 'head', 'tail', 'grep', 'wc', 'clear']
+      const allowedBase = ['git', 'gh', 'ls', 'cat', 'cd', 'pwd', 'echo', 'touch', 'mkdir', 'rm', 'mv', 'cp', 'head', 'tail', 'grep', 'wc', 'clear']
       const match = allowedBase.find(c => c.startsWith(text.toLowerCase()))
       if (match) {
         setInputValue(match + ' ')
@@ -877,6 +905,17 @@ function getCheatsheetCommands(lessonId) {
       return [
         { cmd: "git log --oneline", desc: "Check history: View all commits and count them (e.g. 5 commits) to determine the rebase depth." },
         { cmd: "git rebase -i HEAD~5", desc: "Interactive rebase: Opens the interactive rebase editor for the last 5 commits, where you can pick, squash, drop, or reword." }
+      ]
+    case 8:
+      return [
+        { cmd: "gh repo fork octo/awesome-lib", desc: "Fork: Create your own copy of the upstream project on your GitHub account." },
+        { cmd: "git clone https://github.com/you/awesome-lib", desc: "Clone: Download your fork to your computer so you can edit it." },
+        { cmd: "git checkout -b fix-bug", desc: "Branch: Make a dedicated branch for your change." },
+        { cmd: "git commit -am \"fix the bug\"", desc: "Commit: Save your fix locally (stage + commit in one step)." },
+        { cmd: "git push origin fix-bug", desc: "Push: Upload your branch to your fork on GitHub." },
+        { cmd: "gh pr create", desc: "Pull request: Propose your change to the original upstream project." },
+        { cmd: "gh pr merge", desc: "Merge: Accept the pull request into the upstream project." },
+        { cmd: "gh repo sync", desc: "Sync: Pull the latest upstream changes back into your fork." }
       ]
     default:
       return []

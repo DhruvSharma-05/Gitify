@@ -15,9 +15,10 @@ import ExerciseGuide from './components/ExerciseGuide.jsx'
 import FileInspector from './components/FileInspector.jsx'
 import LiveCommitGraph from './components/LiveCommitGraph.jsx'
 import PretextCanvas from './components/PretextCanvas.jsx'
+import ForkLesson from './components/ForkLesson.jsx'
 import { apiUrl, getInitialOfflineState, getInitialSubtasks } from './api.js'
 
-const lessonOrder = [0, 1, 2, 3, 4, 5, 6, 7]
+const lessonOrder = [0, 1, 2, 3, 4, 5, 6, 7, 8]
 
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -121,6 +122,14 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
 
     if (!sessionId || currentLesson === 0 || currentLesson === 'contributors') return
+
+    // Lesson 8 is a self-contained, simulated GitHub workflow — seed its checklist
+    // locally and let the terminal drive it (no backend sandbox).
+    if (currentLesson === 8) {
+      setSubtasks(getInitialSubtasks(8))
+      setTerminalHydration({ branch: 'main', files: [], pwd: '', nonce: Date.now() })
+      return
+    }
 
     let cancelled = false
     fetch(apiUrl('/api/lessons/enter'), {
@@ -375,6 +384,8 @@ export default function App() {
               <RemoteCollaborationLesson onSuccess={() => handleVerifySuccess(6)} setTerminalSyncListener={setTerminalSyncListener} />
             ) : currentLesson === 7 ? (
               <RebaseLesson onSuccess={() => handleVerifySuccess(7)} setTerminalSyncListener={setTerminalSyncListener} />
+            ) : currentLesson === 8 ? (
+              <ForkLesson setTerminalSyncListener={setTerminalSyncListener} />
             ) : (
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '18px' }}>
                 <div style={{ marginBottom: '8px' }}>

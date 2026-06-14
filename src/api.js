@@ -108,6 +108,10 @@ export function getInitialOfflineState(lessonId) {
       { hash: 'c5c5c5c', full_hash: 'c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5', message: 'debug payment state', branches: [], parents: ['c4c4c4c'], is_head: false },
       { hash: 'c6c6c6c', full_hash: 'c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6', message: 'Handle declined cards', branches: ['main'], parents: ['c5c5c5c'], is_head: true }
     ]
+  } else if (lessonId === 8) {
+    // Lesson 8 is a simulated GitHub fork/PR workflow (not real local git).
+    base.scenario = 'fork'
+    base.fork = { fork: false, clone: false, commit: false, push: false, pr: false, merge: false, sync: false }
   }
 
   return base
@@ -160,6 +164,15 @@ export function getInitialSubtasks(lessonId) {
         { id: "interactive_rebase", title: "Configure interactive rebase N commits", completed: false },
         { id: "squash_commits", title: "Squash and reorder target commits", completed: false },
         { id: "clean_timeline", title: "Complete clean linear rebase history", completed: false }
+      ]
+    case 8:
+      return [
+        { id: "fork", title: "Fork the upstream repo ('gh repo fork')", completed: false },
+        { id: "clone", title: "Clone your fork ('git clone')", completed: false },
+        { id: "commit", title: "Branch & commit your fix ('git commit')", completed: false },
+        { id: "push", title: "Push to your fork ('git push origin')", completed: false },
+        { id: "pr", title: "Open a pull request ('gh pr create')", completed: false },
+        { id: "merge", title: "Merge the pull request ('gh pr merge')", completed: false }
       ]
     default:
       return []
