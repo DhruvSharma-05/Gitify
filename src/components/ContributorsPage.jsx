@@ -38,7 +38,7 @@ const contributors = [
   },
   {
     name: 'Anshika Tripathi',
-    username: 'tripathianshika58',
+    username: 'lostparadise123',
     role: 'Developer & Bug Swatter',
     icon: Layers,
     color: '#a78bfa', 
