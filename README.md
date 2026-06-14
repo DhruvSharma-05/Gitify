@@ -60,6 +60,14 @@ uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 The API server will run at `http://127.0.0.1:8000`.
 
+> **Run single-worker.** Each student's per-lesson sandbox lives in the server process's
+> memory (it maps a session to a temp git repo on disk). A restart drops live sandboxes,
+> and running multiple workers (`--workers N` / multiple Gunicorn/Uvicorn processes) would
+> route a session to a process that doesn't hold its sandbox. Scaling horizontally would
+> require moving the sandbox registry to a shared store (e.g. Redis + a shared volume).
+> Idle sandboxes are auto-reclaimed (`GITIFY_SANDBOX_TTL`, default 30 min) and capped
+> (`GITIFY_SANDBOX_MAX`, default 300).
+
 ### 2. Frontend React Web App Setup
 
 Prerequisites:

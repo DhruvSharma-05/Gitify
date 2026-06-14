@@ -103,4 +103,49 @@ l1run('git commit -m "first commit"')
 res1 = l1run("git push origin main")
 assert res1["verified"], f"Lesson 1 should verify after pushing to origin/main, got {res1['subtasks']}"
 
+# --- Every auto-graded lesson must be completable the intended way ---
+def base_path(session, lesson):
+    return main.SESSION_SANDBOXES[main.sandbox_key(session, lesson)]["base_path"]
+
+def run_lesson(session, lesson, commands):
+    last = None
+    for c in commands:
+        last = main.execute_terminal_command(
+            main.TerminalExecuteRequest(command=c, session_id=session, lesson_id=lesson))
+    return last
+
+def commit_hash_matching(session, lesson, needle, ref="--all"):
+    out = main.verifier.run_git_command(base_path(session, lesson), ["log", ref, "--oneline"])[1]
+    for line in out.splitlines():
+        if needle.lower() in line.lower():
+            return line.split()[0]
+    raise AssertionError(f"commit matching {needle!r} not found in lesson {lesson}")
+
+# Lesson 2: branch -> commit -> merge back to main
+main.enter_lesson(main.ResetRequest(lesson_id=2, session_id="smoke-l2"))
+r2 = run_lesson("smoke-l2", 2, [
+    "git checkout -b feature/auth", "touch feat.js", "git add .",
+    'git commit -m "auth"', "git checkout main", "git merge feature/auth"])
+assert r2["verified"], f"Lesson 2 not completable: {r2['subtasks']}"
+
+# Lesson 4: revert the buggy commit
+main.enter_lesson(main.ResetRequest(lesson_id=4, session_id="smoke-l4"))
+buggy = commit_hash_matching("smoke-l4", 4, "skip null")
+r4 = run_lesson("smoke-l4", 4, [f"git revert --no-edit {buggy}"])
+assert r4["verified"], f"Lesson 4 not completable: {r4['subtasks']}"
+
+# Lesson 5: stash -> switch -> cherry-pick -> pop
+main.enter_lesson(main.ResetRequest(lesson_id=5, session_id="smoke-l5"))
+pick = commit_hash_matching("smoke-l5", 5, "tax", ref="hotfix/invoice")
+r5 = run_lesson("smoke-l5", 5, [
+    "git stash", "git checkout hotfix/invoice", "git checkout feature/payments",
+    f"git cherry-pick {pick}", "git stash pop"])
+assert r5["verified"], f"Lesson 5 not completable: {r5['subtasks']}"
+
+# Lesson 6: fetch -> pull --rebase -> push
+main.enter_lesson(main.ResetRequest(lesson_id=6, session_id="smoke-l6"))
+r6 = run_lesson("smoke-l6", 6, [
+    "git fetch", "git pull --rebase origin main", "git push origin main"])
+assert r6["verified"], f"Lesson 6 not completable: {r6['subtasks']}"
+
 print("backend smoke test passed")
