@@ -48,38 +48,38 @@ function getSmartHint(command, output, lessonId) {
   const cmd = command.toLowerCase()
 
   if (out.includes('fatal: not a git repository')) {
-    return "Tip:You're not inside a git repo yet. Run 'git init' to initialize one."
+    return "Tip: You're not inside a git repo yet. Run 'git init' to initialize one."
   }
   if (out.includes('nothing to commit') && out.includes('working tree clean')) {
-    return "Tip:Nothing to commit — your working tree is clean. Make a change or add a file first."
+    return "Tip: Nothing to commit — your working tree is clean. Make a change or add a file first."
   }
   if (out.includes('nothing added to commit') || out.includes('no changes added to commit')) {
-    return "Tip:Changes exist but aren't staged. Run 'git add <filename>' or 'git add .' to stage them."
+    return "Tip: Changes exist but aren't staged. Run 'git add <filename>' or 'git add .' to stage them."
   }
   if (out.includes('pathspec') && out.includes('did not match')) {
     const fileGuess = (command.match(/\b([\w./]+\.[\w]+)\b/) || [])[1]
     return `Tip: File not found. Run 'ls' to see what's in the workspace${fileGuess ? ` — did you mean '${fileGuess}'?` : '.'}`
   }
   if (out.includes('conflict') || out.includes('<<<<<<<')) {
-    return "Tip:Merge conflict detected. Open the file in the inspector, edit out the conflict markers (<<<, ===, >>>), then 'git add <file>' and 'git commit'."
+    return "Tip: Merge conflict detected. Open the file in the inspector, edit out the conflict markers (<<<, ===, >>>), then 'git add <file>' and 'git commit'."
   }
   if (out.includes('your branch is behind') || out.includes('updates were rejected')) {
-    return "Tip:Your local branch is behind the remote. Try 'git pull --rebase' to sync up."
+    return "Tip: Your local branch is behind the remote. Try 'git pull --rebase' to sync up."
   }
   if (out.includes('needs merge') || out.includes('unresolved conflicts')) {
-    return "Tip:Unresolved conflicts exist. Resolve them in the editor, then 'git add' the file."
+    return "Tip: Unresolved conflicts exist. Resolve them in the editor, then 'git add' the file."
   }
   if (cmd.includes('git stash') && (out.includes('no local changes') || out.includes('nothing to stash'))) {
-    return "Tip:There's nothing to stash. Make a change to a tracked file first."
+    return "Tip: There's nothing to stash. Make a change to a tracked file first."
   }
   if (out.includes('already up to date')) {
-    return "Tip:Already up to date — no new commits to merge or pull."
+    return "Tip: Already up to date — no new commits to merge or pull."
   }
   if (out.includes('error: failed to push') || out.includes('rejected')) {
-    return "Tip:Push rejected. Run 'git pull' first to integrate remote changes."
+    return "Tip: Push rejected. Run 'git pull' first to integrate remote changes."
   }
   if (out.includes('detached head')) {
-    return "Tip:You're in detached HEAD state. Create a branch with 'git checkout -b <branch-name>' to keep your work."
+    return "Tip: You're in detached HEAD state. Create a branch with 'git checkout -b <branch-name>' to keep your work."
   }
   return null
 }

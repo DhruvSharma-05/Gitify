@@ -1,22 +1,31 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, lazy, Suspense } from 'react'
 import { Search, Settings, Lightbulb, Loader, CheckCircle, GripVertical } from 'lucide-react'
 import Flow from './components/Flow.jsx'
 import Intro from './components/Intro.jsx'
 import Sidebar from './components/Sidebar.jsx'
-import ContributorsPage from './components/ContributorsPage.jsx'
-import BranchingLesson from './components/BranchingLesson.jsx'
-import MergeConflictsLesson from './components/MergeConflictsLesson.jsx'
-import HistoryLesson from './components/HistoryLesson.jsx'
-import StashCherryPickLesson from './components/StashCherryPickLesson.jsx'
-import RemoteCollaborationLesson from './components/RemoteCollaborationLesson.jsx'
-import RebaseLesson from './components/RebaseLesson.jsx'
 import TerminalShell from './components/TerminalShell.jsx'
 import ExerciseGuide from './components/ExerciseGuide.jsx'
 import FileInspector from './components/FileInspector.jsx'
 import LiveCommitGraph from './components/LiveCommitGraph.jsx'
 import PretextCanvas from './components/PretextCanvas.jsx'
-import ForkLesson from './components/ForkLesson.jsx'
 import { apiUrl, getInitialOfflineState, getInitialSubtasks } from './api.js'
+
+// Only one lesson visualizer (and the rarely-visited contributors page) is on screen
+// at a time, so load each on demand to keep the initial bundle small.
+const ContributorsPage = lazy(() => import('./components/ContributorsPage.jsx'))
+const BranchingLesson = lazy(() => import('./components/BranchingLesson.jsx'))
+const MergeConflictsLesson = lazy(() => import('./components/MergeConflictsLesson.jsx'))
+const HistoryLesson = lazy(() => import('./components/HistoryLesson.jsx'))
+const StashCherryPickLesson = lazy(() => import('./components/StashCherryPickLesson.jsx'))
+const RemoteCollaborationLesson = lazy(() => import('./components/RemoteCollaborationLesson.jsx'))
+const RebaseLesson = lazy(() => import('./components/RebaseLesson.jsx'))
+const ForkLesson = lazy(() => import('./components/ForkLesson.jsx'))
+
+const lessonFallback = (
+  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px', gap: '10px', color: '#8b949e' }}>
+    <span className="spinner-ring"></span> Loading lesson…
+  </div>
+)
 
 const lessonOrder = [0, 1, 2, 3, 4, 5, 6, 7, 8]
 
@@ -360,7 +369,9 @@ export default function App() {
       {currentLesson === 0 ? (
         <Intro onComplete={handleIntroComplete} />
       ) : currentLesson === 'contributors' ? (
-        <ContributorsPage onBack={() => setCurrentLesson(lastActiveLesson)} />
+        <Suspense fallback={lessonFallback}>
+          <ContributorsPage onBack={() => setCurrentLesson(lastActiveLesson)} />
+        </Suspense>
       ) : (
         <div className="lesson-container-split" style={{ display: 'flex', gap: '24px', minHeight: '520px', alignItems: 'stretch', width: '100%', padding: '0 10px' }}>
           
@@ -372,6 +383,7 @@ export default function App() {
               <LiveCommitGraph commits={commitsGraph} onSelectCommit={handleCommitSelect} />
             )}
 
+            <Suspense fallback={lessonFallback}>
             {currentLesson === 2 ? (
               <BranchingLesson onSuccess={() => handleVerifySuccess(2)} setTerminalSyncListener={setTerminalSyncListener} />
             ) : currentLesson === 3 ? (
@@ -408,6 +420,7 @@ export default function App() {
                 </main>
               </div>
             )}
+            </Suspense>
           </div>
 
           {/* Column 2: Code File Inspector (Active only in Graded Exercise Mode) */}
