@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   layout,
   layoutNextLineRange,
@@ -22,8 +22,74 @@ const scenes = {
     labels: ['main', 'feature/auth', 'fix/login-bug']
   },
   conflictDiff: {
-    ours: ['<<<<<<< HEAD', 'theme: "dark"', '======='],
-    theirs: ['=======', 'theme: "light"', '>>>>>>> feature/ui']
+    ours: [
+      'import os',
+      '',
+      '<<<<<<< HEAD',
+      'def greet(name):',
+      '    print(f"Hello, {name}!")',
+      '    return True',
+      '======='
+    ],
+    theirs: [
+      '=======',
+      'def greet():',
+      '    print("Hello, World!")',
+      '    return False',
+      '>>>>>>> feature/hello',
+      '',
+      'def main():'
+    ],
+    combined: [
+      'import os',
+      '',
+      '<<<<<<< HEAD (Current Change)',
+      'def greet(name):',
+      '    print(f"Hello, {name}!")',
+      '    return True',
+      '=======',
+      'def greet():',
+      '    print("Hello, World!")',
+      '    return False',
+      '>>>>>>> feature/hello (Incoming Change)',
+      '',
+      'def main():',
+      '    greet()'
+    ],
+    oursResolved: [
+      'import os',
+      '',
+      'def greet(name):',
+      '    print(f"Hello, {name}!")',
+      '    return True',
+      '',
+      'def main():',
+      '    greet()'
+    ],
+    theirsResolved: [
+      'import os',
+      '',
+      'def greet():',
+      '    print("Hello, World!")',
+      '    return False',
+      '',
+      'def main():',
+      '    greet()'
+    ],
+    bothResolved: [
+      'import os',
+      '',
+      'def greet(name):',
+      '    print(f"Hello, {name}!")',
+      '    return True',
+      '',
+      'def greet():',
+      '    print("Hello, World!")',
+      '    return False',
+      '',
+      'def main():',
+      '    greet()'
+    ]
   },
   historyLog: {
     commits: [
@@ -67,6 +133,32 @@ function getPrepared(text, font, segmented = true, options) {
 export default function PretextCanvas({ scene, className = '', height = 220 }) {
   const canvasRef = useRef(null)
   const sceneData = useMemo(() => scenes[scene], [scene])
+  const [canvasResolution, setCanvasResolution] = useState(null)
+
+  const handleCanvasClick = (e) => {
+    if (scene !== 'conflictDiff') return;
+    
+    if (canvasResolution) {
+      setCanvasResolution(null);
+      return;
+    }
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+    
+    // Adjusted y bounds to match the new topBoxHeight (240) + gap (16) + yOffset
+    // bottomBoxY = 22 + 240 + 16 = 278. CodeLens is at 278 + 44 = 322.
+    if (clickY > 310 && clickY < 350) {
+      if (clickX >= 60 && clickX <= 200) {
+        setCanvasResolution('ours');
+      } else if (clickX >= 210 && clickX <= 355) {
+        setCanvasResolution('theirs');
+      } else if (clickX >= 365 && clickX <= 500) {
+        setCanvasResolution('both');
+      }
+    }
+  }
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -99,7 +191,7 @@ export default function PretextCanvas({ scene, className = '', height = 220 }) {
       clear(ctx, width, height)
       if (scene === 'gitBasics') drawGitBasics(ctx, width, height, t, sceneData)
       if (scene === 'branchLabels') drawBranchLabels(ctx, width, height, t, sceneData)
-      if (scene === 'conflictDiff') drawConflictDiff(ctx, width, height, t, sceneData)
+      if (scene === 'conflictDiff') drawConflictDiff(ctx, width, height, t, sceneData, canvasResolution)
       if (scene === 'historyLog') drawHistoryLog(ctx, width, height, t, sceneData)
       if (scene === 'stashPick') drawStashPick(ctx, width, height, t, sceneData)
       if (scene === 'remotePackets') drawRemotePackets(ctx, width, height, t, sceneData)
@@ -113,11 +205,16 @@ export default function PretextCanvas({ scene, className = '', height = 220 }) {
       cancelAnimationFrame(rafId)
       observer.disconnect()
     }
-  }, [height, scene, sceneData])
+  }, [height, scene, sceneData, canvasResolution])
 
   return (
     <div className={`pretext-canvas-wrap ${className}`}>
-      <canvas ref={canvasRef} aria-label={`${scene} pretext animation`} />
+      <canvas 
+        ref={canvasRef} 
+        aria-label={`${scene} pretext animation`}
+        onClick={handleCanvasClick}
+        style={{ cursor: scene === 'conflictDiff' ? 'pointer' : 'default' }}
+      />
     </div>
   )
 }
@@ -192,34 +289,120 @@ function drawBranchLabels(ctx, width, height, t, data) {
   })
 }
 
-function drawConflictDiff(ctx, width, height, t, data) {
+function drawConflictDiff(ctx, width, height, t, data, resolution) {
   const gap = 16
   const colWidth = (width - gap - 36) / 2
-  drawDiffColumn(ctx, 18, 22, colWidth, height - 44, 'ours', data.ours, t)
-  drawDiffColumn(ctx, 18 + colWidth + gap, 22, colWidth, height - 44, 'theirs', data.theirs, t + 0.4)
+  
+  const topBoxHeight = 240;
+  drawDiffColumn(ctx, 18, 22, colWidth, topBoxHeight, 'ours', data.ours, t)
+  drawDiffColumn(ctx, 18 + colWidth + gap, 22, colWidth, topBoxHeight, 'theirs', data.theirs, t + 0.4)
+
+  const bottomBoxY = 22 + topBoxHeight + gap;
+  
+  let linesToDraw = data.combined;
+  if (resolution === 'ours') linesToDraw = data.oursResolved;
+  else if (resolution === 'theirs') linesToDraw = data.theirsResolved;
+  else if (resolution === 'both') linesToDraw = data.bothResolved;
+
+  const bottomBoxHeight = linesToDraw.length * 26 + (resolution ? 56 : 80);
+
+  drawDiffColumn(ctx, 18, bottomBoxY, width - 36, bottomBoxHeight, 'merge conflict', linesToDraw, t + 0.8, resolution)
 }
 
-function drawDiffColumn(ctx, x, y, width, height, title, lines, t) {
+function drawDiffColumn(ctx, x, y, width, height, title, lines, t, resolution) {
   roundRect(ctx, x, y, width, height, 10)
   ctx.fillStyle = 'rgba(15, 23, 42, 0.8)'
   ctx.fill()
   ctx.font = labelFont
   ctx.fillStyle = '#f0f6fc'
+  ctx.textBaseline = 'top'
   ctx.fillText(title, x + 12, y + 12)
 
+  let yOffset = 44;
+  if (title === 'merge conflict' && !resolution) {
+    ctx.font = '12px Inter';
+    let currentX = x + 52;
+
+    const drawLink = (text, isLink) => {
+      ctx.fillStyle = isLink ? '#58a6ff' : '#8b949e';
+      ctx.fillText(text, currentX, y + 44);
+      currentX += ctx.measureText(text).width;
+    };
+
+    drawLink('Accept Current Change', true);
+    drawLink(' | ', false);
+    drawLink('Accept Incoming Change', true);
+    drawLink(' | ', false);
+    drawLink('Accept Both Changes', true);
+
+    yOffset = 68;
+  }
+
+  // Draw line number gutter background
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.03)'
+  ctx.fillRect(x, y + yOffset - 4, 40, height - yOffset + 4)
+
   const prepared = getPrepared(lines.join('\n'), monoFont, true, { whiteSpace: 'pre-wrap' })
-  const laidOut = layoutWithLines(prepared, width - 24, 24)
+  const laidOut = layoutWithLines(prepared, width - 52, 24)
   laidOut.lines.forEach((line, index) => {
     const reveal = Math.max(0, Math.min(line.text.length, Math.floor((t * 10) - index * 4)))
     const text = line.text.slice(0, reveal)
-    const lineY = y + 44 + index * 26
-    if (line.text.includes('<<<') || line.text.includes('===') || line.text.includes('>>>')) {
-      ctx.fillStyle = `rgba(239, 68, 68, ${0.18 + 0.12 * Math.sin(t * 8)})`
-      ctx.fillRect(x + 8, lineY - 4, width - 16, 24)
+    const lineY = y + yOffset + index * 26
+    
+    let bgColor = null
+    if (line.text.includes('<<<')) {
+      bgColor = 'rgba(16, 185, 129, 0.45)' 
+    } else if (line.text.includes('>>>')) {
+      bgColor = 'rgba(59, 130, 246, 0.45)'
+    } else if (!line.text.includes('===')) {
+      if (title === 'merge conflict' && !resolution) {
+        const separatorIndex = laidOut.lines.findIndex(l => l.text.includes('==='));
+        const isOurs = separatorIndex === -1 || index < separatorIndex;
+        bgColor = isOurs ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.15)'
+      } else if (title === 'ours' || title === 'theirs') {
+        bgColor = title === 'ours' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.15)'
+      }
     }
+
+    if (bgColor) {
+      ctx.fillStyle = bgColor
+      ctx.fillRect(x, lineY, width, 26)
+    }
+
+    // Draw line number
+    ctx.font = '12px Consolas'
+    ctx.fillStyle = '#484f58'
+    ctx.textBaseline = 'middle'
+    ctx.fillText((index + 1).toString().padStart(2, ' '), x + 12, lineY + 13)
+
+    // Syntax highlighted text
     ctx.font = monoFont
-    ctx.fillStyle = line.text.includes('light') ? '#bbf7d0' : line.text.includes('dark') ? '#bfdbfe' : '#fecaca'
-    ctx.fillText(text, x + 12, lineY)
+    ctx.textBaseline = 'middle'
+    
+    let textX = x + 52;
+    const textY = lineY + 13;
+    if (text.startsWith('<<<') || text.startsWith('===') || text.startsWith('>>>')) {
+      ctx.fillStyle = '#8b949e'
+      ctx.fillText(text, textX, textY)
+    } else {
+      const tokens = text.split(/(\bimport\b|\bdef\b|\breturn\b|\bprint\b|\bTrue\b|\bFalse\b|\bif\b|f?"[^"]*")/g);
+      for (const token of tokens) {
+        if (!token) continue;
+        if (['import', 'def', 'return', 'if'].includes(token)) {
+          ctx.fillStyle = '#ff7b72'; 
+        } else if (['True', 'False'].includes(token)) {
+          ctx.fillStyle = '#79c0ff'; 
+        } else if (['print'].includes(token)) {
+          ctx.fillStyle = '#d2a8ff'; 
+        } else if (token.startsWith('"') || token.startsWith('f"')) {
+          ctx.fillStyle = '#a5d6ff'; 
+        } else {
+          ctx.fillStyle = '#c9d1d9'; 
+        }
+        ctx.fillText(token, textX, textY)
+        textX += ctx.measureText(token).width
+      }
+    }
   })
 }
 
