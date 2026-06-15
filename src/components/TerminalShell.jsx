@@ -389,29 +389,34 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
       })
       .catch(err => {
         setIsExecuting(false)
+        const wasOnline = backendOnline   // only announce the switch once
         setBackendOnline(false)
         console.warn("Terminal server error, using offline mock simulation:", err)
-        
+
         const result = simulateCommandOffline(rawCmd, offlineState, lessonId)
         const updatedOfflineState = result.nextState
         setOfflineState(updatedOfflineState)
-        
+
         if (result.output === 'CLEAR_CONSOLE') {
           setHistory([])
           return
         }
 
-        setHistory(prev => [
-          ...prev, 
-          { 
-            type: result.status === 'success' ? 'output' : 'error', 
-            text: result.output || '(No output)' 
-          },
+        const lines = [
           {
-            type: 'system',
-            text: '[Offline Fallback Mode — server unreachable, simulating in memory]'
+            type: result.status === 'success' ? 'output' : 'error',
+            text: result.output || '(No output)'
           }
-        ])
+        ]
+        // Announce offline mode only on the first command after losing the server —
+        // the header status pill shows it persistently after that.
+        if (wasOnline) {
+          lines.push({
+            type: 'system',
+            text: 'Server unreachable — switched to Offline Mode (commands simulated locally).'
+          })
+        }
+        setHistory(prev => [...prev, ...lines])
 
         // Smart hint in offline mode too
         if (result.status === 'error') {

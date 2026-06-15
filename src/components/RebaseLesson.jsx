@@ -165,6 +165,11 @@ export default function RebaseLesson() {
               </div>
             ))}
           </div>
+          <div className="git-cmd-line">
+            <span className="label">runs</span>
+            <span className="cmd-prompt">$</span>
+            <code>git rebase -i HEAD~{commits.length}</code>
+          </div>
           <button className="rebase-confirm" onClick={() => setRebased(true)}>Confirm rebase</button>
         </section>
 

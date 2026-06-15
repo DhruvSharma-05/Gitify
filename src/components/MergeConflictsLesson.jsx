@@ -137,7 +137,7 @@ export default function MergeConflictsLesson({ onSuccess, setTerminalSyncListene
         </div>
         <p>When two branches edit the same part of the same file, Git asks you to choose what survives.</p>
       </header>
-      <PretextCanvas scene="conflictDiff" height={220} />
+      <PretextCanvas scene="conflictDiff" height={760} />
 
       <main className="merge-layout">
         <section className="merge-panel setup-panel">
