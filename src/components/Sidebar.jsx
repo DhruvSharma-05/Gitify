@@ -10,7 +10,8 @@ const lessons = [
   { id: 5, title: 'Lesson 5: Stash & Cherry-Pick', description: 'Shelve WIP and transplant commits' },
   { id: 6, title: 'Lesson 6: Remote Collaboration', description: 'Fetch, pull, PRs, forks, and push recovery' },
   { id: 7, title: 'Lesson 7: Rebase & Clean History', description: 'Rewrite commits into a clean story' },
-  { id: 8, title: 'Lesson 8: Fork & Contribute', description: 'Fork, PR, and sync — visual & interactive' }
+  { id: 8, title: 'Lesson 8: Fork & Contribute', description: 'Fork, PR, and sync — visual & interactive' },
+  { id: 9, title: 'Lesson 9: Git Bisect', description: 'Binary-search history to find the bad commit' }
 ]
 
 export default function Sidebar({ isOpen, onClose, currentLesson, onSelectLesson, completedLessons = [] }) {

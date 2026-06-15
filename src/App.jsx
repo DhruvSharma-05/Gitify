@@ -20,6 +20,7 @@ const StashCherryPickLesson = lazy(() => import('./components/StashCherryPickLes
 const RemoteCollaborationLesson = lazy(() => import('./components/RemoteCollaborationLesson.jsx'))
 const RebaseLesson = lazy(() => import('./components/RebaseLesson.jsx'))
 const ForkLesson = lazy(() => import('./components/ForkLesson.jsx'))
+const BisectLesson = lazy(() => import('./components/BisectLesson.jsx'))
 
 const lessonFallback = (
   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px', gap: '10px', color: '#8b949e' }}>
@@ -27,7 +28,7 @@ const lessonFallback = (
   </div>
 )
 
-const lessonOrder = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+const lessonOrder = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -379,7 +380,7 @@ export default function App() {
           <div className="lesson-left-content" style={{ flex: 1.5, minWidth: '0', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             
             {/* Dynamic Commit SVG DAG */}
-            {commitsGraph.length > 0 && (
+            {commitsGraph.length > 0 && currentLesson !== 9 && (
               <LiveCommitGraph commits={commitsGraph} onSelectCommit={handleCommitSelect} />
             )}
 
@@ -398,6 +399,8 @@ export default function App() {
               <RebaseLesson onSuccess={() => handleVerifySuccess(7)} setTerminalSyncListener={setTerminalSyncListener} />
             ) : currentLesson === 8 ? (
               <ForkLesson setTerminalSyncListener={setTerminalSyncListener} />
+            ) : currentLesson === 9 ? (
+              <BisectLesson onSuccess={() => handleVerifySuccess(9)} setTerminalSyncListener={setTerminalSyncListener} />
             ) : (
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '18px' }}>
                 <div style={{ marginBottom: '8px' }}>
