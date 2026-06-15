@@ -2765,9 +2765,8 @@ header p {
 }
 
 .stage-instruction {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
+  /* Normal text flow — NOT flex. Flex turns each inline <code>/<strong>/<em> and
+     text run into a separate flex item, which chops the sentence into columns. */
   margin: 0 0 16px;
   padding: 10px 13px;
   background: rgba(255, 255, 255, 0.03);
@@ -2777,7 +2776,7 @@ header p {
   line-height: 1.55;
   color: var(--text-muted);
 }
-.stage-instruction svg { flex-shrink: 0; margin-top: 2px; color: var(--stage-accent, #38bdf8); }
+.stage-instruction svg { vertical-align: -2px; margin-right: 5px; color: var(--stage-accent, #38bdf8); }
 .stage-instruction code {
   background: rgba(0, 0, 0, 0.35);
   padding: 0 5px;
