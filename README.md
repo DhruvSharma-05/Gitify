@@ -96,11 +96,14 @@ Open the visual playground interface in your browser:
 │   ├── main.py            # API routes and terminal commands sandbox handler
 │   ├── verifier.py        # Lesson criteria verification algorithms
 │   ├── database.py        # SQL database logger (attempt histories & progress)
+│   ├── lint_backend.py    # Backend lint checks
+│   ├── test_smoke.py      # Backend smoke tests
 │   └── requirements.txt   # Pinned Python package dependencies
 ├── src/                   # React Frontend Web Application
 │   ├── App.jsx            # Main app router, header controls, and rebase modals
 │   ├── styles.css         # Shared premium dark glassmorphism styling
 │   ├── api.js             # Terminal execute, write-file, and progress clients
+│   ├── offlineGit.js      # In-memory client-side Git flow (offline fallback)
 │   └── components/
 │       ├── Intro.jsx      # Interactive stepper landing page tour
 │       ├── TerminalShell.jsx  # Interactive shell with autocomplete & hints
