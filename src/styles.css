@@ -1100,6 +1100,12 @@ header p {
   animation: slideInRight 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+.hero-visual .pretext-canvas-wrap,
+.hero-visual .mock-terminal {
+  position: relative;
+  z-index: 1;
+}
+
 @keyframes slideInRight {
   from {
     opacity: 0;
@@ -1117,6 +1123,8 @@ header p {
   border-radius: 50%;
   filter: blur(40px);
   opacity: 0.6;
+  z-index: 0;
+  pointer-events: none;
 }
 
 .blob-1 {
