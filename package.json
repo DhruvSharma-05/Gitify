@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "node scripts/lint-frontend.mjs",
-    "test": "node scripts/test-frontend.mjs && vite build",
+    "test": "node scripts/test-frontend.mjs && node scripts/test-offline.mjs && vite build",
     "e2e": "node tests/e2e/offline-lesson.spec.mjs",
     "preview": "vite preview"
   },

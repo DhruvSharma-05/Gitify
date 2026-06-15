@@ -1,4 +1,6 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+// Guard import.meta.env so this module is importable under plain Node (e.g. unit tests),
+// where import.meta.env is undefined.
+const API_BASE_URL = (import.meta.env && import.meta.env.VITE_API_BASE_URL) || ''
 
 export function apiUrl(path) {
   return `${API_BASE_URL}${path}`

@@ -51,10 +51,30 @@ VITE_API_BASE_URL=https://your-render-app.onrender.com
 ### Render
 
 ```env
-GITIFY_DB_PATH=/tmp/gitify.db
+# Persistent disk (see render.yaml: a 1GB disk is mounted at /data).
+# Do NOT point this at /tmp — Render wipes /tmp on every restart/deploy,
+# which would erase all student progress.
+GITIFY_DB_PATH=/data/gitify.db
+
+# Sandboxes are scratch space and can live on ephemeral /tmp.
 GITIFY_SESSION_ROOT=/tmp/gitify-sessions
+
 GITIFY_CORS_ORIGINS=https://your-vercel-app.vercel.app
+# Optional: regex alternative for preview deploys, e.g. ^https://.*\.vercel\.app$
+# GITIFY_CORS_ORIGIN_REGEX=
+
+# Per-lesson sandbox lifecycle (optional; defaults shown):
+GITIFY_SANDBOX_TTL=1800     # reclaim a sandbox after 30 min idle
+GITIFY_SANDBOX_MAX=300      # hard cap on concurrent sandboxes (LRU-evicted)
+GITIFY_SANDBOX_SWEEP=300    # sweep cadence in seconds
 ```
+
+> **Run the backend single-worker.** Each student's per-lesson sandbox lives in the
+> server process's memory (mapping a session to an on-disk git repo). Running multiple
+> workers/instances would route a session to a process that doesn't hold its sandbox,
+> and every restart drops live sandboxes. Keep the start command to one Uvicorn worker
+> (`uvicorn main:app --host 0.0.0.0 --port $PORT` — no `--workers`). Scaling out would
+> require moving the sandbox registry to a shared store.
 
 ---
 
@@ -148,8 +168,12 @@ If deployment fails:
 GET  /api/progress
 POST /api/progress
 POST /api/exercises/verify
-POST /api/terminal/execute
-POST /api/exercises/reset
+POST /api/lessons/enter                 # get-or-create a lesson's sandbox, return its state
+POST /api/terminal/execute              # run a command in the lesson sandbox
+POST /api/terminal/write-file           # save edited file content into the sandbox
+POST /api/terminal/commit-details       # git show --stat for a commit
+POST /api/terminal/rebase-interactive   # apply an interactive-rebase plan
+POST /api/exercises/reset               # tear down and re-seed one lesson sandbox
 GET  /api/exercises/checkpoints
 GET  /health
 ```
