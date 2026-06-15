@@ -24,6 +24,8 @@ Gitify is an interactive Web + API learning application designed to teach Git an
 - **Lesson 5: Stash & Cherry-Pick** - Save uncommitted work and harvest specific commits.
 - **Lesson 6: Remote Collaboration** - Manage clones, forks, fetch vs pull, and rejected pushes.
 - **Lesson 7: Rebase & Clean History** - Streamline branches with standard and interactive rebases.
+- **Lesson 8: Fork & Contribute** - Fork a repo, open a pull request, merge it, and sync back upstream.
+- **Lesson 9: Git Bisect** - Binary-search commit history to pinpoint the first bad commit.
 
 ## Commands Covered
 
@@ -35,6 +37,8 @@ git diff                  git revert <hash>         git reset (--soft/--mixed/--
 git stash                 git stash pop             git cherry-pick <hash>
 git fetch                 git pull                  git pull --rebase
 git rebase <branch>       git rebase -i HEAD~N      git push --force-with-lease
+git bisect start          git bisect good <hash>    git bisect bad
+git bisect reset          gh repo fork              gh pr create
 ```
 
 ## Quick Start
@@ -105,11 +109,18 @@ Open the visual playground interface in your browser:
 │   ├── api.js             # Terminal execute, write-file, and progress clients
 │   ├── offlineGit.js      # In-memory client-side Git flow (offline fallback)
 │   └── components/
-│       ├── Intro.jsx      # Interactive stepper landing page tour
-│       ├── TerminalShell.jsx  # Interactive shell with autocomplete & hints
-│       ├── FileInspector.jsx  # Monospace file text viewer and visual editor
-│       ├── Flow.jsx       # Interactive stage visualizer layout
-│       └── ...            # Individual lesson scenario files
+│       ├── Intro.jsx               # Interactive stepper landing page tour
+│       ├── TerminalShell.jsx       # Interactive shell with autocomplete & hints
+│       ├── FileInspector.jsx       # Monospace file text viewer and visual editor
+│       ├── Flow.jsx                # Interactive stage visualizer layout (Lesson 1)
+│       ├── BranchingLesson.jsx     # Lesson 2: branch/merge visualizer
+│       ├── MergeConflictsLesson.jsx # Lesson 3: conflict resolution
+│       ├── HistoryLesson.jsx       # Lesson 4: revert/reset/time-travel
+│       ├── StashCherryPickLesson.jsx # Lesson 5: stash & cherry-pick
+│       ├── RemoteCollaborationLesson.jsx # Lesson 6: fetch/pull/push
+│       ├── RebaseLesson.jsx        # Lesson 7: rebase & clean history
+│       ├── ForkLesson.jsx          # Lesson 8: fork & contribute (simulated GitHub workflow)
+│       └── BisectLesson.jsx        # Lesson 9: git bisect binary search
 ```
 
 ## Development & Testing
