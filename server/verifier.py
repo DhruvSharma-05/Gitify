@@ -401,37 +401,88 @@ def initialize_sandbox(repo_path, lesson_id):
                 f.write("// Main application core\n")
             run_git_command(repo_path, ["add", "."])
             run_git_command(repo_path, ["commit", "-m", "Base commit"])
-            
+
             # Add Checkout form
             with open(os.path.join(repo_path, "checkout.js"), "w") as f:
                 f.write("// checkout form component\n")
             run_git_command(repo_path, ["add", "."])
             run_git_command(repo_path, ["commit", "-m", "Add checkout form"])
-            
+
             # Typo commit
             with open(os.path.join(repo_path, "checkout.js"), "w") as f:
                 f.write("// checkout form component - fixed typo in layout labels\n")
             run_git_command(repo_path, ["add", "."])
             run_git_command(repo_path, ["commit", "-m", "Fix typo in payment copy"])
-            
+
             # Stripe commit
             with open(os.path.join(repo_path, "stripe.js"), "w") as f:
                 f.write("// stripe integration helper\n")
             run_git_command(repo_path, ["add", "."])
             run_git_command(repo_path, ["commit", "-m", "Wire Stripe token"])
-            
+
             # Debug commit (should be dropped)
             with open(os.path.join(repo_path, "debug.txt"), "w") as f:
                 f.write("temporary payment debug file\n")
             run_git_command(repo_path, ["add", "."])
             run_git_command(repo_path, ["commit", "-m", "debug payment state"])
-            
+
             # declined cards commit
             with open(os.path.join(repo_path, "checkout.js"), "w") as f:
                 f.write("// checkout form component - fixed typo in layout labels and handled declined cards\n")
             run_git_command(repo_path, ["add", "."])
             run_git_command(repo_path, ["commit", "-m", "Handle declined cards"])
-                
+
+        # Lesson 9: Git Bisect
+        # Scenario: a shopping cart total calculation broke somewhere in recent history.
+        # Commit 4 ("Refactor cart total") is the culprit — it drops the quantity multiplier.
+        # The student must bisect from a known-good early commit to HEAD to find it.
+        elif lesson_id == 9:
+            run_git_command(repo_path, ["init", "-b", "main"])
+
+            # Commit 1 — baseline (good)
+            with open(os.path.join(repo_path, "cart.js"), "w") as f:
+                f.write("// cart module\nfunction total(items) {\n  return items.reduce((s, i) => s + i.price * i.qty, 0);\n}\n")
+            with open(os.path.join(repo_path, "test.js"), "w") as f:
+                f.write("// run: node test.js\nconst { total } = require('./cart');\nconst result = total([{ price: 10, qty: 3 }]);\nconsole.log(result === 30 ? 'PASS' : 'FAIL: got ' + result);\n")
+            run_git_command(repo_path, ["add", "."])
+            run_git_command(repo_path, ["commit", "-m", "Init cart module"])
+
+            # Commit 2 — good
+            with open(os.path.join(repo_path, "ui.js"), "w") as f:
+                f.write("// cart UI component\n")
+            run_git_command(repo_path, ["add", "."])
+            run_git_command(repo_path, ["commit", "-m", "Add cart UI"])
+
+            # Commit 3 — good
+            with open(os.path.join(repo_path, "discount.js"), "w") as f:
+                f.write("// discount engine\nfunction applyDiscount(total, pct) { return total * (1 - pct); }\n")
+            run_git_command(repo_path, ["add", "."])
+            run_git_command(repo_path, ["commit", "-m", "Add discount engine"])
+
+            # Commit 4 — BAD: drops qty multiplier
+            with open(os.path.join(repo_path, "cart.js"), "w") as f:
+                f.write("// cart module\nfunction total(items) {\n  return items.reduce((s, i) => s + i.price, 0);\n}\n")
+            run_git_command(repo_path, ["add", "."])
+            run_git_command(repo_path, ["commit", "-m", "Refactor cart total"])
+
+            # Commit 5 — good (unrelated change on top of bad)
+            with open(os.path.join(repo_path, "logger.js"), "w") as f:
+                f.write("// request logger\n")
+            run_git_command(repo_path, ["add", "."])
+            run_git_command(repo_path, ["commit", "-m", "Add request logger"])
+
+            # Commit 6 — good (unrelated)
+            with open(os.path.join(repo_path, "ui.js"), "w") as f:
+                f.write("// cart UI component - polish\n")
+            run_git_command(repo_path, ["add", "."])
+            run_git_command(repo_path, ["commit", "-m", "Polish cart UI"])
+
+            # Commit 7 — good (unrelated), HEAD
+            with open(os.path.join(repo_path, "README.md"), "w") as f:
+                f.write("# Shop App\nRun `node test.js` to check the cart total.\n")
+            run_git_command(repo_path, ["add", "."])
+            run_git_command(repo_path, ["commit", "-m", "Update README"])
+
         return True, "Sandbox initialized successfully."
     except Exception as e:
         return False, f"Failed sandbox initialization: {str(e)}"
@@ -722,6 +773,51 @@ def check_sandbox_state(repo_path, lesson_id):
             
             verified = rebase_started and commits_squashed and timeline_clean
             msg = "Commits squashed and timeline clean!" if verified else "Organize commits using 'pick', 'squash', or 'drop' in rebase."
+            return verified, msg, subtasks
+
+        # Lesson 9: Git Bisect
+        elif lesson_id == 9:
+            started = False
+            marked_bad = False
+            culprit_found = False
+            reset_done = False
+
+            if os.path.exists(os.path.join(repo_path, ".git")):
+                bisect_log = os.path.join(repo_path, ".git", "BISECT_LOG")
+                bisect_start = os.path.join(repo_path, ".git", "BISECT_START")
+
+                # Started: BISECT_LOG exists (created by git bisect start)
+                started = os.path.exists(bisect_log) or os.path.exists(bisect_start)
+
+                if started and os.path.exists(bisect_log):
+                    with open(bisect_log, "r", encoding="utf-8", errors="ignore") as f:
+                        log_content = f.read()
+                    # Marked bad: a "bad" line present in BISECT_LOG
+                    marked_bad = "# bad:" in log_content
+                    # Culprit found: git bisect log reports the first bad commit
+                    culprit_found = "is the first bad commit" in log_content or (
+                        marked_bad and "# good:" in log_content and
+                        log_content.count("# good:") >= 1
+                    )
+
+                # Reset: BISECT_LOG and BISECT_START are gone (bisect session ended)
+                reset_done = not os.path.exists(bisect_log) and not os.path.exists(bisect_start)
+                # Require they at least started before crediting reset
+                if reset_done:
+                    code_log, log_out, _ = run_git_command(repo_path, ["log", "--oneline"])
+                    # If HEAD is back on a branch (not detached) and log has >= 7 commits, they reset
+                    code_head, head_out, _ = run_git_command(repo_path, ["rev-parse", "--abbrev-ref", "HEAD"])
+                    reset_done = head_out.strip() == "main" and "Refactor cart total" in log_out
+
+            subtasks = [
+                {"id": "bisect_start", "title": "Start bisect session ('git bisect start')", "completed": started or reset_done},
+                {"id": "bisect_bad", "title": "Mark HEAD as bad ('git bisect bad')", "completed": marked_bad or reset_done},
+                {"id": "bisect_good", "title": "Mark old commit as good ('git bisect good <hash>')", "completed": culprit_found or reset_done},
+                {"id": "bisect_reset", "title": "Reset bisect and return to main ('git bisect reset')", "completed": reset_done},
+            ]
+
+            verified = reset_done
+            msg = "Culprit found and bisect session closed!" if verified else "Use git bisect to narrow down the bad commit."
             return verified, msg, subtasks
 
         return False, f"Lesson {lesson_id} verifier is active. Complete exercise tasks.", []

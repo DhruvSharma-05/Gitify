@@ -133,6 +133,19 @@ export function checkOfflineProgress(state, lessonId) {
       ? "You completed the full fork-and-contribute workflow!"
       : "Follow the steps: fork → clone → branch+commit → push → open PR → merge."
   }
+  else if (lessonId === 9) {
+    const b = state.bisect || {}
+    subtasks = [
+      { id: "bisect_start", title: "Start bisect session ('git bisect start')", completed: !!b.started },
+      { id: "bisect_bad", title: "Mark HEAD as bad ('git bisect bad')", completed: !!b.marked_bad },
+      { id: "bisect_good", title: "Mark old commit as good ('git bisect good <hash>')", completed: !!b.marked_good },
+      { id: "bisect_reset", title: "Reset bisect and return to main ('git bisect reset')", completed: !!b.reset }
+    ]
+    verified = !!(b.started && b.marked_bad && b.marked_good && b.reset)
+    msg = verified
+      ? "Culprit found and bisect session closed!"
+      : "Use git bisect start → bad → good → reset to hunt down the bug."
+  }
 
   return { verified, msg, subtasks }
 }
@@ -207,10 +220,105 @@ function simulateForkCommand(commandText, state) {
 // rather than silently behaving differently from the live backend.
 const OFFLINE_SUPPORTED_CMDS = ['ls', 'cat', 'touch', 'rm', 'clear', 'git']
 
+function simulateBisectCommand(commandText, state) {
+  const next = JSON.parse(JSON.stringify(state))
+  if (!next.bisect) next.bisect = { started: false, marked_bad: false, marked_good: false, reset: false, step: 0 }
+  const b = next.bisect
+  const parts = commandText.trim().split(/\s+/)
+  let output = ''
+  let status = 'success'
+
+  // The offline bisect simulation walks through the algorithm step by step.
+  // There are 7 commits; the bad one is commit 4 ("Refactor cart total").
+  // Binary search: range [1,7] → mid=4 → bad → range [1,3] → mid=2 → good → range [3,3] → mid=3 → good → culprit=4
+  const COMMITS = [
+    { hash: 'a1b2c3d', msg: 'Init cart module' },
+    { hash: 'b2c3d4e', msg: 'Add cart UI' },
+    { hash: 'c3d4e5f', msg: 'Add discount engine' },
+    { hash: 'd4e5f6g', msg: 'Refactor cart total' }, // BAD (index 3)
+    { hash: 'e5f6g7h', msg: 'Add request logger' },
+    { hash: 'f6g7h8i', msg: 'Polish cart UI' },
+    { hash: 'g7h8i9j', msg: 'Update README' },
+  ]
+
+  if (parts[0] === 'clear') return { nextState: next, output: 'CLEAR_CONSOLE', status: 'success' }
+  if (parts[0] === 'ls') { output = next.files.join('  '); return { nextState: next, output, status } }
+  if (parts[0] === 'cat') {
+    const fn = parts[1]
+    output = fn && next.fileContents[fn] ? next.fileContents[fn] : fn ? `cat: ${fn}: No such file or directory` : 'cat: missing filename'
+    if (!fn || !next.fileContents[fn]) status = 'error'
+    return { nextState: next, output, status }
+  }
+
+  if (parts[0] !== 'git') {
+    return { nextState: next, output: `bash: ${parts[0]}: command not found`, status: 'error' }
+  }
+
+  const sub = parts[1]
+
+  if (sub === 'log') {
+    output = [...COMMITS].reverse().map((c, i) => {
+      const idx = COMMITS.length - 1 - i
+      const branch = idx === COMMITS.length - 1 ? ' (HEAD -> main)' : ''
+      return `commit ${c.hash}${branch}\n    ${c.msg}\n`
+    }).join('\n')
+    return { nextState: next, output, status }
+  }
+
+  if (sub === 'bisect') {
+    const action = parts[2]
+    if (action === 'start') {
+      b.started = true
+      b.step = 0
+      output = 'status: waiting for both good and bad commits'
+    } else if (action === 'bad') {
+      if (!b.started) { output = 'You need to start bisect first: git bisect start'; status = 'error' }
+      else { b.marked_bad = true; output = 'Bisecting: 3 revisions left to test after this (roughly 2 steps)\n[d4e5f6g] Refactor cart total' }
+    } else if (action === 'good') {
+      if (!b.marked_bad) { output = 'Mark HEAD as bad first: git bisect bad'; status = 'error' }
+      else if (!b.marked_good) {
+        b.marked_good = true
+        b.step = 1
+        output = 'Bisecting: 1 revision left to test after this (roughly 1 step)\n[c3d4e5f] Add discount engine'
+      } else if (b.step === 1) {
+        b.step = 2
+        output = 'd4e5f6g is the first bad commit\n    Refactor cart total\n\nfound the culprit!'
+      } else {
+        output = 'd4e5f6g is the first bad commit\n    Refactor cart total'
+      }
+    } else if (action === 'reset') {
+      if (!b.started) { output = 'We are not bisecting.'; status = 'error' }
+      else { b.reset = true; next.branch = 'main'; output = 'Previous HEAD position was d4e5f6g Refactor cart total\nSwitched to branch \'main\'' }
+    } else if (action === 'log') {
+      if (!b.started) { output = 'We are not bisecting.'; status = 'error' }
+      else { output = `# bad: [g7h8i9j] Update README\n# good: [a1b2c3d] Init cart module\ngit bisect good a1b2c3d\ngit bisect bad` }
+    } else {
+      output = `git bisect: unknown subcommand '${action}'`; status = 'error'
+    }
+    return { nextState: next, output, status }
+  }
+
+  if (sub === 'status') {
+    output = b.reset || !b.started
+      ? `On branch main\nnothing to commit, working tree clean`
+      : `HEAD detached at ${b.step === 0 ? 'd4e5f6g' : 'c3d4e5f'}\nnothing to commit, working tree clean`
+    return { nextState: next, output, status }
+  }
+
+  output = `git: '${sub}' is not available in this lesson's offline mode. Try git bisect, git log, or git status.`
+  status = 'error'
+  return { nextState: next, output, status }
+}
+
 export function simulateCommandOffline(commandText, state, lessonId) {
   // Lesson 8 (fork & contribute) is a GitHub-workflow simulation with its own interpreter.
   if (lessonId === 8 || state.scenario === 'fork') {
     return simulateForkCommand(commandText, state)
+  }
+
+  // Lesson 9 (bisect) is a guided simulation of the bisect algorithm.
+  if (lessonId === 9) {
+    return simulateBisectCommand(commandText, state)
   }
 
   const parts = commandText.trim().split(/\s+/)

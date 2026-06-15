@@ -114,6 +114,26 @@ export function getInitialOfflineState(lessonId) {
     // Lesson 8 is a simulated GitHub fork/PR workflow (not real local git).
     base.scenario = 'fork'
     base.fork = { fork: false, clone: false, commit: false, push: false, pr: false, merge: false, sync: false }
+  } else if (lessonId === 9) {
+    base.initialized = true
+    base.files = ['cart.js', 'test.js', 'ui.js', 'discount.js', 'logger.js', 'README.md']
+    base.fileContents = {
+      'cart.js': "// cart module\nfunction total(items) {\n  return items.reduce((s, i) => s + i.price, 0);\n}\n",
+      'test.js': "// run: node test.js\nconst { total } = require('./cart');\nconst result = total([{ price: 10, qty: 3 }]);\nconsole.log(result === 30 ? 'PASS' : 'FAIL: got ' + result);\n",
+      'ui.js': '// cart UI component - polish\n',
+      'discount.js': '// discount engine\nfunction applyDiscount(total, pct) { return total * (1 - pct); }\n',
+      'logger.js': '// request logger\n',
+      'README.md': '# Shop App\nRun `node test.js` to check the cart total.\n'
+    }
+    base.commits = [
+      { hash: 'a1b2c3d', full_hash: 'a1b2c3d0000000000000000000000000000000000', message: 'Init cart module', branches: [], parents: [], is_head: false },
+      { hash: 'b2c3d4e', full_hash: 'b2c3d4e0000000000000000000000000000000000', message: 'Add cart UI', branches: [], parents: ['a1b2c3d'], is_head: false },
+      { hash: 'c3d4e5f', full_hash: 'c3d4e5f0000000000000000000000000000000000', message: 'Add discount engine', branches: [], parents: ['b2c3d4e'], is_head: false },
+      { hash: 'd4e5f6g', full_hash: 'd4e5f6g0000000000000000000000000000000000', message: 'Refactor cart total', branches: [], parents: ['c3d4e5f'], is_head: false },
+      { hash: 'e5f6g7h', full_hash: 'e5f6g7h0000000000000000000000000000000000', message: 'Add request logger', branches: [], parents: ['d4e5f6g'], is_head: false },
+      { hash: 'f6g7h8i', full_hash: 'f6g7h8i0000000000000000000000000000000000', message: 'Polish cart UI', branches: [], parents: ['e5f6g7h'], is_head: false },
+      { hash: 'g7h8i9j', full_hash: 'g7h8i9j0000000000000000000000000000000000', message: 'Update README', branches: ['main'], parents: ['f6g7h8i'], is_head: true }
+    ]
   }
 
   return base
@@ -175,6 +195,13 @@ export function getInitialSubtasks(lessonId) {
         { id: "push", title: "Push to your fork ('git push origin')", completed: false },
         { id: "pr", title: "Open a pull request ('gh pr create')", completed: false },
         { id: "merge", title: "Merge the pull request ('gh pr merge')", completed: false }
+      ]
+    case 9:
+      return [
+        { id: "bisect_start", title: "Start bisect session ('git bisect start')", completed: false },
+        { id: "bisect_bad", title: "Mark HEAD as bad ('git bisect bad')", completed: false },
+        { id: "bisect_good", title: "Mark old commit as good ('git bisect good <hash>')", completed: false },
+        { id: "bisect_reset", title: "Reset bisect and return to main ('git bisect reset')", completed: false }
       ]
     default:
       return []
