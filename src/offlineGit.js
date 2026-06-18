@@ -328,7 +328,10 @@ export function simulateCommandOffline(commandText, state, lessonId) {
 
   // Don't fake features the simulator doesn't really support (pipes, redirection,
   // chaining, grep/head/tail/wc/…). Be honest so behavior doesn't change on a blip.
-  const usesShellOps = /(&&|\|\||;|\||>>|>)/.test(commandText)
+  // Ignore operators that appear inside quotes (e.g. a commit message like
+  // `git commit -m "a > b"`) by stripping quoted substrings before testing.
+  const unquoted = commandText.replace(/"[^"]*"/g, '').replace(/'[^']*'/g, '')
+  const usesShellOps = /(&&|\|\||;|\||>>|>)/.test(unquoted)
   if (usesShellOps || !OFFLINE_SUPPORTED_CMDS.includes(baseCmd)) {
     return {
       nextState: state,
@@ -410,8 +413,14 @@ export function simulateCommandOffline(commandText, state, lessonId) {
       }
       else if (sub === "status") {
         const stagedFiles = nextState.staged
-        const untracked = nextState.files.filter(f => !stagedFiles.includes(f))
-        
+        // Files that appear in at least one commit are tracked; don't show them as untracked
+        const committedFiles = new Set(nextState.commits.flatMap(c => c.branches ? [] : []).concat(
+          nextState.commits.length > 0 ? nextState.files.filter(() => false) : []
+        ))
+        // Simpler: once a file has ever been committed it's tracked — mark via committed_files set
+        const trackedFiles = new Set(nextState.committed_files || [])
+        const untracked = nextState.files.filter(f => !stagedFiles.includes(f) && !trackedFiles.has(f))
+
         let out = `On branch ${nextState.branch}\n`
         if (nextState.lessonId === 6) {
           out += `Your branch is up to date with 'origin/${nextState.branch}'.\n\n`
@@ -448,7 +457,7 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           output = "Nothing specified, nothing added."
           status = "error"
         } else {
-          if (filePattern === "." || filePattern === "-A" || filePattern === "--all") {
+          if (filePattern === "." || filePattern === "-A" || filePattern === "--all" || filePattern === "-u") {
             nextState.staged = [...nextState.files]
             if (nextState.conflict_active) {
               nextState.conflict_resolved = true
@@ -474,11 +483,18 @@ export function simulateCommandOffline(commandText, state, lessonId) {
       }
       else if (sub === "commit") {
         let msg = ""
-        const mIdx = parts.indexOf("-m")
+        // Support -m, -am, -a -m and --message= (students commonly type -am)
+        const mIdx = parts.findIndex(p => p === "-m" || p === "--message" || /^-[a-zA-Z]*m$/.test(p))
         if (mIdx !== -1 && parts[mIdx + 1]) {
-          msg = parts.slice(mIdx + 1).join(" ").replace(/['"]/g, "")
+          msg = parts.slice(mIdx + 1).join(" ").replace(/^["']|["']$/g, "")
         } else {
-          msg = "Minor updates"
+          const longMsg = parts.find(p => p.startsWith("--message="))
+          msg = longMsg ? longMsg.slice("--message=".length).replace(/^["']|["']$/g, "") : "Minor updates"
+        }
+        // -a / -am: auto-stage all tracked files (mirrors real `git commit -a` behavior)
+        const hasAFlag = parts.some(p => /^-[a-zA-Z]*a/.test(p)) || parts.includes("--all")
+        if (hasAFlag && nextState.staged.length === 0 && nextState.files.length > 0) {
+          nextState.staged = [...nextState.files]
         }
 
         if (nextState.staged.length === 0 && !nextState.conflict_resolved) {
@@ -505,6 +521,8 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           }
 
           nextState.commits.push(newCommit)
+          // Track which files have been committed so git status knows they're tracked
+          nextState.committed_files = Array.from(new Set([...(nextState.committed_files || []), ...nextState.staged]))
           nextState.staged = []
           output = `[${activeBranch} ${hash}] ${msg}\n ${nextState.files.length} files changed`
         }
@@ -514,18 +532,41 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           output = `fatal: your current branch '${nextState.branch}' does not have any commits yet`
           status = "error"
         } else {
+          const oneline = parts.includes("--oneline") || parts.includes("--one-line")
           const reversed = [...nextState.commits].reverse()
-          output = reversed.map(c => {
-            const brText = c.branches.length > 0 ? ` (${c.is_head ? 'HEAD -> ' : ''}${c.branches.join(', ')})` : ''
-            return `commit ${c.full_hash}${brText}\nAuthor: Gitify Offline Student <student@gitify.edu>\nDate: Wed Jun 10 2026\n\n    ${c.message}\n`
-          }).join("\n")
+          if (oneline) {
+            output = reversed.map(c => {
+              const brText = c.branches.length > 0 ? ` (${c.is_head ? 'HEAD -> ' : ''}${c.branches.join(', ')})` : ''
+              return `${c.hash}${brText} ${c.message}`
+            }).join("\n")
+          } else {
+            output = reversed.map(c => {
+              const brText = c.branches.length > 0 ? ` (${c.is_head ? 'HEAD -> ' : ''}${c.branches.join(', ')})` : ''
+              return `commit ${c.full_hash}${brText}\nAuthor: Gitify Offline Student <student@gitify.edu>\nDate: Wed Jun 10 2026\n\n    ${c.message}\n`
+            }).join("\n")
+          }
         }
       }
       else if (sub === "branch") {
-        const newBranchName = parts[2]
-        if (!newBranchName) {
-          output = nextState.branches.map(b => (b === nextState.branch ? `* ${b}` : `  ${b}`)).join("\n")
+        const flag = parts[2]
+        const branchArg = parts[3] || parts[2]
+        const isDelete = flag === "-d" || flag === "-D" || flag === "--delete"
+        const isVerbose = flag === "-v" || flag === "--verbose" || flag === "-a" || flag === "--all"
+        if (!flag || isVerbose) {
+          const list = nextState.branches.map(b => (b === nextState.branch ? `* ${b}` : `  ${b}`))
+          output = list.join("\n")
+        } else if (isDelete) {
+          const delName = branchArg
+          if (!delName) { output = "fatal: branch name required"; status = "error" }
+          else if (delName === nextState.branch) { output = `error: Cannot delete branch '${delName}' checked out`; status = "error" }
+          else if (!nextState.branches.includes(delName)) { output = `error: branch '${delName}' not found`; status = "error" }
+          else {
+            nextState.branches = nextState.branches.filter(b => b !== delName)
+            nextState.commits = nextState.commits.map(c => ({ ...c, branches: c.branches.filter(b => b !== delName) }))
+            output = `Deleted branch ${delName}.`
+          }
         } else {
+          const newBranchName = flag
           if (nextState.branches.includes(newBranchName)) {
             output = `fatal: A branch named '${newBranchName}' already exists.`
             status = "error"
@@ -602,21 +643,46 @@ export function simulateCommandOffline(commandText, state, lessonId) {
       }
       else if (sub === "stash") {
         const action = parts[2]
-        if (action === "pop") {
+        if (action === "pop" || action === "apply") {
           if (nextState.stashes.length === 0) {
             output = "No stash entries found."
             status = "error"
           } else {
-            nextState.stashes.pop()
+            const top = nextState.stashes[nextState.stashes.length - 1]
+            if (top.files) top.files.forEach(f => { if (!nextState.files.includes(f)) nextState.files.push(f) })
+            if (action === "pop") nextState.stashes.pop()
             if (!nextState.files.includes("Checkout.jsx")) nextState.files.push("Checkout.jsx")
             if (!nextState.files.includes("styles.css")) nextState.files.push("styles.css")
-            output = "Dropped refs/stash@{0} (offline)"
+            output = action === "pop"
+              ? "Dropped refs/stash@{0} (offline)"
+              : "Applied stash@{0} (offline)"
+          }
+        } else if (action === "list") {
+          if (nextState.stashes.length === 0) {
+            output = "(empty stash)"
+          } else {
+            output = nextState.stashes.map((s, i) => `stash@{${i}}: WIP on ${s.label || nextState.branch}: stashed changes`).join("\n")
+          }
+        } else if (action === "show") {
+          if (nextState.stashes.length === 0) {
+            output = "No stash entries found."; status = "error"
+          } else {
+            const top = nextState.stashes[nextState.stashes.length - 1]
+            output = (top.files || ["Checkout.jsx", "styles.css"]).map(f => ` M ${f}`).join("\n")
+          }
+        } else if (action === "drop") {
+          if (nextState.stashes.length === 0) {
+            output = "No stash entries found."; status = "error"
+          } else {
+            nextState.stashes.pop()
+            output = "Dropped refs/stash@{0}"
           }
         } else {
+          // git stash (no subcommand) = git stash push
           nextState.stashes.push({
-            id: 0,
-            name: "stash@{0}",
-            label: `WIP on ${nextState.branch}`,
+            id: nextState.stashes.length,
+            name: `stash@{${nextState.stashes.length}}`,
+            label: nextState.branch,
             files: ["Checkout.jsx", "styles.css"]
           })
           nextState.stashed_offline = true
@@ -695,6 +761,74 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           output = "Successfully rebased and updated timeline offline."
         } else {
           output = "Rebase complete."
+        }
+      }
+      // git switch <branch> — modern alternative to git checkout <branch>
+      else if (sub === "switch") {
+        const isCFlag = parts[2] === "-c" || parts[2] === "--create"
+        const targetBranch = isCFlag ? parts[3] : parts[2]
+        if (!targetBranch) {
+          output = "fatal: branch name required"; status = "error"
+        } else if (isCFlag) {
+          if (nextState.branches.includes(targetBranch)) {
+            output = `fatal: a branch named '${targetBranch}' already exists`; status = "error"
+          } else {
+            nextState.branches.push(targetBranch)
+            nextState.branch = targetBranch
+            output = `Switched to a new branch '${targetBranch}'`
+          }
+        } else {
+          if (!nextState.branches.includes(targetBranch)) {
+            output = `fatal: invalid reference: ${targetBranch}`; status = "error"
+          } else {
+            nextState.branch = targetBranch
+            nextState.commits = nextState.commits.map(c => ({ ...c, is_head: c.branches.includes(targetBranch) }))
+            output = `Switched to branch '${targetBranch}'`
+          }
+        }
+      }
+      // git restore — unstage (--staged) or discard working-tree changes
+      else if (sub === "restore") {
+        const isStaged = parts.includes("--staged") || parts.includes("-S")
+        const filename = parts.find(p => !p.startsWith("-") && p !== "restore" && p !== "git")
+        if (isStaged && filename) {
+          nextState.staged = nextState.staged.filter(f => f !== filename)
+          output = ""
+        } else if (!isStaged && filename) {
+          output = `Restored '${filename}'`
+        } else {
+          output = "fatal: you must specify path(s) to restore"; status = "error"
+        }
+      }
+      // git diff — show unstaged changes or diff between HEAD and staged
+      else if (sub === "diff") {
+        const isCached = parts.includes("--cached") || parts.includes("--staged")
+        const targetFile = parts.find(p => !p.startsWith("-") && p !== "diff")
+        const showFiles = targetFile ? [targetFile] : (isCached ? nextState.staged : nextState.files.filter(f => !nextState.staged.includes(f)))
+        if (showFiles.length === 0) {
+          output = ""
+        } else {
+          output = showFiles.map(f => {
+            const content = nextState.fileContents[f] || ""
+            return `diff --git a/${f} b/${f}\n--- a/${f}\n+++ b/${f}\n@@ -0,0 +1,${content.split('\n').length} @@\n${content.split('\n').map(l => `+${l}`).join('\n')}`
+          }).join("\n\n")
+        }
+      }
+      // git remote — add/show remotes
+      else if (sub === "remote") {
+        const action = parts[2]
+        if (!action || action === "-v" || action === "--verbose") {
+          output = nextState.remote
+            ? `origin\t${nextState.remote} (fetch)\norigin\t${nextState.remote} (push)`
+            : "(no remotes configured)"
+        } else if (action === "add") {
+          const remoteName = parts[3] || "origin"
+          const remoteUrl = parts[4] || "https://github.com/you/repo.git"
+          nextState.remote = remoteUrl
+          nextState.remoteName = remoteName
+          output = ""
+        } else {
+          output = `git remote: '${action}' is not a git command`; status = "error"
         }
       }
       else {

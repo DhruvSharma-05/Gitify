@@ -24,23 +24,26 @@ export default function ForkLesson({ setTerminalSyncListener }) {
   const [done, setDone] = useState({})
   const [flow, setFlow] = useState(null)
   const flowTimer = useRef(null)
+  const doneRef = useRef({})
+  useEffect(() => { doneRef.current = done }, [done])
 
   // Drive the diagram from terminal commands: each time the terminal reports new
-  // fork progress, reflect it and animate whichever step just completed.
+  // fork progress, reflect it and animate whichever step just completed. We read the
+  // previous progress from a ref (not inside a state updater) so the listener stays
+  // free of side effects and is safe under React StrictMode.
   useEffect(() => {
     if (!setTerminalSyncListener) return
     setTerminalSyncListener(() => (syncState) => {
       if (!syncState || !syncState.fork) return
       const f = syncState.fork
-      setDone((prev) => {
-        const justDone = ORDER.find((id) => f[id] && !prev[id])
-        if (justDone) {
-          setFlow(justDone)
-          clearTimeout(flowTimer.current)
-          flowTimer.current = setTimeout(() => setFlow(null), 950)
-        }
-        return { ...f }
-      })
+      const justDone = ORDER.find((id) => f[id] && !doneRef.current[id])
+      if (justDone) {
+        setFlow(justDone)
+        clearTimeout(flowTimer.current)
+        flowTimer.current = setTimeout(() => setFlow(null), 950)
+      }
+      doneRef.current = { ...f }
+      setDone({ ...f })
     })
     return () => {
       clearTimeout(flowTimer.current)

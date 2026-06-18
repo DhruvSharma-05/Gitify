@@ -25,7 +25,7 @@ function getLevenshteinDistance(a, b) {
 }
 
 function getGitSuggestion(cmd) {
-  const dictionary = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote']
+  const dictionary = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote', 'switch', 'restore', 'diff', 'bisect', 'fetch', 'revert']
   let bestMatch = null
   let minDistance = 3 // Suggest only if distance is <= 2
   
@@ -142,7 +142,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
     const currentWord = words[words.length - 1]
 
     const allowedBase = ['git', 'gh', 'ls', 'cat', 'cd', 'pwd', 'echo', 'touch', 'mkdir', 'rm', 'mv', 'cp', 'head', 'tail', 'grep', 'wc', 'clear']
-    const gitSubcommands = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote']
+    const gitSubcommands = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote', 'switch', 'restore', 'diff', 'bisect', 'fetch', 'revert']
 
     if (words.length === 1) {
       const matches = allowedBase.filter(c => c.startsWith(currentWord.toLowerCase()) && c !== currentWord.toLowerCase())
@@ -248,10 +248,10 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
     // pull requests aren't real local-git commands, so we run it entirely in-browser.
     if (lessonId === 8) {
       setIsExecuting(false)
-      setBackendOnline(true)
       const result = simulateCommandOffline(rawCmd, offlineState, 8)
       const ns = result.nextState
       setOfflineState(ns)
+      if (ns.branch) setBranch(ns.branch)   // keep the prompt's branch in sync
       if (result.output === 'CLEAR_CONSOLE') { setHistory([]); return }
       setHistory(prev => [...prev, { type: result.status === 'success' ? 'output' : 'error', text: result.output || '(No output)' }])
       const check = checkOfflineProgress(ns, 8)
@@ -329,7 +329,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
         // Typo suggestion check: if failed or warning, look for mistyped Git commands
         const parts = rawCmd.split(/\s+/)
         if (parts[0] === 'git' && parts.length > 1) {
-          const dict = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote']
+          const dict = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote', 'switch', 'restore', 'diff', 'bisect', 'fetch', 'revert']
           const sub = parts[1].toLowerCase()
           if (!dict.includes(sub)) {
             const suggestion = getGitSuggestion(sub)
@@ -510,7 +510,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
 
     // Completing git subcommands
     if (words[0] === 'git' && words.length === 2) {
-      const gitCmds = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote']
+      const gitCmds = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote', 'switch', 'restore', 'diff', 'bisect', 'fetch', 'revert']
       const match = gitCmds.find(c => c.startsWith(currentWord.toLowerCase()))
       if (match) {
         setInputValue(`git ${match} `)
@@ -616,7 +616,28 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* Connection status pill */}
+          {/* Connection status pill. Lesson 8 is a designed in-browser simulation
+              (fork/PR aren't real git), so it shows a neutral "Simulation" state
+              instead of implying a server connection or failure. */}
+          {lessonId === 8 ? (
+            <div
+              title="This lesson runs as an in-browser GitHub-workflow simulation"
+              style={{
+                display: 'flex', alignItems: 'center', gap: '5px',
+                fontSize: '0.7rem', fontWeight: '600',
+                color: '#38bdf8',
+                background: 'rgba(56,189,248,0.1)',
+                border: '1px solid rgba(56,189,248,0.25)',
+                padding: '2px 8px', borderRadius: '20px'
+              }}
+            >
+              <span style={{
+                width: '6px', height: '6px', borderRadius: '50%',
+                background: '#38bdf8', display: 'inline-block', boxShadow: '0 0 6px #38bdf8'
+              }} />
+              Interactive Simulation
+            </div>
+          ) : (
           <div
             title={backendOnline ? 'Connected to Gitify backend' : 'Offline — commands simulated in memory'}
             style={{
@@ -636,6 +657,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
             }} />
             {backendOnline ? 'Server Connected' : 'Offline Mode'}
           </div>
+          )}
           <button
             type="button"
             onClick={(e) => {

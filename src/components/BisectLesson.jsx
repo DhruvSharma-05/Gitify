@@ -42,10 +42,12 @@ export default function BisectLesson({ onSuccess, setTerminalSyncListener } = {}
   const firedRef = useRef(false)
   const allDone = started && markedBad && markedGood && resetDone
 
-  // Sync objective state from live terminal subtasks pushed by App.jsx
+  // Sync objective state from live terminal subtasks pushed by App.jsx.
+  // setTerminalSyncListener is a useState setter, so the listener must be stored
+  // via the updater form `() => fn` — otherwise React runs it immediately.
   useEffect(() => {
     if (!setTerminalSyncListener) return
-    setTerminalSyncListener((syncState) => {
+    setTerminalSyncListener(() => (syncState) => {
       if (!syncState || !syncState.subtasks) return
       syncState.subtasks.forEach((t) => {
         if (t.id === 'bisect_start' && t.completed) setStarted(true)
@@ -54,6 +56,7 @@ export default function BisectLesson({ onSuccess, setTerminalSyncListener } = {}
         if (t.id === 'bisect_reset' && t.completed) setResetDone(true)
       })
     })
+    return () => { if (setTerminalSyncListener) setTerminalSyncListener(null) }
   }, [setTerminalSyncListener])
 
   useEffect(() => {
