@@ -25,7 +25,7 @@ function getLevenshteinDistance(a, b) {
 }
 
 function getGitSuggestion(cmd) {
-  const dictionary = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote']
+  const dictionary = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote', 'switch', 'restore', 'diff', 'bisect', 'fetch', 'revert']
   let bestMatch = null
   let minDistance = 3 // Suggest only if distance is <= 2
   
@@ -142,7 +142,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
     const currentWord = words[words.length - 1]
 
     const allowedBase = ['git', 'gh', 'ls', 'cat', 'cd', 'pwd', 'echo', 'touch', 'mkdir', 'rm', 'mv', 'cp', 'head', 'tail', 'grep', 'wc', 'clear']
-    const gitSubcommands = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote']
+    const gitSubcommands = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote', 'switch', 'restore', 'diff', 'bisect', 'fetch', 'revert']
 
     if (words.length === 1) {
       const matches = allowedBase.filter(c => c.startsWith(currentWord.toLowerCase()) && c !== currentWord.toLowerCase())
@@ -329,7 +329,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
         // Typo suggestion check: if failed or warning, look for mistyped Git commands
         const parts = rawCmd.split(/\s+/)
         if (parts[0] === 'git' && parts.length > 1) {
-          const dict = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote']
+          const dict = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote', 'switch', 'restore', 'diff', 'bisect', 'fetch', 'revert']
           const sub = parts[1].toLowerCase()
           if (!dict.includes(sub)) {
             const suggestion = getGitSuggestion(sub)
@@ -510,7 +510,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
 
     // Completing git subcommands
     if (words[0] === 'git' && words.length === 2) {
-      const gitCmds = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote']
+      const gitCmds = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote', 'switch', 'restore', 'diff', 'bisect', 'fetch', 'revert']
       const match = gitCmds.find(c => c.startsWith(currentWord.toLowerCase()))
       if (match) {
         setInputValue(`git ${match} `)

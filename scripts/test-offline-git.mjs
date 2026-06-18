@@ -24,6 +24,7 @@ const lesson0State = () => ({
   initialized: false, branch: 'main', files: ['index.js'], fileContents: { 'index.js': '//' },
   staged: [], commits: [], stashes: [], branches: ['main'], lessonId: 0,
 })
+const initState = () => simulateCommandOffline('git init', lesson0State(), 0).nextState
 function run(seq, state, lessonId) {
   let s = state
   const outs = []
@@ -56,7 +57,7 @@ check('fork: push before commit errors', simulateCommandOffline('git push origin
 check('fork: clone before fork errors', simulateCommandOffline('git clone y', forkState(), 8).status === 'error')
 check('fork: PR before push errors', simulateCommandOffline('gh pr create', forkState(), 8).status === 'error')
 {
-  const { s } = run(['gh repo fork x', 'git clone y'], forkState(), 8) // branch still main
+  const { s } = run(['gh repo fork x', 'git clone y'], forkState(), 8)
   check('fork: commit on main errors', simulateCommandOffline('git commit -am x', s, 8).status === 'error')
 }
 check('fork: partial progress not verified', checkOfflineProgress(run(['gh repo fork x'], forkState(), 8).s, 8).verified === false)
@@ -83,6 +84,114 @@ check('bisect: bad before start errors', simulateCommandOffline('git bisect bad'
 }
 check('shell-ops: real "&&" chaining is blocked', simulateCommandOffline('git push && ls', lesson0State(), 0).output.includes('Offline mode simulates only basic'))
 check('shell-ops: real "|" pipe is blocked', simulateCommandOffline('cat x | grep y', lesson0State(), 0).output.includes('Offline mode simulates only basic'))
+
+// --- git commit -am message extraction fix ---------------------------------
+{
+  const s = initState()
+  const s2 = simulateCommandOffline('git add .', s, 0).nextState
+  const r = simulateCommandOffline('git commit -am "my feature"', s2, 0)
+  check('commit -am: message extracted correctly', r.nextState.commits.some(c => c.message === 'my feature'))
+  check('commit -am: not silently "Minor updates"', !r.nextState.commits.some(c => c.message === 'Minor updates'))
+}
+{
+  const s = initState()
+  const s2 = simulateCommandOffline('git add .', s, 0).nextState
+  const r = simulateCommandOffline('git commit -a -m "another fix"', s2, 0)
+  check('commit -a -m: message extracted correctly', r.nextState.commits.some(c => c.message === 'another fix'))
+}
+
+// --- git switch ------------------------------------------------------------
+{
+  const s = initState()
+  const s2 = simulateCommandOffline('git commit -m "init"', simulateCommandOffline('git add .', s, 0).nextState, 0).nextState
+  const r1 = simulateCommandOffline('git switch -c feature/test', s2, 0)
+  check('switch -c: creates new branch', r1.status === 'success' && r1.nextState.branch === 'feature/test')
+  const r2 = simulateCommandOffline('git switch main', r1.nextState, 0)
+  check('switch: switches to existing branch', r2.status === 'success' && r2.nextState.branch === 'main')
+  const r3 = simulateCommandOffline('git switch nosuchbranch', r2.nextState, 0)
+  check('switch: unknown branch errors', r3.status === 'error')
+}
+
+// --- git restore -----------------------------------------------------------
+{
+  const s = initState()
+  const s2 = simulateCommandOffline('git add .', s, 0).nextState
+  check('restore: file is staged before restore', s2.staged.includes('index.js'))
+  const r = simulateCommandOffline('git restore --staged index.js', s2, 0)
+  check('restore --staged: unstages file', r.status === 'success' && !r.nextState.staged.includes('index.js'))
+}
+
+// --- git add -u ------------------------------------------------------------
+{
+  const s = initState()
+  const r = simulateCommandOffline('git add -u', s, 0)
+  check('add -u: stages all tracked files', r.status === 'success' && r.nextState.staged.length > 0)
+}
+
+// --- git log --oneline -----------------------------------------------------
+{
+  const s = initState()
+  const s2 = simulateCommandOffline('git add .', s, 0).nextState
+  const s3 = simulateCommandOffline('git commit -m "first commit"', s2, 0).nextState
+  const r = simulateCommandOffline('git log --oneline', s3, 0)
+  check('log --oneline: no "Author:" line', !r.output.includes('Author:'))
+  check('log --oneline: contains commit message', r.output.includes('first commit'))
+}
+
+// --- git remote ------------------------------------------------------------
+{
+  const s = initState()
+  const r = simulateCommandOffline('git remote add origin https://github.com/me/repo.git', s, 0)
+  check('remote add: succeeds', r.status === 'success')
+  check('remote add: stores URL', r.nextState.remote === 'https://github.com/me/repo.git')
+  const r2 = simulateCommandOffline('git remote -v', r.nextState, 0)
+  check('remote -v: shows origin URL', r2.output.includes('origin') && r2.output.includes('https://github.com/me/repo.git'))
+}
+
+// --- git diff --------------------------------------------------------------
+{
+  const s = initState()
+  const r = simulateCommandOffline('git diff', s, 0)
+  check('diff: succeeds on initialized repo', r.status === 'success')
+}
+
+// --- Cycle 2: git commit -a auto-stages tracked files ----------------------
+{
+  const s = initState()
+  // Files exist but nothing staged; -am should auto-stage and commit
+  const r = simulateCommandOffline('git commit -am "auto-stage"', s, 0)
+  check('commit -am: auto-stages tracked files when none staged', r.status === 'success')
+  check('commit -am: message is preserved when auto-staging', r.nextState.commits.some(c => c.message === 'auto-stage'))
+}
+
+// --- Cycle 2: git stash list / show / drop ---------------------------------
+{
+  const s = initState()
+  const s2 = simulateCommandOffline('git stash', s, 0).nextState
+  check('stash list: shows entry', simulateCommandOffline('git stash list', s2, 0).output.includes('stash@{'))
+  check('stash show: shows files', simulateCommandOffline('git stash show', s2, 0).status === 'success')
+  const s3 = simulateCommandOffline('git stash drop', s2, 0).nextState
+  check('stash drop: removes entry', s3.stashes.length === 0)
+}
+
+// --- Cycle 2: git branch -d ------------------------------------------------
+{
+  const s = initState()
+  const s2 = simulateCommandOffline('git add .', s, 0).nextState
+  const s3 = simulateCommandOffline('git commit -m "init"', s2, 0).nextState
+  const s4 = simulateCommandOffline('git branch feature/x', s3, 0).nextState
+  check('branch -d: deletes existing branch', simulateCommandOffline('git branch -d feature/x', s4, 0).status === 'success')
+  check('branch -d: cannot delete current branch', simulateCommandOffline('git branch -d main', s4, 0).status === 'error')
+}
+
+// --- Cycle 2: git status shows clean after commit --------------------------
+{
+  const s = initState()
+  const s2 = simulateCommandOffline('git add .', s, 0).nextState
+  const s3 = simulateCommandOffline('git commit -m "init"', s2, 0).nextState
+  const r = simulateCommandOffline('git status', s3, 0)
+  check('status: clean after commit (no untracked files)', r.output.includes('nothing to commit'))
+}
 
 // --- report ----------------------------------------------------------------
 if (failures.length) {
