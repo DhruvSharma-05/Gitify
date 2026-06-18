@@ -328,7 +328,10 @@ export function simulateCommandOffline(commandText, state, lessonId) {
 
   // Don't fake features the simulator doesn't really support (pipes, redirection,
   // chaining, grep/head/tail/wc/…). Be honest so behavior doesn't change on a blip.
-  const usesShellOps = /(&&|\|\||;|\||>>|>)/.test(commandText)
+  // Ignore operators that appear inside quotes (e.g. a commit message like
+  // `git commit -m "a > b"`) by stripping quoted substrings before testing.
+  const unquoted = commandText.replace(/"[^"]*"/g, '').replace(/'[^']*'/g, '')
+  const usesShellOps = /(&&|\|\||;|\||>>|>)/.test(unquoted)
   if (usesShellOps || !OFFLINE_SUPPORTED_CMDS.includes(baseCmd)) {
     return {
       nextState: state,
