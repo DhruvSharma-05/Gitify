@@ -1,4 +1,5 @@
 import os
+import shlex
 import tempfile
 import subprocess
 import shutil
@@ -72,7 +73,10 @@ def verify_lesson_0(commands):
             
         # Run student commands
         for cmd in commands:
-            cmd_parts = cmd.strip().split()
+            try:
+                cmd_parts = shlex.split(cmd.strip())
+            except ValueError:
+                continue
             if not cmd_parts or cmd_parts[0] != "git":
                 continue
             run_git_command(temp_dir, cmd_parts[1:])
@@ -105,7 +109,10 @@ def verify_lesson_2(commands):
         
         # Run student commands
         for cmd in commands:
-            cmd_parts = cmd.strip().split()
+            try:
+                cmd_parts = shlex.split(cmd.strip())
+            except ValueError:
+                continue
             if not cmd_parts or cmd_parts[0] != "git":
                 continue
             if ".." in cmd or "/" in cmd_parts[-1] and cmd_parts[1] not in ["checkout", "branch", "merge"]:
@@ -161,7 +168,10 @@ def verify_lesson_5(commands):
                 sanitized_commands.append(cmd)
                 
         for cmd in sanitized_commands:
-            cmd_parts = cmd.strip().split()
+            try:
+                cmd_parts = shlex.split(cmd.strip())
+            except ValueError:
+                continue
             if not cmd_parts or cmd_parts[0] != "git":
                 continue
             run_git_command(temp_dir, cmd_parts[1:])

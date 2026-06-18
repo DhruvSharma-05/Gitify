@@ -66,6 +66,12 @@ assert "x1.txt" in sh("ls")[1] and "x2.txt" in sh("ls")[1]
 assert "STOP" not in sh("cat missing.txt && echo STOP")[1]  # && short-circuits
 assert "GO" in sh("cat missing.txt ; echo GO")[1]            # ; runs regardless
 
+# POSIX-correct redirect: redirect target file is created even when command fails (e.g. grep no-match returns exit 1)
+sh("echo hello > redir_src.txt")
+sh("grep zzz redir_src.txt > redir_out.txt")  # grep exits 1 (no match) but file must be created
+assert "redir_out.txt" in sh("ls")[1], "redirect file must be created even when command exits non-zero"
+assert sh("cat redir_out.txt")[1] == "", "redirect of no-match grep should produce empty file"
+
 # --- Hardening ---
 assert sh("echo evil > .git/hooks/pre-commit")[0] == "error"   # no .git writes
 assert sh("touch .git/hooks/x")[0] == "error"
@@ -147,5 +153,57 @@ main.enter_lesson(main.ResetRequest(lesson_id=6, session_id="smoke-l6"))
 r6 = run_lesson("smoke-l6", 6, [
     "git fetch", "git pull --rebase origin main", "git push origin main"])
 assert r6["verified"], f"Lesson 6 not completable: {r6['subtasks']}"
+
+# --- write_sandbox_file endpoint ---
+# Setup: reuse smoke-l1 sandbox (lesson 1, session smoke-l1) which is seeded and has a git repo.
+wf_res = main.write_sandbox_file(main.WriteFileRequest(
+    session_id="smoke-l1", lesson_id=1, filename="hello.txt", content="Hello, Gitify!\n"))
+assert wf_res["status"] == "success", f"write-file happy path failed: {wf_res}"
+assert "hello.txt" in wf_res["sync_state"]["files"], "written file must appear in sync_state"
+
+# Path traversal: basename stripping means '../../evil.py' writes 'evil.py' in the sandbox root (safe)
+wf_traversal = main.write_sandbox_file(main.WriteFileRequest(
+    session_id="smoke-l1", lesson_id=1, filename="../../evil.py", content="pwned"))
+# The basename logic strips path components; file is written as 'evil.py' in sandbox — that's the safe behavior
+assert wf_traversal["status"] == "success", "traversal attempt should succeed as safe basename"
+assert "evil.py" in wf_traversal["sync_state"]["files"], "traversal attempt results in sandbox-local file"
+
+# .git prefix guard was too broad — .gitignore is a legitimate file and must succeed now
+wf_gitignore = main.write_sandbox_file(main.WriteFileRequest(
+    session_id="smoke-l1", lesson_id=1, filename=".gitignore", content="*.pyc\n"))
+assert wf_gitignore["status"] == "success", f".gitignore write should succeed: {wf_gitignore}"
+
+# Bare '.git' (the directory entry itself) must still be blocked
+try:
+    main.write_sandbox_file(main.WriteFileRequest(
+        session_id="smoke-l1", lesson_id=1, filename=".git", content="bad"))
+    assert False, "should have raised HTTPException for bare .git filename"
+except Exception as ex:
+    assert "400" in str(ex) or "Invalid filename" in str(ex), f"expected 400 for .git, got: {ex}"
+
+# --- get_commit_details endpoint ---
+# Get a real commit hash from the lesson 4 sandbox (which has 8 commits)
+main.enter_lesson(main.ResetRequest(lesson_id=4, session_id="smoke-cd"))
+cd_hash = commit_hash_matching("smoke-cd", 4, "dashboard")
+cd_res = main.get_commit_details(main.CommitDetailsRequest(
+    session_id="smoke-cd", lesson_id=4, commit_hash=cd_hash))
+assert cd_res["status"] == "success", f"commit-details happy path failed: {cd_res}"
+assert "initial dashboard" in cd_res["details"].lower(), "commit details should contain commit message"
+
+# Invalid hash format must return 400
+try:
+    main.get_commit_details(main.CommitDetailsRequest(
+        session_id="smoke-cd", lesson_id=4, commit_hash="not-a-hash!"))
+    assert False, "should have raised HTTPException for invalid hash"
+except Exception as ex:
+    assert "400" in str(ex) or "Invalid commit hash" in str(ex), f"expected 400 for bad hash, got: {ex}"
+
+# Missing session must return 404
+try:
+    main.get_commit_details(main.CommitDetailsRequest(
+        session_id="no-such-session", lesson_id=4, commit_hash="abc1234"))
+    assert False, "should have raised HTTPException for missing session"
+except Exception as ex:
+    assert "404" in str(ex) or "not found" in str(ex).lower(), f"expected 404 for missing session, got: {ex}"
 
 print("backend smoke test passed")

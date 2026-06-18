@@ -160,21 +160,40 @@ def get_user_checkpoints(lesson_id, username="student"):
 def save_user_checkpoint(lesson_id, subtask_id, completed, username="student"):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
-    user = cursor.fetchone()
-    if not user:
+    try:
+        cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
+        user = cursor.fetchone()
+        if not user:
+            return False
+        user_id = user["id"]
+        now = datetime.datetime.now().isoformat()
+        cursor.execute("""
+        INSERT INTO checkpoints (user_id, lesson_id, subtask_id, completed, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(user_id, lesson_id, subtask_id) DO UPDATE SET
+            completed = excluded.completed,
+            updated_at = excluded.updated_at
+        """, (user_id, lesson_id, subtask_id, 1 if completed else 0, now))
+        conn.commit()
+        return True
+    finally:
         conn.close()
-        return False
-    user_id = user["id"]
-    now = datetime.datetime.now().isoformat()
-    cursor.execute("""
-    INSERT INTO checkpoints (user_id, lesson_id, subtask_id, completed, updated_at)
-    VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(user_id, lesson_id, subtask_id) DO UPDATE SET
-        completed = excluded.completed,
-        updated_at = excluded.updated_at
-    """, (user_id, lesson_id, subtask_id, 1 if completed else 0, now))
-    conn.commit()
-    conn.close()
-    return True
+
+def delete_user_checkpoints(lesson_id, username="student"):
+    """Removes all checkpoint rows for the given user and lesson (used on exercise reset)."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
+        user = cursor.fetchone()
+        if not user:
+            return
+        user_id = user["id"]
+        cursor.execute(
+            "DELETE FROM checkpoints WHERE user_id = ? AND lesson_id = ?",
+            (user_id, lesson_id)
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
