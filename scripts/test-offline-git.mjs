@@ -350,6 +350,25 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter22: lesson 5 WIP files still show as untracked', r.output.includes('Untracked files'))
 }
 
+// --- Iter 42: git status shows modified: for tracked files, new file: for untracked ---
+{
+  // Untracked file staged → "new file:"
+  const s = initState()
+  const s2 = simulateCommandOffline('git add index.js', s, 0).nextState
+  const r = simulateCommandOffline('git status', s2, 0)
+  check('iter42: untracked file staged shows new file:', r.output.includes('new file'))
+  check('iter42: untracked file staged does NOT show modified:', !r.output.includes('modified'))
+}
+{
+  // Already-committed file staged → "modified:"
+  const s4 = getInitialOfflineState(4)
+  // Dashboard.jsx is in committed_files; stage it
+  const s2 = simulateCommandOffline('git add Dashboard.jsx', s4, 4).nextState
+  const r = simulateCommandOffline('git status', s2, 4)
+  check('iter42: committed file staged shows modified:', r.output.includes('modified'))
+  check('iter42: committed file staged does NOT show new file:', !r.output.includes('new file'))
+}
+
 // --- Iter 40: git diff <file> extracts filename correctly -------------------
 {
   const s = initState()

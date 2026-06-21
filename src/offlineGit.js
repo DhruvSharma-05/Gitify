@@ -434,8 +434,9 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           out += `You have unmerged paths.\n  (fix conflicts and run "git commit")\n\nUnmerged paths:\n  (use "git add <file>..." to mark resolution)\n\tboth modified:   config.js\n\n`
         } else if (stagedFiles.length > 0) {
           out += `Changes to be committed:\n  (use "git restore --staged <file>..." to unstage)\n`
+          const alreadyTracked = new Set(nextState.committed_files || [])
           stagedFiles.forEach(f => {
-            out += `\tnew file:   ${f}\n`
+            out += `\t${alreadyTracked.has(f) ? 'modified' : 'new file'}:   ${f}\n`
           })
           out += `\n`
         }
