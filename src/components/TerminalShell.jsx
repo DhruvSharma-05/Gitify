@@ -3,6 +3,17 @@ import { Terminal, BookOpen } from 'lucide-react'
 import { apiUrl, getInitialOfflineState } from '../api.js'
 import { simulateCommandOffline, checkOfflineProgress } from '../offlineGit.js'
 
+// --- Autocomplete command dictionaries (single source of truth) ---
+const GIT_SUBCOMMANDS = [
+  'status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge',
+  'stash', 'rebase', 'pull', 'push', 'remote', 'switch', 'restore',
+  'diff', 'bisect', 'fetch', 'revert', 'cherry-pick', 'tag', 'reset'
+]
+const ALLOWED_BASE_CMDS = [
+  'git', 'gh', 'ls', 'cat', 'cd', 'pwd', 'echo', 'touch', 'mkdir',
+  'rm', 'mv', 'cp', 'head', 'tail', 'grep', 'wc', 'clear'
+]
+
 // Levenshtein distance matcher for typos suggestion
 function getLevenshteinDistance(a, b) {
   const matrix = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0))
@@ -25,11 +36,10 @@ function getLevenshteinDistance(a, b) {
 }
 
 function getGitSuggestion(cmd) {
-  const dictionary = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote', 'switch', 'restore', 'diff', 'bisect', 'fetch', 'revert']
   let bestMatch = null
   let minDistance = 3 // Suggest only if distance is <= 2
   
-  for (const item of dictionary) {
+  for (const item of GIT_SUBCOMMANDS) {
     const dist = getLevenshteinDistance(cmd, item)
     if (dist < minDistance) {
       minDistance = dist
@@ -141,14 +151,11 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
     const words = trimmed.split(/\s+/)
     const currentWord = words[words.length - 1]
 
-    const allowedBase = ['git', 'gh', 'ls', 'cat', 'cd', 'pwd', 'echo', 'touch', 'mkdir', 'rm', 'mv', 'cp', 'head', 'tail', 'grep', 'wc', 'clear']
-    const gitSubcommands = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote', 'switch', 'restore', 'diff', 'bisect', 'fetch', 'revert']
-
     if (words.length === 1) {
-      const matches = allowedBase.filter(c => c.startsWith(currentWord.toLowerCase()) && c !== currentWord.toLowerCase())
+      const matches = ALLOWED_BASE_CMDS.filter(c => c.startsWith(currentWord.toLowerCase()) && c !== currentWord.toLowerCase())
       setSuggestions(matches)
     } else if (words[0] === 'git' && words.length === 2) {
-      const matches = gitSubcommands.filter(c => c.startsWith(currentWord.toLowerCase()) && c !== currentWord.toLowerCase())
+      const matches = GIT_SUBCOMMANDS.filter(c => c.startsWith(currentWord.toLowerCase()) && c !== currentWord.toLowerCase())
       setSuggestions(matches)
     } else if (words.length > 1 && (words[words.length - 2] === 'add' || ['cat', 'rm', 'cd', 'head', 'tail', 'wc', 'cp', 'mv'].includes(words[0]))) {
       const matches = files.filter(f => f.toLowerCase().startsWith(currentWord.toLowerCase()) && f.toLowerCase() !== currentWord.toLowerCase())

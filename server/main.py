@@ -370,15 +370,25 @@ def resolve_writable_path(base_path: str, cwd_rel: str, user_path: str) -> str:
 
 def expand_file_args(base_path: str, cwd_rel: str, args: List[str]) -> List[str]:
     """Expands shell globs (*, ?, []) in file arguments against the current directory.
-    Tokens without glob chars (or with no matches) are returned unchanged."""
+    Tokens without glob chars (or with no matches) are returned unchanged.
+
+    Security: absolute paths (e.g. /etc/passwd or C:\\Windows\\*) are forced relative
+    by stripping leading separators and Windows drive letters before joining with the
+    sandbox base_dir, so globs can never escape the sandbox boundary.
+    """
     base_dir = resolve_sandbox_path(base_path, cwd_rel)
     out = []
     for a in args:
         if any(c in a for c in "*?["):
-            matches = sorted(glob.glob(os.path.join(base_dir, a)))
+            # Sanitize: strip Windows drive letter (e.g. "C:") then leading separators
+            safe_a = re.sub(r'^[A-Za-z]:', '', a).lstrip('/\\')
+            matches = sorted(glob.glob(os.path.join(base_dir, safe_a)))
             if matches:
                 out.extend(os.path.relpath(m, base_dir) for m in matches)
                 continue
+            # No match: still append the sanitized form so absolute paths don't leak through
+            out.append(safe_a)
+            continue
         out.append(a)
     return out
 
