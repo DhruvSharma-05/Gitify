@@ -759,6 +759,43 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           output = `[${activeBranch} rev1234] Revert "Skip null metric check"`
         }
       }
+      else if (sub === "reset") {
+        const flags = parts.slice(2).filter(a => a.startsWith('-'))
+        const targets = parts.slice(2).filter(a => !a.startsWith('-'))
+        const isHard = flags.includes('--hard')
+        const target = targets[0] // HEAD, HEAD~N, or a hash
+        const fileArg = targets[1] // only for `git reset HEAD <file>`
+
+        if (!target || target === 'HEAD') {
+          // git reset [HEAD] [<file>] — unstage file(s)
+          if (fileArg) {
+            nextState.staged = nextState.staged.filter(f => f !== fileArg)
+          } else {
+            nextState.staged = []
+          }
+          output = ""
+        } else if (target.startsWith('HEAD~')) {
+          const n = parseInt(target.slice('HEAD~'.length), 10) || 1
+          const newLen = Math.max(0, nextState.commits.length - n)
+          nextState.commits = nextState.commits.slice(0, newLen)
+          if (isHard) nextState.staged = []
+          const head = nextState.commits[newLen - 1]
+          nextState.commits = nextState.commits.map((c, i) => ({ ...c, is_head: i === newLen - 1 }))
+          output = head ? `HEAD is now at ${head.hash} ${head.message}` : "HEAD is now at (empty)"
+        } else {
+          // hash-based reset: truncate commits after the target
+          const idx = nextState.commits.findIndex(c => c.hash === target || c.full_hash?.startsWith(target))
+          if (idx === -1) {
+            output = `fatal: ambiguous argument '${target}': unknown revision`; status = "error"
+          } else {
+            nextState.commits = nextState.commits.slice(0, idx + 1)
+            if (isHard) nextState.staged = []
+            const head = nextState.commits[idx]
+            nextState.commits = nextState.commits.map((c, i) => ({ ...c, is_head: i === idx }))
+            output = `HEAD is now at ${head.hash} ${head.message}`
+          }
+        }
+      }
       else if (sub === "rebase") {
         const isInteractive = parts.includes("-i")
         if (isInteractive) {

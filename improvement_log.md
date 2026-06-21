@@ -31,6 +31,7 @@
 | 25 | CORRECTNESS/DRY | `TerminalShell.jsx`: `handleTabComplete` had two stale hardcoded arrays — `allowedBase` (duplicate of `ALLOWED_BASE_CMDS`) and `gitCmds` (missing `cherry-pick`, `tag`, `reset` vs `GIT_SUBCOMMANDS`); Tab completion silently failed for those 3 commands in lessons 4 & 5; replaced both with module-level constants | PASS |
 | 26 | UX/CORRECTNESS | `TerminalShell.jsx`: branch autocomplete triggers (`calculateSuggestions` + `handleTabComplete`) omitted `switch` — `git switch <Tab>` never completed branch names; offline error handler never called `setBranches` so created branches vanished from Tab completion after any offline command | PASS |
 | 27 | CORRECTNESS | `offlineGit.js`: `git revert` created a commit with `parents: []` — disconnected floating node in the commit graph; fixed by finding the HEAD commit on the current branch before the `is_head` map and using its hash as the parent; 3 new assertions added | PASS |
+| 28 | CORRECTNESS | `offlineGit.js`: `git reset` was unhandled (fell through to "Unknown git subcommand") despite being in `GIT_SUBCOMMANDS`; lesson 4 "reset_done" could never pass offline; implemented `git reset HEAD [<file>]` (unstage), `git reset HEAD~N` (remove N commits), `git reset [--hard] <hash>` (truncate to hash); 7 new assertions | PASS |
 
 ---
 

@@ -207,6 +207,34 @@ check('shell-ops: real "|" pipe is blocked', simulateCommandOffline('cat x | gre
   check('branch -d: cannot delete current branch', simulateCommandOffline('git branch -d main', s4, 0).status === 'error')
 }
 
+// --- iter28: git reset -------------------------------------------------------
+{
+  // git reset HEAD <file> — unstage
+  const s = initState()
+  const s2 = simulateCommandOffline('git add .', s, 0).nextState
+  check('reset: file staged before reset', s2.staged.includes('index.js'))
+  const r = simulateCommandOffline('git reset HEAD index.js', s2, 0)
+  check('reset: git reset HEAD <file> unstages the file', r.status === 'success' && !r.nextState.staged.includes('index.js'))
+}
+{
+  // git reset --hard <hash> — remove commits after hash (lesson 4 reset_done)
+  const s4 = getInitialOfflineState(4)
+  const r = simulateCommandOffline('git reset --hard d4d4d4d', s4, 4)
+  check('reset: hard reset to hash succeeds', r.status === 'success')
+  check('reset: commits after target are removed', !r.nextState.commits.some(c => c.message.toLowerCase().includes('skip null metric check')))
+  check('reset: commits before target remain', r.nextState.commits.some(c => c.hash === 'd4d4d4d'))
+  // lesson 4 reset_done should now be true
+  const p = checkOfflineProgress(r.nextState, 4)
+  check('reset: lesson 4 reset_done satisfied after hard reset', p.verified === true)
+}
+{
+  // git reset HEAD~1 — remove last commit
+  const s = initState()
+  const s2 = simulateCommandOffline('git add .', s, 0).nextState
+  const s3 = simulateCommandOffline('git commit -m "first"', s2, 0).nextState
+  check('reset: HEAD~1 removes last commit', simulateCommandOffline('git reset HEAD~1', s3, 0).nextState.commits.length === 0)
+}
+
 // --- iter27: git revert sets correct parent --------------------------------
 {
   const s4 = getInitialOfflineState(4)
