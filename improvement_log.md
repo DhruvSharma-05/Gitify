@@ -38,6 +38,7 @@
 | 32 | CORRECTNESS/UX | `offlineGit.js`: `OFFLINE_SUPPORTED_CMDS` listed 6 commands while `ALLOWED_BASE_CMDS` (Tab-completion) listed 17; `echo` and `pwd` appeared in suggestions but triggered "Offline mode simulates only basic commands" on execution; added minimal `echo` and `pwd` handlers; synced `OFFLINE_SUPPORTED_CMDS` to include both | PASS |
 | 33 | CORRECTNESS | `offlineGit.js`: `checkout -b` and `switch -c` used `find(c => c.branches.includes(currentBranch))` to locate HEAD — after Iter-24's stamping, root commit shares branch names so find returned root instead of true HEAD; second-level branching set wrong `is_head` marker and committed dangling nodes; fixed by using `find(c => c.is_head)` in both handlers; 7 new assertions | PASS |
 | 34 | CORRECTNESS | `offlineGit.js`: `git cherry-pick` created commit with `parents: []` — disconnected floating node in LiveCommitGraph (same class of bug as Iter-27's revert fix); fixed by capturing `cherryHead = find(c => c.is_head)` before map and using its hash as parent; 4 new assertions | PASS |
+| 35 | CORRECTNESS | `offlineGit.js`: `git revert` used `find(c => c.branches.includes(activeBranch))` for HEAD lookup — after additional commits, first match was the first commit on branch rather than the true HEAD; fixed by using `find(c => c.is_head)`; 3 new assertions | PASS |
 
 ---
 

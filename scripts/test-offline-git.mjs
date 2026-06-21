@@ -350,6 +350,21 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter22: lesson 5 WIP files still show as untracked', r.output.includes('Untracked files'))
 }
 
+// --- Iter 35: git revert uses is_head for parent lookup ----------------------
+{
+  // After two commits on main, revert must parent from the second commit, not first
+  const s = initState()
+  const { s: s3 } = run(['git add .', 'git commit -m "first"'], s, 0)
+  const firstHash = s3.commits[0].hash
+  const { s: s5 } = run(['touch b.js', 'git add .', 'git commit -m "second"'], s3, 0)
+  const secondHash = s5.commits[s5.commits.length - 1].hash
+  const r = simulateCommandOffline('git revert abc1234', s5, 0)
+  check('iter35: revert succeeds after two commits', r.status === 'success')
+  const revertC = r.nextState.commits[r.nextState.commits.length - 1]
+  check('iter35: revert parent is second commit (HEAD), not first', revertC.parents[0] === secondHash)
+  check('iter35: revert parent is NOT first commit', revertC.parents[0] !== firstHash)
+}
+
 // --- Iter 34: git cherry-pick sets correct parent ----------------------------
 {
   const s = initState()

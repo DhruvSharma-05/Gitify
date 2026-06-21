@@ -771,7 +771,7 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           status = "error"
         } else {
           const activeBranch = nextState.branch
-          const revertHead = nextState.commits.find(c => c.branches.includes(activeBranch))
+          const revertHead = nextState.commits.find(c => c.is_head)
           const newCommit = {
             hash: 'rev1234',
             full_hash: 'rev12345c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1',
