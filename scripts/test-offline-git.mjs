@@ -372,6 +372,24 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter43: git rm nonexistent file errors', simulateCommandOffline('git rm notafile.js', getInitialOfflineState(4), 4).status === 'error')
 }
 
+// --- Iter 59: git remote rename/remove/get-url/set-url ----------------------
+{
+  const s = initState()
+  let r = simulateCommandOffline('git remote add origin https://github.com/you/repo.git', s, 0)
+  // rename
+  r = simulateCommandOffline('git remote rename origin upstream', r.nextState, 0)
+  check('iter59: git remote rename updates remoteName', r.nextState.remoteName === 'upstream')
+  // get-url
+  r = simulateCommandOffline('git remote get-url upstream', r.nextState, 0)
+  check('iter59: git remote get-url returns URL', r.output.includes('github.com'))
+  // set-url
+  r = simulateCommandOffline('git remote set-url upstream https://gitlab.com/you/repo.git', r.nextState, 0)
+  check('iter59: git remote set-url updates URL', r.nextState.remote.includes('gitlab.com'))
+  // remove
+  r = simulateCommandOffline('git remote remove upstream', r.nextState, 0)
+  check('iter59: git remote remove clears remote', r.nextState.remote === null)
+}
+
 // --- Iter 58: git config get/set/list ----------------------------------------
 {
   const s = initState()

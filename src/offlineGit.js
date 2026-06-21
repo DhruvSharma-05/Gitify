@@ -1015,19 +1015,33 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           output = `rm '${filename}'`
         }
       }
-      // git remote — add/show remotes
+      // git remote — add/show/rename/remove/get-url remotes
       else if (sub === "remote") {
         const action = parts[2]
+        const remName = parts[3]
         if (!action || action === "-v" || action === "--verbose") {
+          const name = nextState.remoteName || "origin"
           output = nextState.remote
-            ? `origin\t${nextState.remote} (fetch)\norigin\t${nextState.remote} (push)`
+            ? `${name}\t${nextState.remote} (fetch)\n${name}\t${nextState.remote} (push)`
             : "(no remotes configured)"
         } else if (action === "add") {
-          const remoteName = parts[3] || "origin"
-          const remoteUrl = parts[4] || "https://github.com/you/repo.git"
-          nextState.remote = remoteUrl
-          nextState.remoteName = remoteName
+          nextState.remoteName = remName || "origin"
+          nextState.remote = parts[4] || "https://github.com/you/repo.git"
           output = ""
+        } else if (action === "rename") {
+          const newName = parts[4]
+          if (!remName || !newName) { output = "usage: git remote rename <old> <new>"; status = "error" }
+          else { nextState.remoteName = newName; output = "" }
+        } else if (action === "remove" || action === "rm") {
+          if (!remName) { output = "usage: git remote remove <name>"; status = "error" }
+          else { nextState.remote = null; nextState.remoteName = null; output = "" }
+        } else if (action === "get-url") {
+          if (!nextState.remote) { output = `error: No such remote '${remName || 'origin'}'`; status = "error" }
+          else output = nextState.remote
+        } else if (action === "set-url") {
+          const newUrl = parts[4]
+          if (!newUrl) { output = "usage: git remote set-url <name> <url>"; status = "error" }
+          else { nextState.remote = newUrl; output = "" }
         } else {
           output = `git remote: '${action}' is not a git command`; status = "error"
         }
