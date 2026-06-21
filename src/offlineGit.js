@@ -615,11 +615,20 @@ export function simulateCommandOffline(commandText, state, lessonId) {
       else if (sub === "checkout") {
         let targetBranch = parts[2]
         const isBFlag = parts[2] === "-b"
+        const isDashDash = parts[2] === "--"
         if (isBFlag) {
           targetBranch = parts[3]
         }
 
-        if (!targetBranch) {
+        if (isDashDash) {
+          // git checkout -- <file>: discard working-tree changes (restore from HEAD)
+          const filename = parts[3]
+          if (!filename) {
+            output = "fatal: you must specify path(s) to restore"; status = "error"
+          } else {
+            output = `Restored '${filename}'`
+          }
+        } else if (!targetBranch) {
           output = "fatal: Branch name required."
           status = "error"
         } else {

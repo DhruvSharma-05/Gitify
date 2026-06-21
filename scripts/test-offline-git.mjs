@@ -371,6 +371,18 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter43: git rm nonexistent file errors', simulateCommandOffline('git rm notafile.js', getInitialOfflineState(4), 4).status === 'error')
 }
 
+// --- Iter 47: git checkout -- <file> discards working-tree changes ----------
+{
+  const s4 = getInitialOfflineState(4)
+  const r = simulateCommandOffline('git checkout -- Dashboard.jsx', s4, 4)
+  check('iter47: git checkout -- <file> succeeds', r.status === 'success')
+  check('iter47: git checkout -- <file> outputs Restored', r.output.includes('Restored'))
+}
+{
+  const r = simulateCommandOffline('git checkout --', getInitialOfflineState(4), 4)
+  check('iter47: git checkout -- with no file errors gracefully', r.status === 'error')
+}
+
 // --- Iter 46: git restore --staged . clears all staged files ----------------
 {
   // git restore --staged . should unstage everything
