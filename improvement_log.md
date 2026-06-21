@@ -26,6 +26,7 @@
 | 20 | SECURITY | `main.py`: bounded `VerifyRequest.commands` list to 200 items with per-element `max_length=512` using `Annotated` + `Field`; closes DoS vector through synchronous `verify_lesson_*` subprocess loops | PASS |
 | 21 | CORRECTNESS/DRY | `TerminalShell.jsx`: replaced stale hardcoded `dict` inline list at L339 (missing `cherry-pick`, `tag`, `reset`) with a reference to the module-level `GIT_SUBCOMMANDS` constant; fixes false typo-hints for three valid git subcommands | PASS |
 | 22 | CORRECTNESS | `api.js` + `offlineGit.js`: `git status` was showing all seeded files as "Untracked" for lessons 2-9; fixed by pre-populating `committed_files` in `getInitialOfflineState` for pre-committed lessons; removed dead `committedFiles` block (always-empty Set, never referenced); 5 new assertions added | PASS |
+| 23 | CORRECTNESS | `offlineGit.js`: `git stash` push hardcoded `["Checkout.jsx","styles.css"]` — corrupted workspace in all lessons except 5; now saves actual uncommitted files (`files − committed_files`); pop restores exactly what was saved; "No local changes to save" when clean; 10 new assertions added | PASS |
 
 ---
 

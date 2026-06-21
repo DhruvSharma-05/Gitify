@@ -193,6 +193,35 @@ check('shell-ops: real "|" pipe is blocked', simulateCommandOffline('cat x | gre
   check('status: clean after commit (no untracked files)', r.output.includes('nothing to commit'))
 }
 
+// --- Iter 23: git stash uses actual uncommitted files, not hardcoded ones ----
+{
+  // Lesson 5: Checkout.jsx and styles.css are WIP — stash should save them
+  const s5 = getInitialOfflineState(5)
+  const r = simulateCommandOffline('git stash', s5, 5)
+  check('iter23: lesson 5 stash saves WIP files', r.status === 'success')
+  check('iter23: lesson 5 stash removes WIP files from workspace', !r.nextState.files.includes('Checkout.jsx'))
+  check('iter23: lesson 5 stash records correct files', r.nextState.stashes[0].files.includes('Checkout.jsx'))
+  // Pop restores them
+  const r2 = simulateCommandOffline('git stash pop', r.nextState, 5)
+  check('iter23: lesson 5 stash pop restores Checkout.jsx', r2.nextState.files.includes('Checkout.jsx'))
+  check('iter23: lesson 5 stash pop restores styles.css', r2.nextState.files.includes('styles.css'))
+}
+{
+  // Lesson 2: all files committed — stash has nothing to save
+  const s2 = getInitialOfflineState(2)
+  const r = simulateCommandOffline('git stash', s2, 2)
+  check('iter23: lesson 2 stash with no WIP says "No local changes to save"', r.output.includes('No local changes to save'))
+  check('iter23: lesson 2 stash creates no stash entry', r.nextState.stashes.length === 0)
+  check('iter23: lesson 2 files unaffected by stash', r.nextState.files.includes('index.js'))
+}
+{
+  // Lesson 2: stash pop after no stash entry — should error, not inject Checkout.jsx
+  const s2 = getInitialOfflineState(2)
+  const r = simulateCommandOffline('git stash pop', s2, 2)
+  check('iter23: lesson 2 stash pop with empty stash errors', r.status === 'error')
+  check('iter23: lesson 2 stash pop does not inject Checkout.jsx', !r.nextState.files.includes('Checkout.jsx'))
+}
+
 // --- Iter 22: git status clean for pre-seeded lessons (2-9) ----------------
 import { getInitialOfflineState } from '../src/api.js'
 {

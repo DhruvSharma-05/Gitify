@@ -645,13 +645,12 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             status = "error"
           } else {
             const top = nextState.stashes[nextState.stashes.length - 1]
+            // Restore only the files that were actually stashed
             if (top.files) top.files.forEach(f => { if (!nextState.files.includes(f)) nextState.files.push(f) })
             if (action === "pop") nextState.stashes.pop()
-            if (!nextState.files.includes("Checkout.jsx")) nextState.files.push("Checkout.jsx")
-            if (!nextState.files.includes("styles.css")) nextState.files.push("styles.css")
             output = action === "pop"
-              ? "Dropped refs/stash@{0} (offline)"
-              : "Applied stash@{0} (offline)"
+              ? `Dropped refs/stash@{0}`
+              : `Applied stash@{0}`
           }
         } else if (action === "list") {
           if (nextState.stashes.length === 0) {
@@ -664,7 +663,7 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             output = "No stash entries found."; status = "error"
           } else {
             const top = nextState.stashes[nextState.stashes.length - 1]
-            output = (top.files || ["Checkout.jsx", "styles.css"]).map(f => ` M ${f}`).join("\n")
+            output = (top.files || []).map(f => ` M ${f}`).join("\n") || "(empty stash)"
           }
         } else if (action === "drop") {
           if (nextState.stashes.length === 0) {
@@ -674,16 +673,24 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             output = "Dropped refs/stash@{0}"
           }
         } else {
-          // git stash (no subcommand) = git stash push
-          nextState.stashes.push({
-            id: nextState.stashes.length,
-            name: `stash@{${nextState.stashes.length}}`,
-            label: nextState.branch,
-            files: ["Checkout.jsx", "styles.css"]
-          })
-          nextState.stashed_offline = true
-          nextState.files = nextState.files.filter(f => f !== "Checkout.jsx" && f !== "styles.css")
-          output = `Saved working directory and index state WIP on ${nextState.branch}: WIP stash`
+          // git stash / git stash push — save uncommitted (untracked) files
+          const committed = new Set(nextState.committed_files || [])
+          const toStash = nextState.files.filter(f => !committed.has(f))
+          if (toStash.length === 0 && nextState.staged.length === 0) {
+            output = "No local changes to save"
+          } else {
+            const savedFiles = [...toStash, ...nextState.staged.filter(f => !toStash.includes(f))]
+            nextState.stashes.push({
+              id: nextState.stashes.length,
+              name: `stash@{${nextState.stashes.length}}`,
+              label: nextState.branch,
+              files: savedFiles
+            })
+            nextState.stashed_offline = true
+            nextState.files = nextState.files.filter(f => !toStash.includes(f))
+            nextState.staged = nextState.staged.filter(f => !savedFiles.includes(f))
+            output = `Saved working directory and index state WIP on ${nextState.branch}: WIP stash`
+          }
         }
       }
       else if (sub === "cherry-pick") {
