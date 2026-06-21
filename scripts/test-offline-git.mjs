@@ -207,6 +207,17 @@ check('shell-ops: real "|" pipe is blocked', simulateCommandOffline('cat x | gre
   check('branch -d: cannot delete current branch', simulateCommandOffline('git branch -d main', s4, 0).status === 'error')
 }
 
+// --- iter27: git revert sets correct parent --------------------------------
+{
+  const s4 = getInitialOfflineState(4)
+  const headHash = s4.commits[s4.commits.length - 1].hash
+  const r = simulateCommandOffline('git revert e5e5e5e', s4, 4)
+  check('iter27: git revert succeeds', r.status === 'success')
+  const revertCommit = r.nextState.commits[r.nextState.commits.length - 1]
+  check('iter27: revert commit has non-empty parents', revertCommit.parents.length > 0)
+  check('iter27: revert commit parent is previous HEAD', revertCommit.parents[0] === headHash)
+}
+
 // --- Cycle 2: git status shows clean after commit --------------------------
 {
   const s = initState()

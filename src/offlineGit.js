@@ -744,20 +744,19 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           output = "fatal: Commit hash required."
           status = "error"
         } else {
+          const activeBranch = nextState.branch
+          const revertHead = nextState.commits.find(c => c.branches.includes(activeBranch))
           const newCommit = {
             hash: 'rev1234',
             full_hash: 'rev12345c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1',
             message: "Revert \"Skip null metric check\"",
-            branches: [nextState.branch],
-            parents: [],
+            branches: [activeBranch],
+            parents: revertHead ? [revertHead.hash] : [],
             is_head: true
           }
-          nextState.commits = nextState.commits.map(c => ({
-            ...c,
-            is_head: false
-          }))
+          nextState.commits = nextState.commits.map(c => ({ ...c, is_head: false }))
           nextState.commits.push(newCommit)
-          output = `[${nextState.branch} rev1234] Revert "Skip null metric check"`
+          output = `[${activeBranch} rev1234] Revert "Skip null metric check"`
         }
       }
       else if (sub === "rebase") {
