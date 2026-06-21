@@ -32,7 +32,15 @@ export default function StashCherryPickLesson({ onSuccess, setTerminalSyncListen
         if (syncState.branch) setBranch(syncState.branch)
         if (syncState.files !== undefined) setDirtyFiles(syncState.files)
         if (syncState.stashes !== undefined) setStashes(syncState.stashes)
-        if (syncState.picked !== undefined) setPicked(syncState.picked)
+        
+        let nextPicked = syncState.picked || []
+        if (syncState.commits_graph && syncState.commits_graph.some(c => c.message && c.message.toLowerCase().includes("fix tax rounding"))) {
+          if (!nextPicked.includes('b7a91c')) {
+            nextPicked = [...nextPicked, 'b7a91c']
+          }
+        }
+        setPicked(nextPicked)
+        
         setAppliedNote('✓ Synced workspace elements with global terminal console command.')
       })
     }
