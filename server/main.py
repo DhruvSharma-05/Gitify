@@ -2,8 +2,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+from pydantic import BaseModel, Field
+from typing import Annotated, List, Optional, Dict, Any
 import glob
 import logging
 import os
@@ -60,7 +60,9 @@ class ProgressUpdate(BaseModel):
 
 class VerifyRequest(BaseModel):
     lesson_id: int
-    commands: Optional[List[str]] = []
+    # Cap total commands and per-command length to prevent DoS through the verify_lesson_*
+    # subprocess loops: 200 commands × 512 chars each is still far beyond any real student use.
+    commands: Optional[List[Annotated[str, Field(max_length=512)]]] = Field(default=[], max_length=200)
     state: Optional[Dict[str, Any]] = None
     username: Optional[str] = "student"
 
@@ -137,7 +139,9 @@ def verify_exercise(data: VerifyRequest):
         raise HTTPException(status_code=500, detail="Internal server error.")
 
 class TerminalExecuteRequest(BaseModel):
-    command: str
+    # 4096 chars is far more than any real shell command; cap prevents DoS amplification
+    # via shlex.split / regex / git subprocess chains on arbitrarily large payloads.
+    command: str = Field(..., max_length=4096)
     session_id: str
     lesson_id: int
     username: Optional[str] = "student"
@@ -908,8 +912,10 @@ def get_commit_details(data: CommitDetailsRequest):
 class WriteFileRequest(BaseModel):
     session_id: str
     lesson_id: int
-    filename: str
-    content: str
+    # Filename must be a simple name; 256 chars is the POSIX filename limit.
+    filename: str = Field(..., max_length=256)
+    # 2 MB is generous for any legitimate sandbox file edit.
+    content: str = Field(..., max_length=2_097_152)
 
 @app.post("/api/terminal/write-file")
 def write_sandbox_file(data: WriteFileRequest):

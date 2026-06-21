@@ -336,9 +336,8 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
         // Typo suggestion check: if failed or warning, look for mistyped Git commands
         const parts = rawCmd.split(/\s+/)
         if (parts[0] === 'git' && parts.length > 1) {
-          const dict = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote', 'switch', 'restore', 'diff', 'bisect', 'fetch', 'revert']
           const sub = parts[1].toLowerCase()
-          if (!dict.includes(sub)) {
+          if (!GIT_SUBCOMMANDS.includes(sub)) {
             const suggestion = getGitSuggestion(sub)
             if (suggestion) {
               setHistory(prev => [...prev, {
