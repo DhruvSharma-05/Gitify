@@ -1015,11 +1015,17 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           output = `git remote: '${action}' is not a git command`; status = "error"
         }
       }
-      // git tag — list or create lightweight tags
+      // git tag — list, create (lightweight or annotated), or delete tags
       else if (sub === "tag") {
-        const tagName = parts[2]
         if (!nextState.tags) nextState.tags = []
-        if (!tagName) {
+        const isDelete = parts.includes("-d") || parts.includes("--delete")
+        // Tag name is the first non-flag argument after 'tag'
+        const tagName = parts.slice(2).find(p => !p.startsWith("-"))
+        if (isDelete) {
+          if (!tagName) { output = "error: tag name required"; status = "error" }
+          else if (!nextState.tags.includes(tagName)) { output = `error: tag '${tagName}' not found`; status = "error" }
+          else { nextState.tags = nextState.tags.filter(t => t !== tagName); output = `Deleted tag '${tagName}'` }
+        } else if (!tagName) {
           output = nextState.tags.length ? nextState.tags.join('\n') : '(no tags)'
         } else if (nextState.tags.includes(tagName)) {
           output = `fatal: tag '${tagName}' already exists`; status = "error"

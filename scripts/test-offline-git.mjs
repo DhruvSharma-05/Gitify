@@ -372,6 +372,24 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter43: git rm nonexistent file errors', simulateCommandOffline('git rm notafile.js', getInitialOfflineState(4), 4).status === 'error')
 }
 
+// --- Iter 55: git tag -a <name> creates annotated tag; git tag -d deletes ----
+{
+  const s4 = getInitialOfflineState(4)
+  // Lightweight tag
+  let r = simulateCommandOffline('git tag v1.0', s4, 4)
+  check('iter55: git tag v1.0 succeeds', r.status === 'success')
+  check('iter55: git tag v1.0 adds to tags list', r.nextState.tags.includes('v1.0'))
+  // Annotated tag with -a flag
+  r = simulateCommandOffline('git tag -a v2.0 -m "release"', s4, 4)
+  check('iter55: git tag -a v2.0 succeeds', r.status === 'success')
+  check('iter55: git tag -a extracts real name, not "-a"', r.nextState.tags.includes('v2.0') && !r.nextState.tags.includes('-a'))
+  // Delete tag
+  let r2 = simulateCommandOffline('git tag v1.0', s4, 4)
+  r2 = simulateCommandOffline('git tag -d v1.0', r2.nextState, 4)
+  check('iter55: git tag -d removes tag', !r2.nextState.tags.includes('v1.0'))
+  check('iter55: git tag -d nonexistent errors', simulateCommandOffline('git tag -d notexist', s4, 4).status === 'error')
+}
+
 // --- Iter 54: git show displays commit details --------------------------------
 {
   const s = initState()
