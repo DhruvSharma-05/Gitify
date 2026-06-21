@@ -506,8 +506,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
 
     // Completing the base command
     if (words.length === 1) {
-      const allowedBase = ['git', 'gh', 'ls', 'cat', 'cd', 'pwd', 'echo', 'touch', 'mkdir', 'rm', 'mv', 'cp', 'head', 'tail', 'grep', 'wc', 'clear']
-      const match = allowedBase.find(c => c.startsWith(text.toLowerCase()))
+      const match = ALLOWED_BASE_CMDS.find(c => c.startsWith(text.toLowerCase()))
       if (match) {
         setInputValue(match + ' ')
       }
@@ -516,8 +515,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
 
     // Completing git subcommands
     if (words[0] === 'git' && words.length === 2) {
-      const gitCmds = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote', 'switch', 'restore', 'diff', 'bisect', 'fetch', 'revert']
-      const match = gitCmds.find(c => c.startsWith(currentWord.toLowerCase()))
+      const match = GIT_SUBCOMMANDS.find(c => c.startsWith(currentWord.toLowerCase()))
       if (match) {
         setInputValue(`git ${match} `)
       }
