@@ -106,10 +106,33 @@ check('shell-ops: real "|" pipe is blocked', simulateCommandOffline('cat x | gre
   const s2 = simulateCommandOffline('git commit -m "init"', simulateCommandOffline('git add .', s, 0).nextState, 0).nextState
   const r1 = simulateCommandOffline('git switch -c feature/test', s2, 0)
   check('switch -c: creates new branch', r1.status === 'success' && r1.nextState.branch === 'feature/test')
+  // touch a new file then commit — parent must be the init commit, not empty
+  const r1t = simulateCommandOffline('touch new.js', r1.nextState, 0)
+  const r1a = simulateCommandOffline('git add .', r1t.nextState, 0)
+  const r1b = simulateCommandOffline('git commit -m "branch work"', r1a.nextState, 0)
+  const branchCommit = r1b.nextState.commits[r1b.nextState.commits.length - 1]
+  const initCommit = r1b.nextState.commits[0]
+  check('switch -c: new commit has correct parent (not empty)', branchCommit.parents.length > 0 && branchCommit.parents[0] === initCommit.hash)
   const r2 = simulateCommandOffline('git switch main', r1.nextState, 0)
   check('switch: switches to existing branch', r2.status === 'success' && r2.nextState.branch === 'main')
   const r3 = simulateCommandOffline('git switch nosuchbranch', r2.nextState, 0)
   check('switch: unknown branch errors', r3.status === 'error')
+}
+
+// --- iter24: git checkout -b parent chain ----------------------------------
+{
+  const s = initState()
+  const s2 = simulateCommandOffline('git add .', s, 0).nextState
+  const s3 = simulateCommandOffline('git commit -m "init"', s2, 0).nextState
+  const initHash = s3.commits[0].hash
+  const s4 = simulateCommandOffline('git checkout -b feature/auth', s3, 0).nextState
+  // touch a new file so there's something to commit on the branch
+  const s4t = simulateCommandOffline('touch auth.js', s4, 0).nextState
+  const s4a = simulateCommandOffline('git add .', s4t, 0).nextState
+  const s5 = simulateCommandOffline('git commit -m "auth feature"', s4a, 0).nextState
+  const newCommit = s5.commits[s5.commits.length - 1]
+  check('iter24: checkout -b: new commit has non-empty parents', newCommit.parents.length > 0)
+  check('iter24: checkout -b: new commit parent is the init commit', newCommit.parents[0] === initHash)
 }
 
 // --- git restore -----------------------------------------------------------
