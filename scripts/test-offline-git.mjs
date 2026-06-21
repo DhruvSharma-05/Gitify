@@ -350,6 +350,22 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter22: lesson 5 WIP files still show as untracked', r.output.includes('Untracked files'))
 }
 
+// --- Iter 38: git stash list shows newest stash as stash@{0} ----------------
+{
+  const s = initState()
+  const s1 = simulateCommandOffline('git stash', s, 0).nextState
+  // touch another file so we have something to stash again
+  const s2t = simulateCommandOffline('touch second.js', s1, 0).nextState
+  const s2 = simulateCommandOffline('git stash', s2t, 0).nextState
+  const listOut = simulateCommandOffline('git stash list', s2, 0).output
+  const lines = listOut.split('\n')
+  check('iter38: stash list has 2 entries', lines.length === 2)
+  // stash@{0} should be the most recent (second stash has 'second.js')
+  // stash@{0} is first line; stash@{1} is second line
+  check('iter38: stash list stash@{0} is on first line', lines[0].startsWith('stash@{0}'))
+  check('iter38: stash list stash@{1} is on second line', lines[1].startsWith('stash@{1}'))
+}
+
 // --- Iter 37: checkout/switch to existing branch uses last tip commit --------
 {
   // Scenario: commit on main, checkout -b feature, commit on feature, go back to main,

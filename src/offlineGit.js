@@ -690,7 +690,8 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           if (nextState.stashes.length === 0) {
             output = "(empty stash)"
           } else {
-            output = nextState.stashes.map((s, i) => `stash@{${i}}: WIP on ${s.label || nextState.branch}: stashed changes`).join("\n")
+            // stash@{0} is the most recent stash (top of stack), so display in reverse order
+            output = [...nextState.stashes].reverse().map((s, i) => `stash@{${i}}: WIP on ${s.label || nextState.branch}: stashed changes`).join("\n")
           }
         } else if (action === "show") {
           if (nextState.stashes.length === 0) {
