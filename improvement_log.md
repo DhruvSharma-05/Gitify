@@ -39,6 +39,7 @@
 | 33 | CORRECTNESS | `offlineGit.js`: `checkout -b` and `switch -c` used `find(c => c.branches.includes(currentBranch))` to locate HEAD — after Iter-24's stamping, root commit shares branch names so find returned root instead of true HEAD; second-level branching set wrong `is_head` marker and committed dangling nodes; fixed by using `find(c => c.is_head)` in both handlers; 7 new assertions | PASS |
 | 34 | CORRECTNESS | `offlineGit.js`: `git cherry-pick` created commit with `parents: []` — disconnected floating node in LiveCommitGraph (same class of bug as Iter-27's revert fix); fixed by capturing `cherryHead = find(c => c.is_head)` before map and using its hash as parent; 4 new assertions | PASS |
 | 35 | CORRECTNESS | `offlineGit.js`: `git revert` used `find(c => c.branches.includes(activeBranch))` for HEAD lookup — after additional commits, first match was the first commit on branch rather than the true HEAD; fixed by using `find(c => c.is_head)`; 3 new assertions | PASS |
+| 36 | CORRECTNESS | `offlineGit.js`: `git reset HEAD~N` and `git reset <hash>` left the new HEAD commit with an empty branches array — `git log` showed no `(HEAD -> branch)` ref after reset; fixed by pushing `nextState.branch` onto the new HEAD's branches; 4 new assertions | PASS |
 
 ---
 

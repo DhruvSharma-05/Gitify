@@ -807,6 +807,8 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           if (isHard) nextState.staged = []
           const head = nextState.commits[newLen - 1]
           nextState.commits = nextState.commits.map((c, i) => ({ ...c, is_head: i === newLen - 1 }))
+          // Move the branch pointer to the new HEAD so git log shows (HEAD -> branch)
+          if (head && !head.branches.includes(nextState.branch)) head.branches.push(nextState.branch)
           output = head ? `HEAD is now at ${head.hash} ${head.message}` : "HEAD is now at (empty)"
         } else {
           // hash-based reset: truncate commits after the target
@@ -818,6 +820,8 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             if (isHard) nextState.staged = []
             const head = nextState.commits[idx]
             nextState.commits = nextState.commits.map((c, i) => ({ ...c, is_head: i === idx }))
+            // Move the branch pointer to the new HEAD so git log shows (HEAD -> branch)
+            if (head && !head.branches.includes(nextState.branch)) head.branches.push(nextState.branch)
             output = `HEAD is now at ${head.hash} ${head.message}`
           }
         }

@@ -350,6 +350,28 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter22: lesson 5 WIP files still show as untracked', r.output.includes('Untracked files'))
 }
 
+// --- Iter 36: git reset moves branch pointer to new HEAD ---------------------
+{
+  // After reset, git log should show (HEAD -> main) on the new HEAD commit
+  const s4 = getInitialOfflineState(4)
+  // reset to d4d4d4d (which has branches: [] in the seed)
+  const r = simulateCommandOffline('git reset --hard d4d4d4d', s4, 4)
+  check('iter36: reset adds branch to new HEAD branches', r.nextState.commits.find(c => c.hash === 'd4d4d4d').branches.includes('main'))
+  const logR = simulateCommandOffline('git log --oneline', r.nextState, 4)
+  check('iter36: git log after reset shows HEAD->main ref', logR.output.includes('HEAD ->'))
+}
+{
+  // git reset HEAD~1: new HEAD should get the branch
+  const s = initState()
+  const { s: s3 } = run(['git add .', 'git commit -m "first"'], s, 0)
+  const { s: s5 } = run(['touch b.js', 'git add .', 'git commit -m "second"'], s3, 0)
+  const r = simulateCommandOffline('git reset HEAD~1', s5, 0)
+  const newHead = r.nextState.commits[r.nextState.commits.length - 1]
+  check('iter36: HEAD~1 reset: new HEAD has branch in branches', newHead.branches.includes('main'))
+  const logR = simulateCommandOffline('git log --oneline', r.nextState, 0)
+  check('iter36: git log after HEAD~1 shows HEAD->main ref', logR.output.includes('HEAD ->'))
+}
+
 // --- Iter 35: git revert uses is_head for parent lookup ----------------------
 {
   // After two commits on main, revert must parent from the second commit, not first
