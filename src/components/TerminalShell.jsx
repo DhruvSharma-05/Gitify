@@ -160,7 +160,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
     } else if (words.length > 1 && (words[words.length - 2] === 'add' || ['cat', 'rm', 'cd', 'head', 'tail', 'wc', 'cp', 'mv'].includes(words[0]))) {
       const matches = files.filter(f => f.toLowerCase().startsWith(currentWord.toLowerCase()) && f.toLowerCase() !== currentWord.toLowerCase())
       setSuggestions(matches)
-    } else if (words.length > 1 && (words[words.length - 2] === 'checkout' || words[words.length - 2] === 'merge' || words[words.length - 2] === 'rebase')) {
+    } else if (words.length > 1 && (['checkout', 'merge', 'rebase', 'switch'].includes(words[words.length - 2]))) {
       const matches = branches.filter(b => b.toLowerCase().startsWith(currentWord.toLowerCase()) && b.toLowerCase() !== currentWord.toLowerCase())
       setSuggestions(matches)
     } else {
@@ -435,6 +435,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
         if (updatedOfflineState.pwd !== undefined) setPwd(updatedOfflineState.pwd)
         if (updatedOfflineState.branch !== undefined) setBranch(updatedOfflineState.branch)
         if (updatedOfflineState.files) setFiles(updatedOfflineState.files)
+        if (updatedOfflineState.branches) setBranches(updatedOfflineState.branches)
         
         const checkResult = checkOfflineProgress(updatedOfflineState, lessonId)
         
@@ -533,7 +534,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
     }
 
     // Completing branch names
-    if (words.length > 1 && (words[words.length - 2] === 'checkout' || words[words.length - 2] === 'merge' || words[words.length - 2] === 'rebase')) {
+    if (words.length > 1 && (['checkout', 'merge', 'rebase', 'switch'].includes(words[words.length - 2]))) {
       const match = branches.find(b => b.toLowerCase().startsWith(currentWord.toLowerCase()))
       if (match) {
         words[words.length - 1] = match

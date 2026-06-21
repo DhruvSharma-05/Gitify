@@ -29,6 +29,7 @@
 | 23 | CORRECTNESS | `offlineGit.js`: `git stash` push hardcoded `["Checkout.jsx","styles.css"]` — corrupted workspace in all lessons except 5; now saves actual uncommitted files (`files − committed_files`); pop restores exactly what was saved; "No local changes to save" when clean; 10 new assertions added | PASS |
 | 24 | CORRECTNESS | `offlineGit.js`: `git checkout -b` and `git switch -c` did not stamp the new branch onto the HEAD commit's `branches` array — first commit on the new branch always got `parents: []` (disconnected node in graph); fixed by adding the new branch to HEAD's branches before switching; 3 new assertions added | PASS |
 | 25 | CORRECTNESS/DRY | `TerminalShell.jsx`: `handleTabComplete` had two stale hardcoded arrays — `allowedBase` (duplicate of `ALLOWED_BASE_CMDS`) and `gitCmds` (missing `cherry-pick`, `tag`, `reset` vs `GIT_SUBCOMMANDS`); Tab completion silently failed for those 3 commands in lessons 4 & 5; replaced both with module-level constants | PASS |
+| 26 | UX/CORRECTNESS | `TerminalShell.jsx`: branch autocomplete triggers (`calculateSuggestions` + `handleTabComplete`) omitted `switch` — `git switch <Tab>` never completed branch names; offline error handler never called `setBranches` so created branches vanished from Tab completion after any offline command | PASS |
 
 ---
 
