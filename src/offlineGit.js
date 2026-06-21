@@ -462,7 +462,12 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           output = "Nothing specified, nothing added."
           status = "error"
         } else {
-          if (filePattern === "." || filePattern === "-A" || filePattern === "--all" || filePattern === "-u") {
+          if (filePattern === "-u") {
+            // -u: stage tracked modified files only (mirrors real `git add -u` behavior)
+            const tracked = new Set(nextState.committed_files || [])
+            nextState.staged = nextState.files.filter(f => tracked.has(f))
+            output = ""
+          } else if (filePattern === "." || filePattern === "-A" || filePattern === "--all") {
             nextState.staged = [...nextState.files]
             if (nextState.conflict_active) {
               nextState.conflict_resolved = true

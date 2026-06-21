@@ -52,6 +52,7 @@
 | 46 | CORRECTNESS | `offlineGit.js`: `git restore --staged .` extracted `'.'` as filename then `staged.filter(f => f !== '.')` left all files staged; added wildcard check so `.`, `:/ `, `*` clear the entire staged list; `git restore .` also resets working tree files; 4 new assertions | PASS |
 | 47 | CORRECTNESS | `offlineGit.js`: `git checkout -- <file>` (discard working-tree changes) fell through to branch-switch and errored with "pathspec '--' did not match any file(s)"; added `isDashDash` guard before the branch logic to handle the discard form; 3 new assertions | PASS |
 | 48 | UX/PARITY | `TerminalShell.jsx`: `getGitSuggestion` typo-hint was applied in the live `.then` path but absent from the `.catch` offline path; students in offline mode never saw "Did you mean git X?"; added the same typo block to the offline handler | PASS |
+| 49 | CORRECTNESS | `offlineGit.js`: `git add -u` staged all files like `git add .`; real git `-u` only stages tracked modified files; fixed by filtering against `committed_files`; updated stale regression test; 3 new assertions | PASS |
 
 ---
 

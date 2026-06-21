@@ -184,9 +184,10 @@ check('shell-ops: real "|" pipe is blocked', simulateCommandOffline('cat x | gre
 
 // --- git add -u ------------------------------------------------------------
 {
-  const s = initState()
-  const r = simulateCommandOffline('git add -u', s, 0)
-  check('add -u: stages all tracked files', r.status === 'success' && r.nextState.staged.length > 0)
+  // -u should stage tracked files; use a pre-committed state (lesson 4)
+  const s4 = getInitialOfflineState(4)
+  const r = simulateCommandOffline('git add -u', s4, 4)
+  check('add -u: stages tracked files when committed_files exist', r.status === 'success' && r.nextState.staged.length > 0)
 }
 
 // --- git log --oneline -----------------------------------------------------
@@ -369,6 +370,22 @@ import { getInitialOfflineState } from '../src/api.js'
 }
 {
   check('iter43: git rm nonexistent file errors', simulateCommandOffline('git rm notafile.js', getInitialOfflineState(4), 4).status === 'error')
+}
+
+// --- Iter 49: git add -u only stages tracked files, not untracked -----------
+{
+  // Fresh state with one untracked file: -u should NOT stage it
+  const s = initState()
+  const r = simulateCommandOffline('git add -u', s, 0)
+  check('iter49: git add -u on repo with no prior commits stages nothing', r.nextState.staged.length === 0)
+}
+{
+  // Mixed state: -u stages tracked but not untracked
+  const s4 = getInitialOfflineState(4)
+  let r = simulateCommandOffline('touch brand-new.js', s4, 4)
+  r = simulateCommandOffline('git add -u', r.nextState, 4)
+  check('iter49: git add -u does not stage untracked file', !r.nextState.staged.includes('brand-new.js'))
+  check('iter49: git add -u stages tracked files', r.nextState.staged.some(f => (s4.committed_files || []).includes(f)))
 }
 
 // --- Iter 47: git checkout -- <file> discards working-tree changes ----------
