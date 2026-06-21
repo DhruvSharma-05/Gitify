@@ -350,6 +350,38 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter22: lesson 5 WIP files still show as untracked', r.output.includes('Untracked files'))
 }
 
+// --- Iter 37: checkout/switch to existing branch uses last tip commit --------
+{
+  // Scenario: commit on main, checkout -b feature, commit on feature, go back to main,
+  // commit on main, then switch back to feature — should land on the feature tip, not root.
+  const s = initState()
+  const { s: sA } = run(['git add .', 'git commit -m "A on main"'], s, 0)
+  const { s: sB } = run(['git checkout -b feature'], sA, 0)
+  const { s: sC } = run(['touch f.js', 'git add .', 'git commit -m "B on feature"'], sB, 0)
+  const featureTipHash = sC.commits.find(c => c.message === 'B on feature').hash
+  // Return to main, make a new commit
+  const { s: sD } = run(['git checkout main', 'touch m.js', 'git add .', 'git commit -m "C on main"'], sC, 0)
+  // Switch back to feature
+  const sE = simulateCommandOffline('git checkout feature', sD, 0).nextState
+  check('iter37: checkout feature after divergence: HEAD is feature tip', sE.commits.find(c => c.is_head)?.hash === featureTipHash)
+  check('iter37: checkout feature: branch is feature', sE.branch === 'feature')
+  // git log from feature should show only A and B (not C on main)
+  const logE = simulateCommandOffline('git log --oneline', sE, 0)
+  check('iter37: git log on feature excludes main-only commit', !logE.output.includes('C on main'))
+  check('iter37: git log on feature includes feature commit', logE.output.includes('B on feature'))
+}
+{
+  // Same but using switch
+  const s = initState()
+  const { s: sA } = run(['git add .', 'git commit -m "A"'], s, 0)
+  const { s: sB } = run(['git switch -c feat2'], sA, 0)
+  const { s: sC } = run(['touch f2.js', 'git add .', 'git commit -m "B on feat2"'], sB, 0)
+  const feat2TipHash = sC.commits.find(c => c.message === 'B on feat2').hash
+  const { s: sD } = run(['git switch main', 'touch m2.js', 'git add .', 'git commit -m "C on main"'], sC, 0)
+  const sE = simulateCommandOffline('git switch feat2', sD, 0).nextState
+  check('iter37: switch feat2 HEAD is feat2 tip', sE.commits.find(c => c.is_head)?.hash === feat2TipHash)
+}
+
 // --- Iter 36: git reset moves branch pointer to new HEAD ---------------------
 {
   // After reset, git log should show (HEAD -> main) on the new HEAD commit

@@ -632,9 +632,14 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           } else {
             if (nextState.branches.includes(targetBranch)) {
               nextState.branch = targetBranch
+              // Use the last commit with targetBranch (insertion order = most recent tip).
+              // Multiple commits can share a branch name after checkout -b stamping, so
+              // branches.includes() alone would return the root, not the branch tip.
+              const withBranch = nextState.commits.filter(c => c.branches.includes(targetBranch))
+              const tipHash = withBranch.length > 0 ? withBranch[withBranch.length - 1].hash : null
               nextState.commits = nextState.commits.map(c => ({
                 ...c,
-                is_head: c.branches.includes(targetBranch)
+                is_head: c.hash === tipHash
               }))
               output = `Switched to branch '${targetBranch}'`
             } else {
@@ -857,7 +862,9 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             output = `fatal: invalid reference: ${targetBranch}`; status = "error"
           } else {
             nextState.branch = targetBranch
-            nextState.commits = nextState.commits.map(c => ({ ...c, is_head: c.branches.includes(targetBranch) }))
+            const withBranch = nextState.commits.filter(c => c.branches.includes(targetBranch))
+            const tipHash = withBranch.length > 0 ? withBranch[withBranch.length - 1].hash : null
+            nextState.commits = nextState.commits.map(c => ({ ...c, is_head: c.hash === tipHash }))
             output = `Switched to branch '${targetBranch}'`
           }
         }
