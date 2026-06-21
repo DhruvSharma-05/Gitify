@@ -716,7 +716,15 @@ export function simulateCommandOffline(commandText, state, lessonId) {
       }
       else if (sub === "merge") {
         const mergeSrc = parts[2]
-        if (!mergeSrc) {
+        if (mergeSrc === "--abort") {
+          if (!nextState.conflict_active) {
+            output = "fatal: There is no merge in progress (MERGE_HEAD missing)."; status = "error"
+          } else {
+            nextState.conflict_active = false
+            nextState.conflict_triggered = false
+            output = "Merge aborted."
+          }
+        } else if (!mergeSrc) {
           output = "fatal: Branch to merge required."
           status = "error"
         } else if (!nextState.branches.includes(mergeSrc)) {
@@ -923,7 +931,13 @@ export function simulateCommandOffline(commandText, state, lessonId) {
       }
       else if (sub === "rebase") {
         const isInteractive = parts.includes("-i")
-        if (isInteractive) {
+        const isAbort = parts.includes("--abort")
+        const isContinue = parts.includes("--continue")
+        if (isAbort) {
+          output = "Rebase aborted."
+        } else if (isContinue) {
+          output = "Successfully rebased and updated."
+        } else if (isInteractive) {
           nextState.commits = nextState.commits.filter(c => !c.message.includes("debug payment state"))
           nextState.commits = nextState.commits.filter(c => !c.message.includes("Fix typo"))
           output = "Successfully rebased and updated timeline offline."

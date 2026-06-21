@@ -63,6 +63,7 @@
 | 57 | CORRECTNESS | `offlineGit.js`: `git log --all` used the same HEAD-only BFS filter as plain `git log`, hiding commits on other branches; added `showAll` flag to bypass the BFS when `--all` is present; 3 new assertions | PASS |
 | 58 | CORRECTNESS/UX | `offlineGit.js`: `git config` fell through to "Unknown git subcommand"; added handler for `--list`, `config key value` (set), and `config key` (get); also added `config` to `GIT_SUBCOMMANDS`; 4 new assertions | PASS |
 | 59 | CORRECTNESS | `offlineGit.js`: `git remote rename/remove/get-url/set-url` fell through to "not a git command"; added all four operations plus fixed `-v` to use `remoteName` not hardcoded "origin"; 4 new assertions | PASS |
+| 60 | CORRECTNESS | `offlineGit.js`: `git merge --abort` errored with "not something we can merge"; `git rebase --abort` returned "Rebase complete." (wrong); added abort/continue guards before existing merge/rebase logic; 7 new assertions | PASS |
 
 ---
 

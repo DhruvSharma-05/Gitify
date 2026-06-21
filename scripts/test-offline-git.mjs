@@ -372,6 +372,29 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter43: git rm nonexistent file errors', simulateCommandOffline('git rm notafile.js', getInitialOfflineState(4), 4).status === 'error')
 }
 
+// --- Iter 60: git merge --abort and git rebase --abort/--continue -----------
+{
+  // git merge --abort cancels active conflict
+  const s3 = getInitialOfflineState(3)
+  let r = simulateCommandOffline('git merge feature/ui', s3, 3)
+  check('iter60: merge produces conflict', r.nextState.conflict_active === true)
+  r = simulateCommandOffline('git merge --abort', r.nextState, 3)
+  check('iter60: merge --abort clears conflict', r.nextState.conflict_active === false)
+  check('iter60: merge --abort succeeds', r.status === 'success')
+  check('iter60: merge --abort when no conflict errors', simulateCommandOffline('git merge --abort', s3, 3).status === 'error')
+}
+{
+  // git rebase --abort and --continue
+  const s = initState()
+  let r = simulateCommandOffline('git add index.js', s, 0)
+  r = simulateCommandOffline('git commit -m "c1"', r.nextState, 0)
+  r = simulateCommandOffline('git rebase --abort', r.nextState, 0)
+  check('iter60: rebase --abort succeeds', r.status === 'success')
+  check('iter60: rebase --abort output indicates aborted', r.output.includes('aborted'))
+  r = simulateCommandOffline('git rebase --continue', r.nextState, 0)
+  check('iter60: rebase --continue succeeds', r.status === 'success')
+}
+
 // --- Iter 59: git remote rename/remove/get-url/set-url ----------------------
 {
   const s = initState()
