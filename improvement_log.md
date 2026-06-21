@@ -42,6 +42,7 @@
 | 36 | CORRECTNESS | `offlineGit.js`: `git reset HEAD~N` and `git reset <hash>` left the new HEAD commit with an empty branches array — `git log` showed no `(HEAD -> branch)` ref after reset; fixed by pushing `nextState.branch` onto the new HEAD's branches; 4 new assertions | PASS |
 | 37 | CORRECTNESS | `offlineGit.js`: `git checkout <branch>` and `git switch <branch>` used `branches.includes(targetBranch)` for HEAD lookup — after checkout -b stamping, multiple commits share a branch name so `map` set multiple commits as HEAD; switching back to a diverged branch landed on the root not the tip; fixed by finding the last matching commit in insertion order; 5 new assertions | PASS |
 | 38 | CORRECTNESS | `offlineGit.js`: `git stash list` numbered stashes oldest-first (`stash@{0}` = oldest); real git numbers newest-first; fixed by reversing the display array before numbering; 3 new assertions | PASS |
+| 39 | UX/CORRECTNESS | `TerminalShell.jsx`: file Tab-completion only triggered for `git add`; `git rm <Tab>`, `git restore <Tab>`, `git diff <Tab>` suggested nothing; changed both `calculateSuggestions` and `handleTabComplete` to check `words[1]` for git file-completing subcommands | PASS |
 
 ---
 

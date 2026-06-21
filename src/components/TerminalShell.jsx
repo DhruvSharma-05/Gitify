@@ -157,7 +157,10 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
     } else if (words[0] === 'git' && words.length === 2) {
       const matches = GIT_SUBCOMMANDS.filter(c => c.startsWith(currentWord.toLowerCase()) && c !== currentWord.toLowerCase())
       setSuggestions(matches)
-    } else if (words.length > 1 && (words[words.length - 2] === 'add' || ['cat', 'rm', 'cd', 'head', 'tail', 'wc', 'cp', 'mv'].includes(words[0]))) {
+    } else if (words.length > 1 && (
+      (words[0] === 'git' && ['add', 'rm', 'restore', 'diff'].includes(words[1])) ||
+      ['cat', 'rm', 'cd', 'head', 'tail', 'wc', 'cp', 'mv'].includes(words[0])
+    )) {
       const matches = files.filter(f => f.toLowerCase().startsWith(currentWord.toLowerCase()) && f.toLowerCase() !== currentWord.toLowerCase())
       setSuggestions(matches)
     } else if (words.length > 1 && (['checkout', 'merge', 'rebase', 'switch'].includes(words[words.length - 2]))) {
@@ -524,7 +527,10 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
     }
 
     // Completing file names
-    if (words.length > 1 && (words[words.length - 2] === 'add' || ['cat', 'rm', 'cd', 'head', 'tail', 'wc', 'cp', 'mv'].includes(words[0]))) {
+    if (words.length > 1 && (
+      (words[0] === 'git' && ['add', 'rm', 'restore', 'diff'].includes(words[1])) ||
+      ['cat', 'rm', 'cd', 'head', 'tail', 'wc', 'cp', 'mv'].includes(words[0])
+    )) {
       const match = files.find(f => f.toLowerCase().startsWith(currentWord.toLowerCase()))
       if (match) {
         words[words.length - 1] = match
