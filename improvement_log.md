@@ -25,8 +25,7 @@
 | 19 | SECURITY/RELIABILITY | `main.py`: added `Field(max_length=…)` to `TerminalExecuteRequest.command` (4096), `WriteFileRequest.filename` (256), and `WriteFileRequest.content` (2 MB); prevents DoS amplification from unbounded payloads flowing through shlex/regex/git/DB | PASS |
 | 20 | SECURITY | `main.py`: bounded `VerifyRequest.commands` list to 200 items with per-element `max_length=512` using `Annotated` + `Field`; closes DoS vector through synchronous `verify_lesson_*` subprocess loops | PASS |
 | 21 | CORRECTNESS/DRY | `TerminalShell.jsx`: replaced stale hardcoded `dict` inline list at L339 (missing `cherry-pick`, `tag`, `reset`) with a reference to the module-level `GIT_SUBCOMMANDS` constant; fixes false typo-hints for three valid git subcommands | PASS |
-
-> **EXIT CONDITION MET** — Full SCAN after Iter 21 yields zero CRITICAL or HIGH findings.
+| 22 | CORRECTNESS | `api.js` + `offlineGit.js`: `git status` was showing all seeded files as "Untracked" for lessons 2-9; fixed by pre-populating `committed_files` in `getInitialOfflineState` for pre-committed lessons; removed dead `committedFiles` block (always-empty Set, never referenced); 5 new assertions added | PASS |
 
 ---
 

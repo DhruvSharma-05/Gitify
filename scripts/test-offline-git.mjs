@@ -193,6 +193,34 @@ check('shell-ops: real "|" pipe is blocked', simulateCommandOffline('cat x | gre
   check('status: clean after commit (no untracked files)', r.output.includes('nothing to commit'))
 }
 
+// --- Iter 22: git status clean for pre-seeded lessons (2-9) ----------------
+import { getInitialOfflineState } from '../src/api.js'
+{
+  // Lesson 2 starts with index.js already committed — status should be clean
+  const s2 = getInitialOfflineState(2)
+  const r = simulateCommandOffline('git status', s2, 2)
+  check('iter22: lesson 2 initial git status shows nothing to commit', r.output.includes('nothing to commit'))
+  check('iter22: lesson 2 initial git status has no untracked files', !r.output.includes('Untracked files'))
+}
+{
+  // Lesson 4: all files already committed
+  const s4 = getInitialOfflineState(4)
+  const r = simulateCommandOffline('git status', s4, 4)
+  check('iter22: lesson 4 initial git status shows nothing to commit', r.output.includes('nothing to commit'))
+}
+{
+  // Lesson 9: all files already committed
+  const s9 = getInitialOfflineState(9)
+  const r = simulateCommandOffline('git status', s9, 9)
+  check('iter22: lesson 9 initial git status shows nothing to commit', r.output.includes('nothing to commit'))
+}
+{
+  // Lesson 5: Checkout.jsx and styles.css are intentional WIP — must still show as untracked
+  const s5 = getInitialOfflineState(5)
+  const r = simulateCommandOffline('git status', s5, 5)
+  check('iter22: lesson 5 WIP files still show as untracked', r.output.includes('Untracked files'))
+}
+
 // --- report ----------------------------------------------------------------
 if (failures.length) {
   console.error(`offline-git tests: ${passed} passed, ${failures.length} FAILED`)

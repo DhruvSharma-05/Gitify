@@ -413,11 +413,7 @@ export function simulateCommandOffline(commandText, state, lessonId) {
       }
       else if (sub === "status") {
         const stagedFiles = nextState.staged
-        // Files that appear in at least one commit are tracked; don't show them as untracked
-        const committedFiles = new Set(nextState.commits.flatMap(c => c.branches ? [] : []).concat(
-          nextState.commits.length > 0 ? nextState.files.filter(() => false) : []
-        ))
-        // Simpler: once a file has ever been committed it's tracked — mark via committed_files set
+        // Files recorded in committed_files are tracked (populated by git commit and seeded initial states).
         const trackedFiles = new Set(nextState.committed_files || [])
         const untracked = nextState.files.filter(f => !stagedFiles.includes(f) && !trackedFiles.has(f))
 
