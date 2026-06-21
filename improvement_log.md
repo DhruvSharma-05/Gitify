@@ -49,6 +49,7 @@
 | 43 | CORRECTNESS | `offlineGit.js`: `git rm` was unhandled (fell through to "Unknown subcommand"); added handler supporting both full removal and `--cached` (untrack without deleting); `TerminalShell.jsx`: added `rm` to `GIT_SUBCOMMANDS`; 8 new assertions | PASS |
 | 44 | CORRECTNESS | `offlineGit.js`: `git commit -a/-am` staged all files including untracked ones; real git `-a` only auto-stages tracked (committed) files; fixed to filter against `committed_files`; updated stale regression test; 3 new assertions | PASS |
 | 45 | CORRECTNESS | `offlineGit.js`: `git rm` removed from `committed_files` immediately, so `git commit` after `git rm` said "nothing to commit"; added `staged_deletions` array — `git rm` stages to it, `git commit` processes it, `git status` shows "deleted:"; 4 new assertions | PASS |
+| 46 | CORRECTNESS | `offlineGit.js`: `git restore --staged .` extracted `'.'` as filename then `staged.filter(f => f !== '.')` left all files staged; added wildcard check so `.`, `:/ `, `*` clear the entire staged list; `git restore .` also resets working tree files; 4 new assertions | PASS |
 
 ---
 

@@ -886,9 +886,17 @@ export function simulateCommandOffline(commandText, state, lessonId) {
         const isStaged = parts.includes("--staged") || parts.includes("-S")
         const filename = parts.find(p => !p.startsWith("-") && p !== "restore" && p !== "git")
         if (isStaged && filename) {
-          nextState.staged = nextState.staged.filter(f => f !== filename)
+          // '.' and ':/' are "all files" wildcards; clear the entire staged list
+          if (filename === '.' || filename === ':/' || filename === '*') {
+            nextState.staged = []
+          } else {
+            nextState.staged = nextState.staged.filter(f => f !== filename)
+          }
           output = ""
         } else if (!isStaged && filename) {
+          if (filename === '.' || filename === ':/' || filename === '*') {
+            nextState.files = [...(nextState.committed_files || [])]
+          }
           output = `Restored '${filename}'`
         } else {
           output = "fatal: you must specify path(s) to restore"; status = "error"

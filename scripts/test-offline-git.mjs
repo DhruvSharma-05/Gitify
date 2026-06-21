@@ -371,6 +371,24 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter43: git rm nonexistent file errors', simulateCommandOffline('git rm notafile.js', getInitialOfflineState(4), 4).status === 'error')
 }
 
+// --- Iter 46: git restore --staged . clears all staged files ----------------
+{
+  // git restore --staged . should unstage everything
+  const s = initState()
+  let r = simulateCommandOffline('git add index.js', s, 0)
+  check('iter46: pre-condition: file is staged', r.nextState.staged.includes('index.js'))
+  r = simulateCommandOffline('git restore --staged .', r.nextState, 0)
+  check('iter46: git restore --staged . unstages all files', r.nextState.staged.length === 0)
+  check('iter46: git restore --staged . succeeds', r.status === 'success')
+}
+{
+  // git restore --staged <file> still works for specific files
+  const s4 = getInitialOfflineState(4)
+  let r = simulateCommandOffline('git add Dashboard.jsx', s4, 4)
+  r = simulateCommandOffline('git restore --staged Dashboard.jsx', r.nextState, 4)
+  check('iter46: git restore --staged <file> unstages specific file', !r.nextState.staged.includes('Dashboard.jsx'))
+}
+
 // --- Iter 45: git rm + commit removes file from committed_files; status shows deleted: ---
 {
   // Full workflow: git rm → git commit should actually finalize the deletion
