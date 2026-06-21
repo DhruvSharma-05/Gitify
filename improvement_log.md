@@ -55,6 +55,7 @@
 | 49 | CORRECTNESS | `offlineGit.js`: `git add -u` staged all files like `git add .`; real git `-u` only stages tracked modified files; fixed by filtering against `committed_files`; updated stale regression test; 3 new assertions | PASS |
 | 50 | CORRECTNESS | `offlineGit.js`: `git branch -m <new>` fell through to the "create branch" path and created a branch named `-m`; added `isRename` guard and proper rename logic updating `branches`, `commits`, and `nextState.branch`; 7 new assertions | PASS |
 | 51 | CORRECTNESS | `offlineGit.js`: `git commit --amend` created a new commit instead of replacing HEAD; added early --amend check that mutates HEAD commit's message in place and absorbs any staged files; 4 new assertions | PASS |
+| 52 | CORRECTNESS | `offlineGit.js`: `git log -n N`, `git log -N`, and `git log --max-count=N` showed all commits regardless of the limit flag; added limit extraction and `slice(0, maxCount)` before rendering; 4 new assertions | PASS |
 
 ---
 

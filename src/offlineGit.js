@@ -586,7 +586,15 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             reachable = nextState.commits.filter(c => seen.has(c.hash))
           }
           const oneline = parts.includes("--oneline") || parts.includes("--one-line")
-          const reversed = [...reachable].reverse()
+          // -n N / -N / --max-count=N: limit the number of commits shown
+          let maxCount = Infinity
+          const shortN = parts.find(p => /^-\d+$/.test(p))
+          if (shortN) maxCount = parseInt(shortN.slice(1), 10)
+          const nIdx = parts.indexOf('-n')
+          if (nIdx !== -1 && parts[nIdx + 1]) maxCount = parseInt(parts[nIdx + 1], 10) || maxCount
+          const maxFlag = parts.find(p => p.startsWith('--max-count='))
+          if (maxFlag) maxCount = parseInt(maxFlag.split('=')[1], 10) || maxCount
+          const reversed = [...reachable].reverse().slice(0, maxCount)
           if (oneline) {
             output = reversed.map(c => {
               const brText = c.branches.length > 0 ? ` (${c.is_head ? 'HEAD -> ' : ''}${c.branches.join(', ')})` : ''

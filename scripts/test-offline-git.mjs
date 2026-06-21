@@ -372,6 +372,29 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter43: git rm nonexistent file errors', simulateCommandOffline('git rm notafile.js', getInitialOfflineState(4), 4).status === 'error')
 }
 
+// --- Iter 52: git log -n N / -N / --max-count=N limits output ---------------
+{
+  // Build a state with 3 commits
+  const s = initState()
+  let r = simulateCommandOffline('git add index.js', s, 0)
+  r = simulateCommandOffline('git commit -m "c1"', r.nextState, 0)
+  r = simulateCommandOffline('touch b.js', r.nextState, 0)
+  r = simulateCommandOffline('git add b.js', r.nextState, 0)
+  r = simulateCommandOffline('git commit -m "c2"', r.nextState, 0)
+  r = simulateCommandOffline('touch c.js', r.nextState, 0)
+  r = simulateCommandOffline('git add c.js', r.nextState, 0)
+  r = simulateCommandOffline('git commit -m "c3"', r.nextState, 0)
+  const s3 = r.nextState // 3 commits
+  const rAll = simulateCommandOffline('git log --oneline', s3, 0)
+  check('iter52: git log without -n shows all 3 commits', rAll.output.split('\n').length === 3)
+  const r1 = simulateCommandOffline('git log -n 1 --oneline', s3, 0)
+  check('iter52: git log -n 1 shows only 1 commit', r1.output.split('\n').length === 1)
+  const r2 = simulateCommandOffline('git log -2 --oneline', s3, 0)
+  check('iter52: git log -2 shows only 2 commits', r2.output.split('\n').length === 2)
+  const r3 = simulateCommandOffline('git log --max-count=1 --oneline', s3, 0)
+  check('iter52: git log --max-count=1 shows only 1 commit', r3.output.split('\n').length === 1)
+}
+
 // --- Iter 51: git commit --amend replaces HEAD commit, not creates new one --
 {
   const s = initState()
