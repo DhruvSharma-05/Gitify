@@ -741,13 +741,21 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             output = "No stash entries found."
             status = "error"
           } else {
-            const top = nextState.stashes[nextState.stashes.length - 1]
-            // Restore only the files that were actually stashed
-            if (top.files) top.files.forEach(f => { if (!nextState.files.includes(f)) nextState.files.push(f) })
-            if (action === "pop") nextState.stashes.pop()
-            output = action === "pop"
-              ? `Dropped refs/stash@{0}`
-              : `Applied stash@{0}`
+            // Parse optional stash@{N} reference; default to top (stash@{0})
+            const stashRef = parts[3]
+            const dispIdx = stashRef ? parseInt((stashRef.match(/\{(\d+)\}/) || [, 0])[1], 10) : 0
+            const arrIdx = nextState.stashes.length - 1 - dispIdx
+            if (arrIdx < 0 || arrIdx >= nextState.stashes.length) {
+              output = `error: ${stashRef} is not a valid reference`; status = "error"
+            } else {
+              const entry = nextState.stashes[arrIdx]
+              // Restore only the files that were actually stashed
+              if (entry.files) entry.files.forEach(f => { if (!nextState.files.includes(f)) nextState.files.push(f) })
+              if (action === "pop") nextState.stashes.splice(arrIdx, 1)
+              output = action === "pop"
+                ? `Dropped refs/${stashRef || 'stash@{0}'}`
+                : `Applied ${stashRef || 'stash@{0}'}`
+            }
           }
         } else if (action === "list") {
           if (nextState.stashes.length === 0) {
@@ -770,8 +778,15 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           if (nextState.stashes.length === 0) {
             output = "No stash entries found."; status = "error"
           } else {
-            nextState.stashes.pop()
-            output = "Dropped refs/stash@{0}"
+            const stashRef = parts[3]
+            const dispIdx = stashRef ? parseInt((stashRef.match(/\{(\d+)\}/) || [, 0])[1], 10) : 0
+            const arrIdx = nextState.stashes.length - 1 - dispIdx
+            if (arrIdx < 0 || arrIdx >= nextState.stashes.length) {
+              output = `error: ${stashRef} is not a valid reference`; status = "error"
+            } else {
+              nextState.stashes.splice(arrIdx, 1)
+              output = `Dropped ${stashRef || 'stash@{0}'}`
+            }
           }
         } else {
           // git stash / git stash push [-m "msg"] / git stash save "msg"

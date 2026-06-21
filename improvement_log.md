@@ -59,6 +59,7 @@
 | 53 | CORRECTNESS/UX | `offlineGit.js`: `git stash push -m "msg"` and `git stash save "msg"` ignored the message; all stashes showed generic "WIP stash" label; extracted and stored `message` field; `stash list` now shows "On branch: msg" format for named stashes; 4 new assertions | PASS |
 | 54 | CORRECTNESS | `offlineGit.js`: `git show` fell through to "Unknown git subcommand"; added handler showing HEAD commit (or specific hash) details; added `show` to `GIT_SUBCOMMANDS` for autocomplete; 5 new assertions | PASS |
 | 55 | CORRECTNESS | `offlineGit.js`: `git tag -a v1.0 -m "msg"` created a tag named `-a` (flag treated as name); `git tag -d` was unhandled; fixed by extracting first non-flag arg as tag name and adding delete support; 6 new assertions | PASS |
+| 56 | CORRECTNESS | `offlineGit.js`: `git stash pop/apply/drop stash@{N}` always operated on the top/last stash regardless of the index; added `stash@{N}` reference parsing to map display index to array index (newest-first); 5 new assertions | PASS |
 
 ---
 

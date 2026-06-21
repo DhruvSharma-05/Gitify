@@ -372,6 +372,30 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter43: git rm nonexistent file errors', simulateCommandOffline('git rm notafile.js', getInitialOfflineState(4), 4).status === 'error')
 }
 
+// --- Iter 56: git stash pop/apply/drop stash@{N} respects index -------------
+{
+  const s5 = getInitialOfflineState(5)
+  // Build two stashes: stash first, then add a new untracked file and stash again
+  let r = simulateCommandOffline('git stash push -m "first"', s5, 5)
+  r = simulateCommandOffline('touch wip1.js', r.nextState, 5)
+  r = simulateCommandOffline('git stash push -m "second"', r.nextState, 5)
+  check('iter56: pre-condition: two stashes exist', r.nextState.stashes.length === 2)
+  // stash@{1} = the older one ("first")
+  const r2 = simulateCommandOffline('git stash pop stash@{1}', r.nextState, 5)
+  check('iter56: stash pop stash@{1} leaves one stash', r2.nextState.stashes.length === 1)
+  check('iter56: stash pop stash@{1} keeps the newer stash', r2.nextState.stashes[0].message === 'second')
+}
+{
+  // git stash drop stash@{N}
+  const s5 = getInitialOfflineState(5)
+  let r = simulateCommandOffline('git stash push -m "first"', s5, 5)
+  r = simulateCommandOffline('touch wip2.js', r.nextState, 5)
+  r = simulateCommandOffline('git stash push -m "second"', r.nextState, 5)
+  const r2 = simulateCommandOffline('git stash drop stash@{0}', r.nextState, 5)
+  check('iter56: stash drop stash@{0} removes newest', r2.nextState.stashes.length === 1)
+  check('iter56: stash drop stash@{0} keeps older stash', r2.nextState.stashes[0].message === 'first')
+}
+
 // --- Iter 55: git tag -a <name> creates annotated tag; git tag -d deletes ----
 {
   const s4 = getInitialOfflineState(4)
