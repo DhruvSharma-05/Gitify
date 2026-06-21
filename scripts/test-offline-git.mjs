@@ -350,6 +350,28 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter22: lesson 5 WIP files still show as untracked', r.output.includes('Untracked files'))
 }
 
+// --- Iter 40: git diff <file> extracts filename correctly -------------------
+{
+  const s = initState()
+  const r = simulateCommandOffline('git diff index.js', s, 0)
+  check('iter40: git diff <file> succeeds', r.status === 'success')
+  check('iter40: git diff <file> shows filename, not "git"', r.output.includes('index.js') && !r.output.includes('a/git'))
+}
+{
+  // git diff (no file) shows unstaged files
+  const s = initState()
+  const r = simulateCommandOffline('git diff', s, 0)
+  check('iter40: git diff no file succeeds', r.status === 'success')
+  // index.js is untracked/unstaged, should appear in diff output
+  check('iter40: git diff no file includes untracked file', r.output.includes('index.js'))
+}
+{
+  // git diff HEAD (HEAD ref should not be treated as filename)
+  const s = initState()
+  const r = simulateCommandOffline('git diff HEAD', s, 0)
+  check('iter40: git diff HEAD does not diff a file named HEAD', !r.output.includes('a/HEAD'))
+}
+
 // --- Iter 38: git stash list shows newest stash as stash@{0} ----------------
 {
   const s = initState()

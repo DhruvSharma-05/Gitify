@@ -886,7 +886,8 @@ export function simulateCommandOffline(commandText, state, lessonId) {
       // git diff — show unstaged changes or diff between HEAD and staged
       else if (sub === "diff") {
         const isCached = parts.includes("--cached") || parts.includes("--staged")
-        const targetFile = parts.find(p => !p.startsWith("-") && p !== "diff")
+        // Slice past 'git' and 'diff'; exclude flags and HEAD refs to get the optional filename arg
+        const targetFile = parts.slice(2).find(p => !p.startsWith("-") && !p.match(/^HEAD/))
         const showFiles = targetFile ? [targetFile] : (isCached ? nextState.staged : nextState.files.filter(f => !nextState.staged.includes(f)))
         if (showFiles.length === 0) {
           output = ""
