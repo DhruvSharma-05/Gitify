@@ -372,6 +372,23 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter43: git rm nonexistent file errors', simulateCommandOffline('git rm notafile.js', getInitialOfflineState(4), 4).status === 'error')
 }
 
+// --- Iter 53: git stash push -m / save preserves message in stash list ------
+{
+  const s5 = getInitialOfflineState(5)
+  let r = simulateCommandOffline('git stash push -m "my wip"', s5, 5)
+  check('iter53: stash push -m succeeds', r.status === 'success')
+  const listR = simulateCommandOffline('git stash list', r.nextState, 5)
+  check('iter53: stash list shows custom message', listR.output.includes('my wip'))
+  check('iter53: stash list uses "On branch" format for named stash', listR.output.includes('On '))
+}
+{
+  const s5 = getInitialOfflineState(5)
+  let r = simulateCommandOffline('git stash save "save message"', s5, 5)
+  check('iter53: git stash save with message succeeds', r.status === 'success')
+  const listR = simulateCommandOffline('git stash list', r.nextState, 5)
+  check('iter53: git stash save message appears in list', listR.output.includes('save message'))
+}
+
 // --- Iter 52: git log -n N / -N / --max-count=N limits output ---------------
 {
   // Build a state with 3 commits

@@ -754,7 +754,10 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             output = "(empty stash)"
           } else {
             // stash@{0} is the most recent stash (top of stack), so display in reverse order
-            output = [...nextState.stashes].reverse().map((s, i) => `stash@{${i}}: WIP on ${s.label || nextState.branch}: stashed changes`).join("\n")
+            output = [...nextState.stashes].reverse().map((s, i) => {
+              const br = s.label || nextState.branch
+              return s.message ? `stash@{${i}}: On ${br}: ${s.message}` : `stash@{${i}}: WIP on ${br}: stashed changes`
+            }).join("\n")
           }
         } else if (action === "show") {
           if (nextState.stashes.length === 0) {
@@ -771,7 +774,11 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             output = "Dropped refs/stash@{0}"
           }
         } else {
-          // git stash / git stash push — save uncommitted (untracked) files
+          // git stash / git stash push [-m "msg"] / git stash save "msg"
+          const mIdx = parts.indexOf('-m')
+          const stashMsg = action === 'save'
+            ? (parts[3] ? parts.slice(3).join(' ').replace(/^["']|["']$/g, '') : null)
+            : (mIdx !== -1 && parts[mIdx + 1] ? parts.slice(mIdx + 1).join(' ').replace(/^["']|["']$/g, '') : null)
           const committed = new Set(nextState.committed_files || [])
           const toStash = nextState.files.filter(f => !committed.has(f))
           if (toStash.length === 0 && nextState.staged.length === 0) {
@@ -782,12 +789,14 @@ export function simulateCommandOffline(commandText, state, lessonId) {
               id: nextState.stashes.length,
               name: `stash@{${nextState.stashes.length}}`,
               label: nextState.branch,
+              message: stashMsg || null,
               files: savedFiles
             })
             nextState.stashed_offline = true
             nextState.files = nextState.files.filter(f => !toStash.includes(f))
             nextState.staged = nextState.staged.filter(f => !savedFiles.includes(f))
-            output = `Saved working directory and index state WIP on ${nextState.branch}: WIP stash`
+            const msgSuffix = stashMsg ? `: ${stashMsg}` : ': WIP stash'
+            output = `Saved working directory and index state On ${nextState.branch}${msgSuffix}`
           }
         }
       }
