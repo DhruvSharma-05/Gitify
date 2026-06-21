@@ -525,10 +525,12 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           }
 
           nextState.commits.push(newCommit)
+          // Capture staged count before clearing so the output reports files committed, not total workspace files
+          const committedCount = nextState.staged.length || 1
           // Track which files have been committed so git status knows they're tracked
           nextState.committed_files = Array.from(new Set([...(nextState.committed_files || []), ...nextState.staged]))
           nextState.staged = []
-          output = `[${activeBranch} ${hash}] ${msg}\n ${nextState.files.length} files changed`
+          output = `[${activeBranch} ${hash}] ${msg}\n ${committedCount} file${committedCount !== 1 ? 's' : ''} changed`
         }
       }
       else if (sub === "log") {

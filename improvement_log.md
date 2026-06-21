@@ -44,6 +44,7 @@
 | 38 | CORRECTNESS | `offlineGit.js`: `git stash list` numbered stashes oldest-first (`stash@{0}` = oldest); real git numbers newest-first; fixed by reversing the display array before numbering; 3 new assertions | PASS |
 | 39 | UX/CORRECTNESS | `TerminalShell.jsx`: file Tab-completion only triggered for `git add`; `git rm <Tab>`, `git restore <Tab>`, `git diff <Tab>` suggested nothing; changed both `calculateSuggestions` and `handleTabComplete` to check `words[1]` for git file-completing subcommands | PASS |
 | 40 | CORRECTNESS | `offlineGit.js`: `git diff <file>` had a wrong `targetFile` extraction — `parts.find()` returned `'git'` (first non-flag word) so the filename argument was ignored and diff always showed a fake file named "git"; fixed by using `parts.slice(2).find()` to skip `git` and `diff`; also excluded HEAD refs from filename extraction; 5 new assertions | PASS |
+| 41 | CORRECTNESS | `offlineGit.js`: `git commit` reported total workspace files ("7 files changed") instead of staged file count; fixed by capturing `nextState.staged.length` before clearing staged; also correctly pluralises "file" vs "files" | PASS |
 
 ---
 
