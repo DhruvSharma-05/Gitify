@@ -350,25 +350,37 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter22: lesson 5 WIP files still show as untracked', r.output.includes('Untracked files'))
 }
 
-// --- Iter 43: git rm removes file from workspace and tracked list ---------------
+// --- Iter 43: git rm stages deletion; Iter 45 ensures commit processes it -------
 {
   const s4 = getInitialOfflineState(4)
   const r = simulateCommandOffline('git rm Dashboard.jsx', s4, 4)
   check('iter43: git rm succeeds', r.status === 'success')
   check('iter43: git rm removes from files array', !r.nextState.files.includes('Dashboard.jsx'))
-  check('iter43: git rm removes from committed_files', !r.nextState.committed_files.includes('Dashboard.jsx'))
+  check('iter43: git rm stages deletion in staged_deletions', (r.nextState.staged_deletions || []).includes('Dashboard.jsx'))
   check('iter43: git rm output contains filename', r.output.includes('Dashboard.jsx'))
 }
 {
-  // git rm --cached keeps the file in workspace but untracks it
+  // git rm --cached keeps the file in workspace but stages deletion
   const s4 = getInitialOfflineState(4)
   const r = simulateCommandOffline('git rm --cached Dashboard.jsx', s4, 4)
   check('iter43: git rm --cached succeeds', r.status === 'success')
   check('iter43: git rm --cached keeps file in workspace', r.nextState.files.includes('Dashboard.jsx'))
-  check('iter43: git rm --cached removes from committed_files', !r.nextState.committed_files.includes('Dashboard.jsx'))
+  check('iter43: git rm --cached stages deletion', (r.nextState.staged_deletions || []).includes('Dashboard.jsx'))
 }
 {
   check('iter43: git rm nonexistent file errors', simulateCommandOffline('git rm notafile.js', getInitialOfflineState(4), 4).status === 'error')
+}
+
+// --- Iter 45: git rm + commit removes file from committed_files; status shows deleted: ---
+{
+  // Full workflow: git rm → git commit should actually finalize the deletion
+  const s4 = getInitialOfflineState(4)
+  let r = simulateCommandOffline('git rm Dashboard.jsx', s4, 4)
+  check('iter45: git status after rm shows deleted:', simulateCommandOffline('git status', r.nextState, 4).output.includes('deleted'))
+  r = simulateCommandOffline('git commit -m "remove Dashboard"', r.nextState, 4)
+  check('iter45: commit after git rm succeeds', r.status === 'success')
+  check('iter45: committed_files no longer contains removed file', !r.nextState.committed_files.includes('Dashboard.jsx'))
+  check('iter45: staged_deletions cleared after commit', (r.nextState.staged_deletions || []).length === 0)
 }
 
 // --- Iter 44: git commit -am only auto-stages tracked files, not untracked ----

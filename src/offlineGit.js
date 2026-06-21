@@ -430,11 +430,13 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           out += `Your branch is up to date.\n\n`
         }
 
+        const stagedDels = nextState.staged_deletions || []
         if (nextState.conflict_active) {
           out += `You have unmerged paths.\n  (fix conflicts and run "git commit")\n\nUnmerged paths:\n  (use "git add <file>..." to mark resolution)\n\tboth modified:   config.js\n\n`
-        } else if (stagedFiles.length > 0) {
+        } else if (stagedFiles.length > 0 || stagedDels.length > 0) {
           out += `Changes to be committed:\n  (use "git restore --staged <file>..." to unstage)\n`
           const alreadyTracked = new Set(nextState.committed_files || [])
+          stagedDels.forEach(f => { out += `\tdeleted:   ${f}\n` })
           stagedFiles.forEach(f => {
             out += `\t${alreadyTracked.has(f) ? 'modified' : 'new file'}:   ${f}\n`
           })
@@ -502,7 +504,8 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           nextState.staged = nextState.files.filter(f => tracked.has(f))
         }
 
-        if (nextState.staged.length === 0 && !nextState.conflict_resolved) {
+        const stagedDeletions = nextState.staged_deletions || []
+        if (nextState.staged.length === 0 && stagedDeletions.length === 0 && !nextState.conflict_resolved) {
           output = `On branch ${nextState.branch}\nnothing to commit, working tree clean`
         } else {
           const hash = Math.random().toString(16).substring(2, 9)
@@ -517,7 +520,7 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             ...c,
             is_head: c.branches.includes(activeBranch) ? false : c.is_head
           }))
-          
+
           const newCommit = {
             hash: hash,
             full_hash: fullHash,
@@ -529,10 +532,13 @@ export function simulateCommandOffline(commandText, state, lessonId) {
 
           nextState.commits.push(newCommit)
           // Capture staged count before clearing so the output reports files committed, not total workspace files
-          const committedCount = nextState.staged.length || 1
+          const committedCount = (nextState.staged.length + stagedDeletions.length) || 1
           // Track which files have been committed so git status knows they're tracked
           nextState.committed_files = Array.from(new Set([...(nextState.committed_files || []), ...nextState.staged]))
+          // Apply staged deletions: remove deleted files from committed_files
+          nextState.committed_files = nextState.committed_files.filter(f => !stagedDeletions.includes(f))
           nextState.staged = []
+          nextState.staged_deletions = []
           output = `[${activeBranch} ${hash}] ${msg}\n ${committedCount} file${committedCount !== 1 ? 's' : ''} changed`
         }
       }
@@ -903,7 +909,7 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           }).join("\n\n")
         }
       }
-      // git rm — remove file from working tree and index (or just index with --cached)
+      // git rm — stage file deletion (remove from working tree unless --cached)
       else if (sub === "rm") {
         const isCached = parts.includes("--cached")
         const filename = parts.slice(2).find(p => !p.startsWith("-"))
@@ -916,8 +922,10 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             nextState.files = nextState.files.filter(f => f !== filename)
             delete nextState.fileContents[filename]
           }
-          nextState.committed_files = (nextState.committed_files || []).filter(f => f !== filename)
           nextState.staged = nextState.staged.filter(f => f !== filename)
+          // Stage the deletion so `git commit` will remove the file from committed_files
+          if (!nextState.staged_deletions) nextState.staged_deletions = []
+          if (!nextState.staged_deletions.includes(filename)) nextState.staged_deletions.push(filename)
           output = `rm '${filename}'`
         }
       }
