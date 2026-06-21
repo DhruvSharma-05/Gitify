@@ -435,6 +435,18 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
           }
         }
 
+        // Typo suggestion in offline mode (parity with the live path)
+        const offlineParts = rawCmd.split(/\s+/)
+        if (offlineParts[0] === 'git' && offlineParts.length > 1) {
+          const offlineSub = offlineParts[1].toLowerCase()
+          if (!GIT_SUBCOMMANDS.includes(offlineSub)) {
+            const suggestion = getGitSuggestion(offlineSub)
+            if (suggestion) {
+              setHistory(prev => [...prev, { type: 'system', text: `Hint: Did you mean "git ${suggestion}"?` }])
+            }
+          }
+        }
+
         if (updatedOfflineState.pwd !== undefined) setPwd(updatedOfflineState.pwd)
         if (updatedOfflineState.branch !== undefined) setBranch(updatedOfflineState.branch)
         if (updatedOfflineState.files) setFiles(updatedOfflineState.files)

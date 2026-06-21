@@ -51,6 +51,7 @@
 | 45 | CORRECTNESS | `offlineGit.js`: `git rm` removed from `committed_files` immediately, so `git commit` after `git rm` said "nothing to commit"; added `staged_deletions` array — `git rm` stages to it, `git commit` processes it, `git status` shows "deleted:"; 4 new assertions | PASS |
 | 46 | CORRECTNESS | `offlineGit.js`: `git restore --staged .` extracted `'.'` as filename then `staged.filter(f => f !== '.')` left all files staged; added wildcard check so `.`, `:/ `, `*` clear the entire staged list; `git restore .` also resets working tree files; 4 new assertions | PASS |
 | 47 | CORRECTNESS | `offlineGit.js`: `git checkout -- <file>` (discard working-tree changes) fell through to branch-switch and errored with "pathspec '--' did not match any file(s)"; added `isDashDash` guard before the branch logic to handle the discard form; 3 new assertions | PASS |
+| 48 | UX/PARITY | `TerminalShell.jsx`: `getGitSuggestion` typo-hint was applied in the live `.then` path but absent from the `.catch` offline path; students in offline mode never saw "Did you mean git X?"; added the same typo block to the offline handler | PASS |
 
 ---
 
