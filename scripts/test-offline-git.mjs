@@ -350,6 +350,19 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter22: lesson 5 WIP files still show as untracked', r.output.includes('Untracked files'))
 }
 
+// --- Iter 34: git cherry-pick sets correct parent ----------------------------
+{
+  const s = initState()
+  const { s: s3 } = run(['git add .', 'git commit -m "init"'], s, 0)
+  const initHash = s3.commits[0].hash
+  const r = simulateCommandOffline('git cherry-pick abc1234', s3, 0)
+  check('iter34: cherry-pick succeeds', r.status === 'success')
+  const picked = r.nextState.commits[r.nextState.commits.length - 1]
+  check('iter34: cherry-pick commit has non-empty parents', picked.parents.length > 0)
+  check('iter34: cherry-pick commit parent is the HEAD commit', picked.parents[0] === initHash)
+  check('iter34: cherry-pick commit is_head', picked.is_head === true)
+}
+
 // --- Iter 33: second-level checkout -b uses is_head, not branch name ---------
 {
   // After checkout -b feature, root commit gets 'feature' stamped.

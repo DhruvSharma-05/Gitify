@@ -728,12 +728,13 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           output = "fatal: Commit hash required."
           status = "error"
         } else {
+          const cherryHead = nextState.commits.find(c => c.is_head)
           const newCommit = {
             hash: 'b7a91c0',
             full_hash: 'b7a91c01c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1',
             message: "Fix tax rounding",
             branches: [nextState.branch],
-            parents: [],
+            parents: cherryHead ? [cherryHead.hash] : [],
             is_head: true
           }
           nextState.commits = nextState.commits.map(c => ({
