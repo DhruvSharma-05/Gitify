@@ -372,6 +372,24 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter43: git rm nonexistent file errors', simulateCommandOffline('git rm notafile.js', getInitialOfflineState(4), 4).status === 'error')
 }
 
+// --- Iter 57: git log --all shows commits from all branches, not just HEAD ---
+{
+  const s = initState()
+  let r = simulateCommandOffline('git add index.js', s, 0)
+  r = simulateCommandOffline('git commit -m "root"', r.nextState, 0)
+  r = simulateCommandOffline('git checkout -b feature', r.nextState, 0)
+  r = simulateCommandOffline('touch b.js', r.nextState, 0)
+  r = simulateCommandOffline('git add b.js', r.nextState, 0)
+  r = simulateCommandOffline('git commit -m "feature commit"', r.nextState, 0)
+  // Switch back to main so feature commit is NOT reachable from HEAD
+  r = simulateCommandOffline('git checkout main', r.nextState, 0)
+  const logMain = simulateCommandOffline('git log --oneline', r.nextState, 0)
+  check('iter57: git log without --all shows only main commits', logMain.output.split('\n').length === 1)
+  const logAll = simulateCommandOffline('git log --all --oneline', r.nextState, 0)
+  check('iter57: git log --all shows commits from all branches', logAll.output.split('\n').length === 2)
+  check('iter57: git log --all includes feature branch commit', logAll.output.includes('feature commit'))
+}
+
 // --- Iter 56: git stash pop/apply/drop stash@{N} respects index -------------
 {
   const s5 = getInitialOfflineState(5)

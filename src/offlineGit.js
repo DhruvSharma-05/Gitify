@@ -568,11 +568,13 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           output = `fatal: your current branch '${nextState.branch}' does not have any commits yet`
           status = "error"
         } else {
-          // Filter to commits reachable from HEAD by walking the parent chain.
-          // Falls back to all commits if HEAD is ambiguous (no is_head set).
+          // --all: show commits from every branch, not just HEAD's reachable chain
+          const showAll = parts.includes("--all")
           const headCommit = nextState.commits.find(c => c.is_head)
           let reachable = nextState.commits
-          if (headCommit) {
+          if (!showAll && headCommit) {
+            // Filter to commits reachable from HEAD by walking the parent chain.
+            // Falls back to all commits if HEAD is ambiguous (no is_head set).
             const seen = new Set()
             const queue = [headCommit.hash]
             while (queue.length > 0) {

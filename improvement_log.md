@@ -60,6 +60,7 @@
 | 54 | CORRECTNESS | `offlineGit.js`: `git show` fell through to "Unknown git subcommand"; added handler showing HEAD commit (or specific hash) details; added `show` to `GIT_SUBCOMMANDS` for autocomplete; 5 new assertions | PASS |
 | 55 | CORRECTNESS | `offlineGit.js`: `git tag -a v1.0 -m "msg"` created a tag named `-a` (flag treated as name); `git tag -d` was unhandled; fixed by extracting first non-flag arg as tag name and adding delete support; 6 new assertions | PASS |
 | 56 | CORRECTNESS | `offlineGit.js`: `git stash pop/apply/drop stash@{N}` always operated on the top/last stash regardless of the index; added `stash@{N}` reference parsing to map display index to array index (newest-first); 5 new assertions | PASS |
+| 57 | CORRECTNESS | `offlineGit.js`: `git log --all` used the same HEAD-only BFS filter as plain `git log`, hiding commits on other branches; added `showAll` flag to bypass the BFS when `--all` is present; 3 new assertions | PASS |
 
 ---
 
