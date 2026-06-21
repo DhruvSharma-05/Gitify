@@ -372,6 +372,18 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter43: git rm nonexistent file errors', simulateCommandOffline('git rm notafile.js', getInitialOfflineState(4), 4).status === 'error')
 }
 
+// --- Iter 58: git config get/set/list ----------------------------------------
+{
+  const s = initState()
+  let r = simulateCommandOffline('git config user.name "Alice"', s, 0)
+  check('iter58: git config set succeeds', r.status === 'success')
+  check('iter58: git config set stores value', r.nextState.config['user.name'] === 'Alice')
+  r = simulateCommandOffline('git config user.name', r.nextState, 0)
+  check('iter58: git config get returns value', r.output === 'Alice')
+  r = simulateCommandOffline('git config --list', r.nextState, 0)
+  check('iter58: git config --list shows stored entry', r.output.includes('user.name=Alice'))
+}
+
 // --- Iter 57: git log --all shows commits from all branches, not just HEAD ---
 {
   const s = initState()

@@ -7,7 +7,7 @@ import { simulateCommandOffline, checkOfflineProgress } from '../offlineGit.js'
 const GIT_SUBCOMMANDS = [
   'status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge',
   'stash', 'rebase', 'pull', 'push', 'remote', 'switch', 'restore',
-  'diff', 'bisect', 'fetch', 'revert', 'cherry-pick', 'tag', 'reset', 'rm', 'show'
+  'diff', 'bisect', 'fetch', 'revert', 'cherry-pick', 'tag', 'reset', 'rm', 'show', 'config'
 ]
 const ALLOWED_BASE_CMDS = [
   'git', 'gh', 'ls', 'cat', 'cd', 'pwd', 'echo', 'touch', 'mkdir',

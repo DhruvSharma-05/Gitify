@@ -1051,6 +1051,30 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           output = ""
         }
       }
+      // git config — get/set/list configuration values
+      else if (sub === "config") {
+        const isList = parts.includes("--list") || parts.includes("-l")
+        if (isList) {
+          const entries = Object.entries(nextState.config || {}).map(([k, v]) => `${k}=${v}`)
+          output = entries.length ? entries.join('\n') : 'user.name=Student\nuser.email=student@gitify.edu'
+        } else {
+          // git config [--global] <key> [<value>]
+          const keyIdx = parts.findIndex(p => !p.startsWith('-') && p !== 'git' && p !== 'config')
+          const key = keyIdx !== -1 ? parts[keyIdx] : null
+          const value = keyIdx !== -1 && parts[keyIdx + 1]
+            ? parts.slice(keyIdx + 1).join(' ').replace(/^["']|["']$/g, '') : null
+          if (!key) { output = "usage: git config [--global] key [value]"; status = "error" }
+          else if (value !== null) {
+            if (!nextState.config) nextState.config = {}
+            nextState.config[key] = value
+            output = ""
+          } else {
+            const val = (nextState.config || {})[key]
+            if (val === undefined) { output = `error: key does not contain a section: ${key}`; status = "error" }
+            else output = val
+          }
+        }
+      }
       // git show [<hash>] — display commit details
       else if (sub === "show") {
         const hashArg = parts[2] && !parts[2].startsWith('-') ? parts[2] : null
