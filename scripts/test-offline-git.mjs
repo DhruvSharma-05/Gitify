@@ -372,6 +372,25 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter43: git rm nonexistent file errors', simulateCommandOffline('git rm notafile.js', getInitialOfflineState(4), 4).status === 'error')
 }
 
+// --- Iter 50: git branch -m renames the current branch ----------------------
+{
+  const s4 = getInitialOfflineState(4)
+  const r = simulateCommandOffline('git branch -m new-history', s4, 4)
+  check('iter50: git branch -m succeeds', r.status === 'success')
+  check('iter50: git branch -m updates branch state', r.nextState.branch === 'new-history')
+  check('iter50: git branch -m adds new name to branches list', r.nextState.branches.includes('new-history'))
+  check('iter50: git branch -m removes old name from branches list', !r.nextState.branches.includes('main'))
+  check('iter50: git branch -m updates commit branch labels', r.nextState.commits.every(c => !c.branches.includes('main')))
+}
+{
+  // git branch -m <old> <new> explicit old branch name
+  const s4 = getInitialOfflineState(4)
+  let r = simulateCommandOffline('git checkout -b feature', s4, 4)
+  r = simulateCommandOffline('git branch -m feature renamed-feature', r.nextState, 4)
+  check('iter50: git branch -m <old> <new> renames target branch', r.nextState.branches.includes('renamed-feature'))
+  check('iter50: git branch -m <old> <new> removes old target', !r.nextState.branches.includes('feature'))
+}
+
 // --- Iter 49: git add -u only stages tracked files, not untracked -----------
 {
   // Fresh state with one untracked file: -u should NOT stage it

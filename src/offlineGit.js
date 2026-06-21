@@ -589,6 +589,7 @@ export function simulateCommandOffline(commandText, state, lessonId) {
         const branchArg = parts[3] || parts[2]
         const isDelete = flag === "-d" || flag === "-D" || flag === "--delete"
         const isVerbose = flag === "-v" || flag === "--verbose" || flag === "-a" || flag === "--all"
+        const isRename = flag === "-m" || flag === "-M" || flag === "--move"
         if (!flag || isVerbose) {
           const list = nextState.branches.map(b => (b === nextState.branch ? `* ${b}` : `  ${b}`))
           output = list.join("\n")
@@ -601,6 +602,19 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             nextState.branches = nextState.branches.filter(b => b !== delName)
             nextState.commits = nextState.commits.map(c => ({ ...c, branches: c.branches.filter(b => b !== delName) }))
             output = `Deleted branch ${delName}.`
+          }
+        } else if (isRename) {
+          // git branch -m [<old>] <new>: rename a branch
+          const oldName = parts[4] ? parts[3] : nextState.branch
+          const newName = parts[4] ? parts[4] : parts[3]
+          if (!newName) { output = "fatal: branch name required"; status = "error" }
+          else if (!nextState.branches.includes(oldName)) { output = `error: branch '${oldName}' not found`; status = "error" }
+          else if (nextState.branches.includes(newName)) { output = `fatal: A branch named '${newName}' already exists.`; status = "error" }
+          else {
+            nextState.branches = nextState.branches.map(b => b === oldName ? newName : b)
+            nextState.commits = nextState.commits.map(c => ({ ...c, branches: c.branches.map(b => b === oldName ? newName : b) }))
+            if (nextState.branch === oldName) nextState.branch = newName
+            output = ""
           }
         } else {
           const newBranchName = flag
