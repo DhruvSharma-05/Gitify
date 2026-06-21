@@ -530,8 +530,25 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           output = `fatal: your current branch '${nextState.branch}' does not have any commits yet`
           status = "error"
         } else {
+          // Filter to commits reachable from HEAD by walking the parent chain.
+          // Falls back to all commits if HEAD is ambiguous (no is_head set).
+          const headCommit = nextState.commits.find(c => c.is_head)
+          let reachable = nextState.commits
+          if (headCommit) {
+            const seen = new Set()
+            const queue = [headCommit.hash]
+            while (queue.length > 0) {
+              const h = queue.shift()
+              if (!h || seen.has(h)) continue
+              const found = nextState.commits.find(c => c.hash === h)
+              if (!found) continue
+              seen.add(h)
+              found.parents.forEach(p => queue.push(p))
+            }
+            reachable = nextState.commits.filter(c => seen.has(c.hash))
+          }
           const oneline = parts.includes("--oneline") || parts.includes("--one-line")
-          const reversed = [...nextState.commits].reverse()
+          const reversed = [...reachable].reverse()
           if (oneline) {
             output = reversed.map(c => {
               const brText = c.branches.length > 0 ? ` (${c.is_head ? 'HEAD -> ' : ''}${c.branches.join(', ')})` : ''

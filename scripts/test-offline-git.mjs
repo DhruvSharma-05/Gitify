@@ -119,6 +119,26 @@ check('shell-ops: real "|" pipe is blocked', simulateCommandOffline('cat x | gre
   check('switch: unknown branch errors', r3.status === 'error')
 }
 
+// --- iter31: git log filters to HEAD's reachable commits only ---------------
+{
+  const s = initState()
+  const s2 = simulateCommandOffline('git add .', s, 0).nextState
+  const s3 = simulateCommandOffline('git commit -m "init"', s2, 0).nextState
+  const s4 = simulateCommandOffline('git checkout -b feature/x', s3, 0).nextState
+  const s4t = simulateCommandOffline('touch f.js', s4, 0).nextState
+  const s4a = simulateCommandOffline('git add .', s4t, 0).nextState
+  const s5 = simulateCommandOffline('git commit -m "feature work"', s4a, 0).nextState
+  // Switch back to main — git log from main should NOT show the feature commit
+  const s6 = simulateCommandOffline('git checkout main', s5, 0).nextState
+  const logFromMain = simulateCommandOffline('git log --oneline', s6, 0)
+  check('iter31: git log from main excludes unmerged feature commits', !logFromMain.output.includes('feature work'))
+  check('iter31: git log from main shows init commit', logFromMain.output.includes('init'))
+  // git log from feature branch should show both
+  const logFromFeature = simulateCommandOffline('git log --oneline', s5, 0)
+  check('iter31: git log from feature shows feature commit', logFromFeature.output.includes('feature work'))
+  check('iter31: git log from feature shows init commit', logFromFeature.output.includes('init'))
+}
+
 // --- iter29: second commit on branch has correct parent (not the root) -----
 {
   const s = initState()
