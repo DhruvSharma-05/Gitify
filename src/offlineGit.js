@@ -901,6 +901,24 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           }).join("\n\n")
         }
       }
+      // git rm — remove file from working tree and index (or just index with --cached)
+      else if (sub === "rm") {
+        const isCached = parts.includes("--cached")
+        const filename = parts.slice(2).find(p => !p.startsWith("-"))
+        if (!filename) {
+          output = "fatal: No pathspec given"; status = "error"
+        } else if (!nextState.files.includes(filename) && !(nextState.committed_files || []).includes(filename)) {
+          output = `fatal: pathspec '${filename}' did not match any files`; status = "error"
+        } else {
+          if (!isCached) {
+            nextState.files = nextState.files.filter(f => f !== filename)
+            delete nextState.fileContents[filename]
+          }
+          nextState.committed_files = (nextState.committed_files || []).filter(f => f !== filename)
+          nextState.staged = nextState.staged.filter(f => f !== filename)
+          output = `rm '${filename}'`
+        }
+      }
       // git remote — add/show remotes
       else if (sub === "remote") {
         const action = parts[2]

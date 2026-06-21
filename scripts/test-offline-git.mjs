@@ -350,6 +350,27 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter22: lesson 5 WIP files still show as untracked', r.output.includes('Untracked files'))
 }
 
+// --- Iter 43: git rm removes file from workspace and tracked list ---------------
+{
+  const s4 = getInitialOfflineState(4)
+  const r = simulateCommandOffline('git rm Dashboard.jsx', s4, 4)
+  check('iter43: git rm succeeds', r.status === 'success')
+  check('iter43: git rm removes from files array', !r.nextState.files.includes('Dashboard.jsx'))
+  check('iter43: git rm removes from committed_files', !r.nextState.committed_files.includes('Dashboard.jsx'))
+  check('iter43: git rm output contains filename', r.output.includes('Dashboard.jsx'))
+}
+{
+  // git rm --cached keeps the file in workspace but untracks it
+  const s4 = getInitialOfflineState(4)
+  const r = simulateCommandOffline('git rm --cached Dashboard.jsx', s4, 4)
+  check('iter43: git rm --cached succeeds', r.status === 'success')
+  check('iter43: git rm --cached keeps file in workspace', r.nextState.files.includes('Dashboard.jsx'))
+  check('iter43: git rm --cached removes from committed_files', !r.nextState.committed_files.includes('Dashboard.jsx'))
+}
+{
+  check('iter43: git rm nonexistent file errors', simulateCommandOffline('git rm notafile.js', getInitialOfflineState(4), 4).status === 'error')
+}
+
 // --- Iter 42: git status shows modified: for tracked files, new file: for untracked ---
 {
   // Untracked file staged → "new file:"

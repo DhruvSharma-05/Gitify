@@ -46,6 +46,7 @@
 | 40 | CORRECTNESS | `offlineGit.js`: `git diff <file>` had a wrong `targetFile` extraction — `parts.find()` returned `'git'` (first non-flag word) so the filename argument was ignored and diff always showed a fake file named "git"; fixed by using `parts.slice(2).find()` to skip `git` and `diff`; also excluded HEAD refs from filename extraction; 5 new assertions | PASS |
 | 41 | CORRECTNESS | `offlineGit.js`: `git commit` reported total workspace files ("7 files changed") instead of staged file count; fixed by capturing `nextState.staged.length` before clearing staged; also correctly pluralises "file" vs "files" | PASS |
 | 42 | CORRECTNESS | `offlineGit.js`: `git status` showed all staged files as "new file:" regardless of tracked status; already-committed files staged for update now correctly show "modified:" via a `committed_files` set lookup; 4 new assertions | PASS |
+| 43 | CORRECTNESS | `offlineGit.js`: `git rm` was unhandled (fell through to "Unknown subcommand"); added handler supporting both full removal and `--cached` (untrack without deleting); `TerminalShell.jsx`: added `rm` to `GIT_SUBCOMMANDS`; 8 new assertions | PASS |
 
 ---
 
