@@ -620,12 +620,12 @@ export function simulateCommandOffline(commandText, state, lessonId) {
               nextState.branches.push(targetBranch)
               // Stamp the new branch onto the HEAD commit so the next commit
               // can find its parent via branches.includes(activeBranch).
-              const headCommit = nextState.commits.find(c => c.branches.includes(nextState.branch))
+              const headCommit = nextState.commits.find(c => c.is_head)
               if (headCommit) headCommit.branches.push(targetBranch)
               nextState.branch = targetBranch
               nextState.commits = nextState.commits.map(c => ({
                 ...c,
-                is_head: c.branches.includes(targetBranch)
+                is_head: c.branches.includes(targetBranch) && c.is_head
               }))
               output = `Switched to a new branch '${targetBranch}'`
             }
@@ -842,7 +842,7 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             output = `fatal: a branch named '${targetBranch}' already exists`; status = "error"
           } else {
             nextState.branches.push(targetBranch)
-            const headCommit = nextState.commits.find(c => c.branches.includes(nextState.branch))
+            const headCommit = nextState.commits.find(c => c.is_head)
             if (headCommit) headCommit.branches.push(targetBranch)
             nextState.branch = targetBranch
             output = `Switched to a new branch '${targetBranch}'`

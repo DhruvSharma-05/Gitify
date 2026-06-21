@@ -350,6 +350,43 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter22: lesson 5 WIP files still show as untracked', r.output.includes('Untracked files'))
 }
 
+// --- Iter 33: second-level checkout -b uses is_head, not branch name ---------
+{
+  // After checkout -b feature, root commit gets 'feature' stamped.
+  // A commit on feature means root and feature-commit both have 'feature'.
+  // checkout -b hotfix from feature must stamp the feature-commit, NOT root.
+  const s = initState()
+  const { s: s3 } = run(['git add .', 'git commit -m "init on main"'], s, 0)
+  const { s: s4 } = run(['git checkout -b feature'], s3, 0)
+  const { s: s5 } = run(['touch feat.js', 'git add .', 'git commit -m "work on feature"'], s4, 0)
+  const featureCommit = s5.commits.find(c => c.message === 'work on feature')
+  check('iter33: feature commit exists before second branch', !!featureCommit)
+  // Now create a second branch from feature
+  const s6 = simulateCommandOffline('git checkout -b hotfix', s5, 0).nextState
+  check('iter33: checkout -b hotfix sets hotfix as branch', s6.branch === 'hotfix')
+  // HEAD should be on the feature commit (not root)
+  const headAfterSwitch = s6.commits.find(c => c.is_head)
+  check('iter33: checkout -b hotfix HEAD is feature commit, not root', headAfterSwitch?.hash === featureCommit?.hash)
+  // Commit on hotfix must have feature commit as parent
+  const s7 = run(['touch hot.js', 'git add .', 'git commit -m "hotfix work"'], s6, 0).s
+  const hotfixCommit = s7.commits.find(c => c.message === 'hotfix work')
+  check('iter33: hotfix commit has non-empty parents', hotfixCommit?.parents.length > 0)
+  check('iter33: hotfix commit parent is feature commit', hotfixCommit?.parents[0] === featureCommit?.hash)
+}
+{
+  // Same for switch -c
+  const s = initState()
+  const { s: s3 } = run(['git add .', 'git commit -m "init"'], s, 0)
+  const { s: s4 } = run(['git checkout -b feature'], s3, 0)
+  const { s: s5 } = run(['touch f.js', 'git add .', 'git commit -m "feature work"'], s4, 0)
+  const featureCommit = s5.commits.find(c => c.message === 'feature work')
+  const s6 = simulateCommandOffline('git switch -c hotfix2', s5, 0).nextState
+  const { s: s7 } = run(['touch h.js', 'git add .', 'git commit -m "hotfix2 work"'], s6, 0)
+  const hotfixCommit = s7.commits.find(c => c.message === 'hotfix2 work')
+  check('iter33: switch -c hotfix2 commit has non-empty parents', hotfixCommit?.parents.length > 0)
+  check('iter33: switch -c hotfix2 commit parent is feature commit', hotfixCommit?.parents[0] === featureCommit?.hash)
+}
+
 // --- report ----------------------------------------------------------------
 if (failures.length) {
   console.error(`offline-git tests: ${passed} passed, ${failures.length} FAILED`)
