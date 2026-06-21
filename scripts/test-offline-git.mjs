@@ -372,6 +372,26 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter43: git rm nonexistent file errors', simulateCommandOffline('git rm notafile.js', getInitialOfflineState(4), 4).status === 'error')
 }
 
+// --- Iter 51: git commit --amend replaces HEAD commit, not creates new one --
+{
+  const s = initState()
+  let r = simulateCommandOffline('git add index.js', s, 0)
+  r = simulateCommandOffline('git commit -m "original message"', r.nextState, 0)
+  const beforeLen = r.nextState.commits.length
+  r = simulateCommandOffline('git commit --amend -m "corrected message"', r.nextState, 0)
+  check('iter51: git commit --amend does not add a new commit', r.nextState.commits.length === beforeLen)
+  check('iter51: git commit --amend updates HEAD message', r.nextState.commits.find(c => c.is_head)?.message === 'corrected message')
+  check('iter51: git commit --amend succeeds', r.status === 'success')
+}
+{
+  // --amend with no staged changes and no -m keeps the existing message
+  const s = initState()
+  let r = simulateCommandOffline('git add index.js', s, 0)
+  r = simulateCommandOffline('git commit -m "keep this"', r.nextState, 0)
+  r = simulateCommandOffline('git commit --amend', r.nextState, 0)
+  check('iter51: git commit --amend with no -m keeps existing message', r.nextState.commits.find(c => c.is_head)?.message === 'keep this')
+}
+
 // --- Iter 50: git branch -m renames the current branch ----------------------
 {
   const s4 = getInitialOfflineState(4)

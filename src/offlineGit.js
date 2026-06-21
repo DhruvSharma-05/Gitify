@@ -501,6 +501,21 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           const longMsg = parts.find(p => p.startsWith("--message="))
           msg = longMsg ? longMsg.slice("--message=".length).replace(/^["']|["']$/g, "") : "Minor updates"
         }
+
+        // git commit --amend: replace HEAD commit's message (and absorb any staged changes)
+        if (parts.includes("--amend")) {
+          const headCommit = nextState.commits.find(c => c.is_head)
+          if (!headCommit) {
+            output = "fatal: You have nothing to amend."; status = "error"
+          } else {
+            const amendMsg = msg !== "Minor updates" ? msg : headCommit.message
+            headCommit.message = amendMsg
+            nextState.committed_files = Array.from(new Set([...(nextState.committed_files || []), ...nextState.staged]))
+            nextState.staged = []
+            output = `[${nextState.branch} ${headCommit.hash}] ${amendMsg}\n Date: 1 second ago`
+          }
+        } else {
+
         // -a / -am: auto-stage tracked modified files only (mirrors real `git commit -a` behavior).
         // Untracked files must be explicitly `git add`-ed first.
         const hasAFlag = parts.some(p => /^-[a-zA-Z]*a/.test(p)) || parts.includes("--all")
@@ -546,6 +561,7 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           nextState.staged_deletions = []
           output = `[${activeBranch} ${hash}] ${msg}\n ${committedCount} file${committedCount !== 1 ? 's' : ''} changed`
         }
+        } // end of non-amend branch
       }
       else if (sub === "log") {
         if (nextState.commits.length === 0) {
