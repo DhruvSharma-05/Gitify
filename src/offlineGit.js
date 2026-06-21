@@ -498,14 +498,16 @@ export function simulateCommandOffline(commandText, state, lessonId) {
         } else {
           const hash = Math.random().toString(16).substring(2, 9)
           const fullHash = hash + '0'.repeat(33)
-          
+          const activeBranch = nextState.branch
+          // Find the true HEAD before clearing is_head flags; using is_head avoids
+          // false matches when multiple commits share a branch name (e.g. after
+          // checkout -b stamps the new branch onto the root commit).
+          const currentHead = nextState.commits.find(c => c.is_head)
+
           nextState.commits = nextState.commits.map(c => ({
             ...c,
-            is_head: c.branches.includes(nextState.branch) ? false : c.is_head
+            is_head: c.branches.includes(activeBranch) ? false : c.is_head
           }))
-
-          const activeBranch = nextState.branch
-          const currentHead = nextState.commits.find(c => c.branches.includes(activeBranch))
           
           const newCommit = {
             hash: hash,

@@ -119,6 +119,24 @@ check('shell-ops: real "|" pipe is blocked', simulateCommandOffline('cat x | gre
   check('switch: unknown branch errors', r3.status === 'error')
 }
 
+// --- iter29: second commit on branch has correct parent (not the root) -----
+{
+  const s = initState()
+  const s2 = simulateCommandOffline('git add .', s, 0).nextState
+  const s3 = simulateCommandOffline('git commit -m "init"', s2, 0).nextState
+  const s4 = simulateCommandOffline('git checkout -b feature/auth', s3, 0).nextState
+  const s5t = simulateCommandOffline('touch auth.js', s4, 0).nextState
+  const s5a = simulateCommandOffline('git add .', s5t, 0).nextState
+  const s5 = simulateCommandOffline('git commit -m "first on branch"', s5a, 0).nextState
+  const firstBranchHash = s5.commits[s5.commits.length - 1].hash
+  // Second commit — parent should be firstBranchHash, not the root
+  const s6t = simulateCommandOffline('touch util.js', s5, 0).nextState
+  const s6a = simulateCommandOffline('git add .', s6t, 0).nextState
+  const s6 = simulateCommandOffline('git commit -m "second on branch"', s6a, 0).nextState
+  const secondCommit = s6.commits[s6.commits.length - 1]
+  check('iter29: second branch commit parent is first branch commit (not root)', secondCommit.parents[0] === firstBranchHash)
+}
+
 // --- iter24: git checkout -b parent chain ----------------------------------
 {
   const s = initState()
