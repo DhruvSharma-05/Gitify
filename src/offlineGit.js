@@ -218,7 +218,7 @@ function simulateForkCommand(commandText, state) {
 // Commands the in-memory simulator can faithfully reproduce. Anything else — shell
 // operators, or tools the simulator doesn't implement — is refused with a clear note
 // rather than silently behaving differently from the live backend.
-const OFFLINE_SUPPORTED_CMDS = ['ls', 'cat', 'touch', 'rm', 'clear', 'git']
+const OFFLINE_SUPPORTED_CMDS = ['ls', 'cat', 'touch', 'rm', 'clear', 'git', 'echo', 'pwd']
 
 function simulateBisectCommand(commandText, state) {
   const next = JSON.parse(JSON.stringify(state))
@@ -391,6 +391,12 @@ export function simulateCommandOffline(commandText, state, lessonId) {
   }
   else if (baseCmd === "clear") {
     output = "CLEAR_CONSOLE"
+  }
+  else if (baseCmd === "echo") {
+    output = parts.slice(1).join(' ').replace(/^["']|["']$/g, '')
+  }
+  else if (baseCmd === "pwd") {
+    output = '/workspace' + (nextState.pwd ? '/' + nextState.pwd : '')
   }
   else if (baseCmd === "git") {
     const sub = parts[1]

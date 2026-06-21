@@ -35,6 +35,7 @@
 | 29 | CORRECTNESS | `offlineGit.js`: `git commit` looked up `currentHead` AFTER resetting `is_head` flags — when Iter-24's branch-stamping left multiple commits sharing a branch name, `find` returned the root instead of the true HEAD; second+ commits on a feature branch got wrong parent; fixed by capturing `currentHead = find(c => c.is_head)` before the map; 1 new assertion | PASS |
 | 30 | RELIABILITY/CORRECTNESS | `LiveCommitGraph.jsx`: `n.full_hash.startsWith(pHash)` would crash on any commit missing `full_hash` (TypeError); replaced with `?.startsWith()`; `offlineGit.js`: `git tag` was unhandled — falls through to "Unknown subcommand"; added minimal tag list/create handler | PASS |
 | 31 | CORRECTNESS | `offlineGit.js`: `git log` reversed the entire commits array, showing commits from other branches; added BFS walk from HEAD via parent chain so only reachable commits are shown; `git log` from `main` no longer shows unmerged feature-branch commits; 4 new assertions | PASS |
+| 32 | CORRECTNESS/UX | `offlineGit.js`: `OFFLINE_SUPPORTED_CMDS` listed 6 commands while `ALLOWED_BASE_CMDS` (Tab-completion) listed 17; `echo` and `pwd` appeared in suggestions but triggered "Offline mode simulates only basic commands" on execution; added minimal `echo` and `pwd` handlers; synced `OFFLINE_SUPPORTED_CMDS` to include both | PASS |
 
 ---
 
