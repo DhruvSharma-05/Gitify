@@ -218,9 +218,9 @@ check('shell-ops: real "|" pipe is blocked', simulateCommandOffline('cat x | gre
 
 // --- Cycle 2: git commit -a auto-stages tracked files ----------------------
 {
-  const s = initState()
-  // Files exist but nothing staged; -am should auto-stage and commit
-  const r = simulateCommandOffline('git commit -am "auto-stage"', s, 0)
+  // Use a state with committed_files so -am has tracked files to auto-stage
+  const s4 = getInitialOfflineState(4)
+  const r = simulateCommandOffline('git commit -am "auto-stage"', s4, 4)
   check('commit -am: auto-stages tracked files when none staged', r.status === 'success')
   check('commit -am: message is preserved when auto-staging', r.nextState.commits.some(c => c.message === 'auto-stage'))
 }
@@ -369,6 +369,29 @@ import { getInitialOfflineState } from '../src/api.js'
 }
 {
   check('iter43: git rm nonexistent file errors', simulateCommandOffline('git rm notafile.js', getInitialOfflineState(4), 4).status === 'error')
+}
+
+// --- Iter 44: git commit -am only auto-stages tracked files, not untracked ----
+{
+  // Untracked-only workspace: -am should say "nothing to commit"
+  const s = initState()
+  const r = simulateCommandOffline('git commit -am "should not commit untracked"', s, 0)
+  check('iter44: commit -am with only untracked files says nothing to commit', r.output.includes('nothing to commit'))
+}
+{
+  // Mixed: -am stages tracked files but not the new untracked file
+  const s4 = getInitialOfflineState(4)
+  let r = simulateCommandOffline('touch newfile.js', s4, 4)
+  r = simulateCommandOffline('git commit -am "auto-stage tracked"', r.nextState, 4)
+  check('iter44: commit -am with tracked files succeeds', r.status === 'success')
+  check('iter44: commit -am does not include untracked file in committed_files', !r.nextState.committed_files.includes('newfile.js'))
+}
+{
+  // After git init + touch (no prior commits), -am should not commit the untracked file
+  const s = initState()
+  let r = simulateCommandOffline('touch readme.md', s, 0)
+  r = simulateCommandOffline('git commit -am "noop"', r.nextState, 0)
+  check('iter44: commit -am on clean repo with untracked file stays empty', r.nextState.commits.length === 0)
 }
 
 // --- Iter 42: git status shows modified: for tracked files, new file: for untracked ---

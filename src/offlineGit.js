@@ -494,10 +494,12 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           const longMsg = parts.find(p => p.startsWith("--message="))
           msg = longMsg ? longMsg.slice("--message=".length).replace(/^["']|["']$/g, "") : "Minor updates"
         }
-        // -a / -am: auto-stage all tracked files (mirrors real `git commit -a` behavior)
+        // -a / -am: auto-stage tracked modified files only (mirrors real `git commit -a` behavior).
+        // Untracked files must be explicitly `git add`-ed first.
         const hasAFlag = parts.some(p => /^-[a-zA-Z]*a/.test(p)) || parts.includes("--all")
-        if (hasAFlag && nextState.staged.length === 0 && nextState.files.length > 0) {
-          nextState.staged = [...nextState.files]
+        if (hasAFlag && nextState.staged.length === 0) {
+          const tracked = new Set(nextState.committed_files || [])
+          nextState.staged = nextState.files.filter(f => tracked.has(f))
         }
 
         if (nextState.staged.length === 0 && !nextState.conflict_resolved) {
