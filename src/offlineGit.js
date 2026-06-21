@@ -1028,6 +1028,19 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           output = ""
         }
       }
+      // git show [<hash>] — display commit details
+      else if (sub === "show") {
+        const hashArg = parts[2] && !parts[2].startsWith('-') ? parts[2] : null
+        const target = hashArg
+          ? nextState.commits.find(c => c.hash === hashArg || c.full_hash?.startsWith(hashArg))
+          : nextState.commits.find(c => c.is_head)
+        if (!target) {
+          output = `fatal: ambiguous argument '${hashArg || 'HEAD'}': unknown revision or path`; status = "error"
+        } else {
+          const brText = target.branches.length > 0 ? ` (${target.is_head ? 'HEAD -> ' : ''}${target.branches.join(', ')})` : ''
+          output = `commit ${target.full_hash}${brText}\nAuthor: Gitify Offline Student <student@gitify.edu>\nDate:   Wed Jun 10 2026\n\n    ${target.message}\n`
+        }
+      }
       else {
         output = `Unknown git subcommand: ${sub}`
         status = "error"

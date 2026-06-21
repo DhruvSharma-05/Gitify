@@ -372,6 +372,25 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter43: git rm nonexistent file errors', simulateCommandOffline('git rm notafile.js', getInitialOfflineState(4), 4).status === 'error')
 }
 
+// --- Iter 54: git show displays commit details --------------------------------
+{
+  const s = initState()
+  let r = simulateCommandOffline('git add index.js', s, 0)
+  r = simulateCommandOffline('git commit -m "initial commit"', r.nextState, 0)
+  const commitHash = r.nextState.commits[r.nextState.commits.length - 1].hash
+  // git show (HEAD)
+  const rHead = simulateCommandOffline('git show', r.nextState, 0)
+  check('iter54: git show succeeds', rHead.status === 'success')
+  check('iter54: git show includes commit message', rHead.output.includes('initial commit'))
+  // git show <hash>
+  const rHash = simulateCommandOffline(`git show ${commitHash}`, r.nextState, 0)
+  check('iter54: git show <hash> succeeds', rHash.status === 'success')
+  check('iter54: git show <hash> includes message', rHash.output.includes('initial commit'))
+  // git show <unknown>
+  const rBad = simulateCommandOffline('git show deadbeef', r.nextState, 0)
+  check('iter54: git show unknown hash errors', rBad.status === 'error')
+}
+
 // --- Iter 53: git stash push -m / save preserves message in stash list ------
 {
   const s5 = getInitialOfflineState(5)

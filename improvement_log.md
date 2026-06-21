@@ -57,6 +57,7 @@
 | 51 | CORRECTNESS | `offlineGit.js`: `git commit --amend` created a new commit instead of replacing HEAD; added early --amend check that mutates HEAD commit's message in place and absorbs any staged files; 4 new assertions | PASS |
 | 52 | CORRECTNESS | `offlineGit.js`: `git log -n N`, `git log -N`, and `git log --max-count=N` showed all commits regardless of the limit flag; added limit extraction and `slice(0, maxCount)` before rendering; 4 new assertions | PASS |
 | 53 | CORRECTNESS/UX | `offlineGit.js`: `git stash push -m "msg"` and `git stash save "msg"` ignored the message; all stashes showed generic "WIP stash" label; extracted and stored `message` field; `stash list` now shows "On branch: msg" format for named stashes; 4 new assertions | PASS |
+| 54 | CORRECTNESS | `offlineGit.js`: `git show` fell through to "Unknown git subcommand"; added handler showing HEAD commit (or specific hash) details; added `show` to `GIT_SUBCOMMANDS` for autocomplete; 5 new assertions | PASS |
 
 ---
 
