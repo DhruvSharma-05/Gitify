@@ -878,12 +878,25 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           output = `git remote: '${action}' is not a git command`; status = "error"
         }
       }
+      // git tag — list or create lightweight tags
+      else if (sub === "tag") {
+        const tagName = parts[2]
+        if (!nextState.tags) nextState.tags = []
+        if (!tagName) {
+          output = nextState.tags.length ? nextState.tags.join('\n') : '(no tags)'
+        } else if (nextState.tags.includes(tagName)) {
+          output = `fatal: tag '${tagName}' already exists`; status = "error"
+        } else {
+          nextState.tags.push(tagName)
+          output = ""
+        }
+      }
       else {
         output = `Unknown git subcommand: ${sub}`
         status = "error"
       }
     }
-  } 
+  }
   else {
     output = `bash: ${baseCmd}: command not found`
     status = "error"

@@ -70,7 +70,7 @@ export default function LiveCommitGraph({ commits = [], onSelectCommit }) {
     const links = []
     nodes.forEach(node => {
       node.parents.forEach(pHash => {
-        const parentNode = nodes.find(n => n.hash === pHash || n.full_hash.startsWith(pHash))
+        const parentNode = nodes.find(n => n.hash === pHash || n.full_hash?.startsWith(pHash))
         if (parentNode) {
           // Curved Bezier path between coordinates
           const d = `M ${parentNode.x} ${parentNode.y} C ${(parentNode.x + node.x) / 2} ${parentNode.y}, ${(parentNode.x + node.x) / 2} ${node.y}, ${node.x} ${node.y}`
