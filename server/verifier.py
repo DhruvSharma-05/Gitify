@@ -1,7 +1,11 @@
+import logging
 import os
+import shlex
 import tempfile
 import subprocess
 import shutil
+
+logger = logging.getLogger("gitify")
 
 # A controlled global git config: we ignore the user's real ~/.gitconfig (which could
 # carry shell aliases / pager / editor hooks) but still set safe sandbox defaults like
@@ -72,7 +76,10 @@ def verify_lesson_0(commands):
             
         # Run student commands
         for cmd in commands:
-            cmd_parts = cmd.strip().split()
+            try:
+                cmd_parts = shlex.split(cmd.strip())
+            except ValueError:
+                continue
             if not cmd_parts or cmd_parts[0] != "git":
                 continue
             run_git_command(temp_dir, cmd_parts[1:])
@@ -105,7 +112,10 @@ def verify_lesson_2(commands):
         
         # Run student commands
         for cmd in commands:
-            cmd_parts = cmd.strip().split()
+            try:
+                cmd_parts = shlex.split(cmd.strip())
+            except ValueError:
+                continue
             if not cmd_parts or cmd_parts[0] != "git":
                 continue
             if ".." in cmd or "/" in cmd_parts[-1] and cmd_parts[1] not in ["checkout", "branch", "merge"]:
@@ -161,7 +171,10 @@ def verify_lesson_5(commands):
                 sanitized_commands.append(cmd)
                 
         for cmd in sanitized_commands:
-            cmd_parts = cmd.strip().split()
+            try:
+                cmd_parts = shlex.split(cmd.strip())
+            except ValueError:
+                continue
             if not cmd_parts or cmd_parts[0] != "git":
                 continue
             run_git_command(temp_dir, cmd_parts[1:])
@@ -231,7 +244,11 @@ def verify_simulated_state(lesson_id, state):
     return False, "Unknown exercise validation criteria."
 
 def initialize_sandbox(repo_path, lesson_id):
-    """Initializes the baseline repository structure on disk based on the lesson ID."""
+    """Initializes the baseline repository structure on disk based on the lesson ID.
+
+    Raises RuntimeError on any failure so the caller's try/except can set
+    seeding_error and unblock concurrent waiters before re-raising.
+    """
     try:
         # Purge existing files first to get a clean baseline
         for item in os.listdir(repo_path):
@@ -483,9 +500,8 @@ def initialize_sandbox(repo_path, lesson_id):
             run_git_command(repo_path, ["add", "."])
             run_git_command(repo_path, ["commit", "-m", "Update README"])
 
-        return True, "Sandbox initialized successfully."
     except Exception as e:
-        return False, f"Failed sandbox initialization: {str(e)}"
+        raise RuntimeError(f"Failed sandbox initialization for lesson {lesson_id}: {e}") from e
 
 def check_sandbox_state(repo_path, lesson_id):
     """
@@ -649,27 +665,22 @@ def check_sandbox_state(repo_path, lesson_id):
         elif lesson_id == 4:
             revert_done = False
             reset_done = False
-            matrix_done = True # Matrix is tracked on client side or defaults to True when history resolved
-            
+
             if os.path.exists(os.path.join(repo_path, ".git")):
                 code_log, log_out, _ = run_git_command(repo_path, ["log", "--oneline"])
-                
+
                 # Revert: a commit exists reverting 'Skip null metric check'
                 revert_done = "revert" in log_out.lower() and "skip null" in log_out.lower()
-                
+
                 # Reset: buggy commit is missing from log
                 reset_done = "skip null metric check" not in log_out.lower()
-                
-                # If they did either one, they successfully repaired history!
-                if revert_done or reset_done:
-                    pass
-            
+
             subtasks = [
                 {"id": "revert_commit", "title": "Revert the buggy commit ('git revert')", "completed": revert_done},
                 {"id": "reset_clean", "title": "Explore soft/hard resets ('git reset')", "completed": reset_done},
                 {"id": "safety_matrix", "title": "Match situations in the Safety Matrix", "completed": revert_done or reset_done}
             ]
-            
+
             verified = revert_done or reset_done
             msg = "Git history repaired successfully!" if verified else "Inspect git log and revert or reset buggy commits."
             return verified, msg, subtasks
@@ -886,6 +897,6 @@ def get_workspace_files_content(repo_path):
                     lines = f.readlines()[:200]
                     contents[item] = "".join(lines)
     except Exception as e:
-        print(f"Error reading workspace files: {e}")
+        logger.exception("Error reading workspace files")
     return contents
 

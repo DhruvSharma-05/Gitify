@@ -3,6 +3,17 @@ import { Terminal, BookOpen } from 'lucide-react'
 import { apiUrl, getInitialOfflineState } from '../api.js'
 import { simulateCommandOffline, checkOfflineProgress } from '../offlineGit.js'
 
+// --- Autocomplete command dictionaries (single source of truth) ---
+const GIT_SUBCOMMANDS = [
+  'status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge',
+  'stash', 'rebase', 'pull', 'push', 'remote', 'switch', 'restore',
+  'diff', 'bisect', 'fetch', 'revert', 'cherry-pick', 'tag', 'reset', 'rm', 'show', 'config'
+]
+const ALLOWED_BASE_CMDS = [
+  'git', 'gh', 'ls', 'cat', 'cd', 'pwd', 'echo', 'touch', 'mkdir',
+  'rm', 'mv', 'cp', 'head', 'tail', 'grep', 'wc', 'clear'
+]
+
 // Levenshtein distance matcher for typos suggestion
 function getLevenshteinDistance(a, b) {
   const matrix = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0))
@@ -25,11 +36,10 @@ function getLevenshteinDistance(a, b) {
 }
 
 function getGitSuggestion(cmd) {
-  const dictionary = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote', 'switch', 'restore', 'diff', 'bisect', 'fetch', 'revert']
   let bestMatch = null
   let minDistance = 3 // Suggest only if distance is <= 2
   
-  for (const item of dictionary) {
+  for (const item of GIT_SUBCOMMANDS) {
     const dist = getLevenshteinDistance(cmd, item)
     if (dist < minDistance) {
       minDistance = dist
@@ -141,19 +151,19 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
     const words = trimmed.split(/\s+/)
     const currentWord = words[words.length - 1]
 
-    const allowedBase = ['git', 'gh', 'ls', 'cat', 'cd', 'pwd', 'echo', 'touch', 'mkdir', 'rm', 'mv', 'cp', 'head', 'tail', 'grep', 'wc', 'clear']
-    const gitSubcommands = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote', 'switch', 'restore', 'diff', 'bisect', 'fetch', 'revert']
-
     if (words.length === 1) {
-      const matches = allowedBase.filter(c => c.startsWith(currentWord.toLowerCase()) && c !== currentWord.toLowerCase())
+      const matches = ALLOWED_BASE_CMDS.filter(c => c.startsWith(currentWord.toLowerCase()) && c !== currentWord.toLowerCase())
       setSuggestions(matches)
     } else if (words[0] === 'git' && words.length === 2) {
-      const matches = gitSubcommands.filter(c => c.startsWith(currentWord.toLowerCase()) && c !== currentWord.toLowerCase())
+      const matches = GIT_SUBCOMMANDS.filter(c => c.startsWith(currentWord.toLowerCase()) && c !== currentWord.toLowerCase())
       setSuggestions(matches)
-    } else if (words.length > 1 && (words[words.length - 2] === 'add' || ['cat', 'rm', 'cd', 'head', 'tail', 'wc', 'cp', 'mv'].includes(words[0]))) {
+    } else if (words.length > 1 && (
+      (words[0] === 'git' && ['add', 'rm', 'restore', 'diff'].includes(words[1])) ||
+      ['cat', 'rm', 'cd', 'head', 'tail', 'wc', 'cp', 'mv'].includes(words[0])
+    )) {
       const matches = files.filter(f => f.toLowerCase().startsWith(currentWord.toLowerCase()) && f.toLowerCase() !== currentWord.toLowerCase())
       setSuggestions(matches)
-    } else if (words.length > 1 && (words[words.length - 2] === 'checkout' || words[words.length - 2] === 'merge' || words[words.length - 2] === 'rebase')) {
+    } else if (words.length > 1 && (['checkout', 'merge', 'rebase', 'switch'].includes(words[words.length - 2]))) {
       const matches = branches.filter(b => b.toLowerCase().startsWith(currentWord.toLowerCase()) && b.toLowerCase() !== currentWord.toLowerCase())
       setSuggestions(matches)
     } else {
@@ -329,9 +339,8 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
         // Typo suggestion check: if failed or warning, look for mistyped Git commands
         const parts = rawCmd.split(/\s+/)
         if (parts[0] === 'git' && parts.length > 1) {
-          const dict = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote', 'switch', 'restore', 'diff', 'bisect', 'fetch', 'revert']
           const sub = parts[1].toLowerCase()
-          if (!dict.includes(sub)) {
+          if (!GIT_SUBCOMMANDS.includes(sub)) {
             const suggestion = getGitSuggestion(sub)
             if (suggestion) {
               setHistory(prev => [...prev, {
@@ -426,9 +435,22 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
           }
         }
 
+        // Typo suggestion in offline mode (parity with the live path)
+        const offlineParts = rawCmd.split(/\s+/)
+        if (offlineParts[0] === 'git' && offlineParts.length > 1) {
+          const offlineSub = offlineParts[1].toLowerCase()
+          if (!GIT_SUBCOMMANDS.includes(offlineSub)) {
+            const suggestion = getGitSuggestion(offlineSub)
+            if (suggestion) {
+              setHistory(prev => [...prev, { type: 'system', text: `Hint: Did you mean "git ${suggestion}"?` }])
+            }
+          }
+        }
+
         if (updatedOfflineState.pwd !== undefined) setPwd(updatedOfflineState.pwd)
         if (updatedOfflineState.branch !== undefined) setBranch(updatedOfflineState.branch)
         if (updatedOfflineState.files) setFiles(updatedOfflineState.files)
+        if (updatedOfflineState.branches) setBranches(updatedOfflineState.branches)
         
         const checkResult = checkOfflineProgress(updatedOfflineState, lessonId)
         
@@ -500,8 +522,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
 
     // Completing the base command
     if (words.length === 1) {
-      const allowedBase = ['git', 'gh', 'ls', 'cat', 'cd', 'pwd', 'echo', 'touch', 'mkdir', 'rm', 'mv', 'cp', 'head', 'tail', 'grep', 'wc', 'clear']
-      const match = allowedBase.find(c => c.startsWith(text.toLowerCase()))
+      const match = ALLOWED_BASE_CMDS.find(c => c.startsWith(text.toLowerCase()))
       if (match) {
         setInputValue(match + ' ')
       }
@@ -510,8 +531,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
 
     // Completing git subcommands
     if (words[0] === 'git' && words.length === 2) {
-      const gitCmds = ['status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge', 'stash', 'rebase', 'pull', 'push', 'remote', 'switch', 'restore', 'diff', 'bisect', 'fetch', 'revert']
-      const match = gitCmds.find(c => c.startsWith(currentWord.toLowerCase()))
+      const match = GIT_SUBCOMMANDS.find(c => c.startsWith(currentWord.toLowerCase()))
       if (match) {
         setInputValue(`git ${match} `)
       }
@@ -519,7 +539,10 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
     }
 
     // Completing file names
-    if (words.length > 1 && (words[words.length - 2] === 'add' || ['cat', 'rm', 'cd', 'head', 'tail', 'wc', 'cp', 'mv'].includes(words[0]))) {
+    if (words.length > 1 && (
+      (words[0] === 'git' && ['add', 'rm', 'restore', 'diff'].includes(words[1])) ||
+      ['cat', 'rm', 'cd', 'head', 'tail', 'wc', 'cp', 'mv'].includes(words[0])
+    )) {
       const match = files.find(f => f.toLowerCase().startsWith(currentWord.toLowerCase()))
       if (match) {
         words[words.length - 1] = match
@@ -529,7 +552,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
     }
 
     // Completing branch names
-    if (words.length > 1 && (words[words.length - 2] === 'checkout' || words[words.length - 2] === 'merge' || words[words.length - 2] === 'rebase')) {
+    if (words.length > 1 && (['checkout', 'merge', 'rebase', 'switch'].includes(words[words.length - 2]))) {
       const match = branches.find(b => b.toLowerCase().startsWith(currentWord.toLowerCase()))
       if (match) {
         words[words.length - 1] = match

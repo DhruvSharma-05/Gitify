@@ -32,6 +32,7 @@ export function getInitialOfflineState(lessonId) {
     base.fileContents = {
       'index.js': "console.log('init');"
     }
+    base.committed_files = ['index.js']
     base.commits = [
       { hash: 'c1c1c1c', full_hash: 'c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1', message: 'Init setup', branches: ['main'], parents: [], is_head: true }
     ]
@@ -42,6 +43,7 @@ export function getInitialOfflineState(lessonId) {
     base.fileContents = {
       'config.js': "export const config = {\n  api: '/v1',\n  retries: 3,\n  theme: 'dark'\n};\n"
     }
+    base.committed_files = ['config.js']
     base.commits = [
       { hash: 'c1c1c1c', full_hash: 'c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1', message: 'Base config', branches: [], parents: [], is_head: false },
       { hash: 'c2c2c2c', full_hash: 'c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2', message: 'ALEX: set dark theme', branches: ['main'], parents: ['c1c1c1c'], is_head: true },
@@ -59,6 +61,7 @@ export function getInitialOfflineState(lessonId) {
       'deploy.yml': 'replicas: 1\n',
       'CHANGELOG.md': 'version: 1.3.2\n'
     }
+    base.committed_files = ['Dashboard.jsx', 'auth.js', 'metrics.js', 'Chart.jsx', 'Spinner.jsx', 'deploy.yml', 'CHANGELOG.md']
     base.commits = [
       { hash: 'a1a1a1a', full_hash: 'a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1', message: 'Initial dashboard', branches: [], parents: [], is_head: false },
       { hash: 'b2b2b2b', full_hash: 'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', message: 'Add auth guard', branches: [], parents: ['a1a1a1a'], is_head: false },
@@ -88,6 +91,7 @@ export function getInitialOfflineState(lessonId) {
       'README.md': '# Gitify Collab Project\n',
       'auth.js': '// Student local changes: login form implementation\n'
     }
+    base.committed_files = ['README.md', 'auth.js']
     base.commits = [
       { hash: 'c1c1c1c', full_hash: 'c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1', message: 'Init project', branches: ['origin/main'], parents: [], is_head: false },
       { hash: 's2s2s2s', full_hash: 's2s2s2s2s2s2s2s2s2s2s2s2s2s2s2s2s2s2s2s2', message: 'nav polish', branches: [], parents: ['c1c1c1c'], is_head: false },
@@ -102,6 +106,7 @@ export function getInitialOfflineState(lessonId) {
       'stripe.js': '// stripe integration helper\n',
       'debug.txt': 'temporary payment debug file\n'
     }
+    base.committed_files = ['app.js', 'checkout.js', 'stripe.js', 'debug.txt']
     base.commits = [
       { hash: 'c1c1c1c', full_hash: 'c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1', message: 'Base commit', branches: [], parents: [], is_head: false },
       { hash: 'c2c2c2c', full_hash: 'c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2', message: 'Add checkout form', branches: [], parents: ['c1c1c1c'], is_head: false },
@@ -125,6 +130,7 @@ export function getInitialOfflineState(lessonId) {
       'logger.js': '// request logger\n',
       'README.md': '# Shop App\nRun `node test.js` to check the cart total.\n'
     }
+    base.committed_files = ['cart.js', 'test.js', 'ui.js', 'discount.js', 'logger.js', 'README.md']
     base.commits = [
       { hash: 'a1b2c3d', full_hash: 'a1b2c3d0000000000000000000000000000000000', message: 'Init cart module', branches: [], parents: [], is_head: false },
       { hash: 'b2c3d4e', full_hash: 'b2c3d4e0000000000000000000000000000000000', message: 'Add cart UI', branches: [], parents: ['a1b2c3d'], is_head: false },

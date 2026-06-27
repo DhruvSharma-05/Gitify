@@ -106,10 +106,71 @@ check('shell-ops: real "|" pipe is blocked', simulateCommandOffline('cat x | gre
   const s2 = simulateCommandOffline('git commit -m "init"', simulateCommandOffline('git add .', s, 0).nextState, 0).nextState
   const r1 = simulateCommandOffline('git switch -c feature/test', s2, 0)
   check('switch -c: creates new branch', r1.status === 'success' && r1.nextState.branch === 'feature/test')
+  // touch a new file then commit — parent must be the init commit, not empty
+  const r1t = simulateCommandOffline('touch new.js', r1.nextState, 0)
+  const r1a = simulateCommandOffline('git add .', r1t.nextState, 0)
+  const r1b = simulateCommandOffline('git commit -m "branch work"', r1a.nextState, 0)
+  const branchCommit = r1b.nextState.commits[r1b.nextState.commits.length - 1]
+  const initCommit = r1b.nextState.commits[0]
+  check('switch -c: new commit has correct parent (not empty)', branchCommit.parents.length > 0 && branchCommit.parents[0] === initCommit.hash)
   const r2 = simulateCommandOffline('git switch main', r1.nextState, 0)
   check('switch: switches to existing branch', r2.status === 'success' && r2.nextState.branch === 'main')
   const r3 = simulateCommandOffline('git switch nosuchbranch', r2.nextState, 0)
   check('switch: unknown branch errors', r3.status === 'error')
+}
+
+// --- iter31: git log filters to HEAD's reachable commits only ---------------
+{
+  const s = initState()
+  const s2 = simulateCommandOffline('git add .', s, 0).nextState
+  const s3 = simulateCommandOffline('git commit -m "init"', s2, 0).nextState
+  const s4 = simulateCommandOffline('git checkout -b feature/x', s3, 0).nextState
+  const s4t = simulateCommandOffline('touch f.js', s4, 0).nextState
+  const s4a = simulateCommandOffline('git add .', s4t, 0).nextState
+  const s5 = simulateCommandOffline('git commit -m "feature work"', s4a, 0).nextState
+  // Switch back to main — git log from main should NOT show the feature commit
+  const s6 = simulateCommandOffline('git checkout main', s5, 0).nextState
+  const logFromMain = simulateCommandOffline('git log --oneline', s6, 0)
+  check('iter31: git log from main excludes unmerged feature commits', !logFromMain.output.includes('feature work'))
+  check('iter31: git log from main shows init commit', logFromMain.output.includes('init'))
+  // git log from feature branch should show both
+  const logFromFeature = simulateCommandOffline('git log --oneline', s5, 0)
+  check('iter31: git log from feature shows feature commit', logFromFeature.output.includes('feature work'))
+  check('iter31: git log from feature shows init commit', logFromFeature.output.includes('init'))
+}
+
+// --- iter29: second commit on branch has correct parent (not the root) -----
+{
+  const s = initState()
+  const s2 = simulateCommandOffline('git add .', s, 0).nextState
+  const s3 = simulateCommandOffline('git commit -m "init"', s2, 0).nextState
+  const s4 = simulateCommandOffline('git checkout -b feature/auth', s3, 0).nextState
+  const s5t = simulateCommandOffline('touch auth.js', s4, 0).nextState
+  const s5a = simulateCommandOffline('git add .', s5t, 0).nextState
+  const s5 = simulateCommandOffline('git commit -m "first on branch"', s5a, 0).nextState
+  const firstBranchHash = s5.commits[s5.commits.length - 1].hash
+  // Second commit — parent should be firstBranchHash, not the root
+  const s6t = simulateCommandOffline('touch util.js', s5, 0).nextState
+  const s6a = simulateCommandOffline('git add .', s6t, 0).nextState
+  const s6 = simulateCommandOffline('git commit -m "second on branch"', s6a, 0).nextState
+  const secondCommit = s6.commits[s6.commits.length - 1]
+  check('iter29: second branch commit parent is first branch commit (not root)', secondCommit.parents[0] === firstBranchHash)
+}
+
+// --- iter24: git checkout -b parent chain ----------------------------------
+{
+  const s = initState()
+  const s2 = simulateCommandOffline('git add .', s, 0).nextState
+  const s3 = simulateCommandOffline('git commit -m "init"', s2, 0).nextState
+  const initHash = s3.commits[0].hash
+  const s4 = simulateCommandOffline('git checkout -b feature/auth', s3, 0).nextState
+  // touch a new file so there's something to commit on the branch
+  const s4t = simulateCommandOffline('touch auth.js', s4, 0).nextState
+  const s4a = simulateCommandOffline('git add .', s4t, 0).nextState
+  const s5 = simulateCommandOffline('git commit -m "auth feature"', s4a, 0).nextState
+  const newCommit = s5.commits[s5.commits.length - 1]
+  check('iter24: checkout -b: new commit has non-empty parents', newCommit.parents.length > 0)
+  check('iter24: checkout -b: new commit parent is the init commit', newCommit.parents[0] === initHash)
 }
 
 // --- git restore -----------------------------------------------------------
@@ -123,9 +184,10 @@ check('shell-ops: real "|" pipe is blocked', simulateCommandOffline('cat x | gre
 
 // --- git add -u ------------------------------------------------------------
 {
-  const s = initState()
-  const r = simulateCommandOffline('git add -u', s, 0)
-  check('add -u: stages all tracked files', r.status === 'success' && r.nextState.staged.length > 0)
+  // -u should stage tracked files; use a pre-committed state (lesson 4)
+  const s4 = getInitialOfflineState(4)
+  const r = simulateCommandOffline('git add -u', s4, 4)
+  check('add -u: stages tracked files when committed_files exist', r.status === 'success' && r.nextState.staged.length > 0)
 }
 
 // --- git log --oneline -----------------------------------------------------
@@ -157,9 +219,9 @@ check('shell-ops: real "|" pipe is blocked', simulateCommandOffline('cat x | gre
 
 // --- Cycle 2: git commit -a auto-stages tracked files ----------------------
 {
-  const s = initState()
-  // Files exist but nothing staged; -am should auto-stage and commit
-  const r = simulateCommandOffline('git commit -am "auto-stage"', s, 0)
+  // Use a state with committed_files so -am has tracked files to auto-stage
+  const s4 = getInitialOfflineState(4)
+  const r = simulateCommandOffline('git commit -am "auto-stage"', s4, 4)
   check('commit -am: auto-stages tracked files when none staged', r.status === 'success')
   check('commit -am: message is preserved when auto-staging', r.nextState.commits.some(c => c.message === 'auto-stage'))
 }
@@ -184,6 +246,45 @@ check('shell-ops: real "|" pipe is blocked', simulateCommandOffline('cat x | gre
   check('branch -d: cannot delete current branch', simulateCommandOffline('git branch -d main', s4, 0).status === 'error')
 }
 
+// --- iter28: git reset -------------------------------------------------------
+{
+  // git reset HEAD <file> — unstage
+  const s = initState()
+  const s2 = simulateCommandOffline('git add .', s, 0).nextState
+  check('reset: file staged before reset', s2.staged.includes('index.js'))
+  const r = simulateCommandOffline('git reset HEAD index.js', s2, 0)
+  check('reset: git reset HEAD <file> unstages the file', r.status === 'success' && !r.nextState.staged.includes('index.js'))
+}
+{
+  // git reset --hard <hash> — remove commits after hash (lesson 4 reset_done)
+  const s4 = getInitialOfflineState(4)
+  const r = simulateCommandOffline('git reset --hard d4d4d4d', s4, 4)
+  check('reset: hard reset to hash succeeds', r.status === 'success')
+  check('reset: commits after target are removed', !r.nextState.commits.some(c => c.message.toLowerCase().includes('skip null metric check')))
+  check('reset: commits before target remain', r.nextState.commits.some(c => c.hash === 'd4d4d4d'))
+  // lesson 4 reset_done should now be true
+  const p = checkOfflineProgress(r.nextState, 4)
+  check('reset: lesson 4 reset_done satisfied after hard reset', p.verified === true)
+}
+{
+  // git reset HEAD~1 — remove last commit
+  const s = initState()
+  const s2 = simulateCommandOffline('git add .', s, 0).nextState
+  const s3 = simulateCommandOffline('git commit -m "first"', s2, 0).nextState
+  check('reset: HEAD~1 removes last commit', simulateCommandOffline('git reset HEAD~1', s3, 0).nextState.commits.length === 0)
+}
+
+// --- iter27: git revert sets correct parent --------------------------------
+{
+  const s4 = getInitialOfflineState(4)
+  const headHash = s4.commits[s4.commits.length - 1].hash
+  const r = simulateCommandOffline('git revert e5e5e5e', s4, 4)
+  check('iter27: git revert succeeds', r.status === 'success')
+  const revertCommit = r.nextState.commits[r.nextState.commits.length - 1]
+  check('iter27: revert commit has non-empty parents', revertCommit.parents.length > 0)
+  check('iter27: revert commit parent is previous HEAD', revertCommit.parents[0] === headHash)
+}
+
 // --- Cycle 2: git status shows clean after commit --------------------------
 {
   const s = initState()
@@ -191,6 +292,552 @@ check('shell-ops: real "|" pipe is blocked', simulateCommandOffline('cat x | gre
   const s3 = simulateCommandOffline('git commit -m "init"', s2, 0).nextState
   const r = simulateCommandOffline('git status', s3, 0)
   check('status: clean after commit (no untracked files)', r.output.includes('nothing to commit'))
+}
+
+// --- Iter 23: git stash uses actual uncommitted files, not hardcoded ones ----
+{
+  // Lesson 5: Checkout.jsx and styles.css are WIP — stash should save them
+  const s5 = getInitialOfflineState(5)
+  const r = simulateCommandOffline('git stash', s5, 5)
+  check('iter23: lesson 5 stash saves WIP files', r.status === 'success')
+  check('iter23: lesson 5 stash removes WIP files from workspace', !r.nextState.files.includes('Checkout.jsx'))
+  check('iter23: lesson 5 stash records correct files', r.nextState.stashes[0].files.includes('Checkout.jsx'))
+  // Pop restores them
+  const r2 = simulateCommandOffline('git stash pop', r.nextState, 5)
+  check('iter23: lesson 5 stash pop restores Checkout.jsx', r2.nextState.files.includes('Checkout.jsx'))
+  check('iter23: lesson 5 stash pop restores styles.css', r2.nextState.files.includes('styles.css'))
+}
+{
+  // Lesson 2: all files committed — stash has nothing to save
+  const s2 = getInitialOfflineState(2)
+  const r = simulateCommandOffline('git stash', s2, 2)
+  check('iter23: lesson 2 stash with no WIP says "No local changes to save"', r.output.includes('No local changes to save'))
+  check('iter23: lesson 2 stash creates no stash entry', r.nextState.stashes.length === 0)
+  check('iter23: lesson 2 files unaffected by stash', r.nextState.files.includes('index.js'))
+}
+{
+  // Lesson 2: stash pop after no stash entry — should error, not inject Checkout.jsx
+  const s2 = getInitialOfflineState(2)
+  const r = simulateCommandOffline('git stash pop', s2, 2)
+  check('iter23: lesson 2 stash pop with empty stash errors', r.status === 'error')
+  check('iter23: lesson 2 stash pop does not inject Checkout.jsx', !r.nextState.files.includes('Checkout.jsx'))
+}
+
+// --- Iter 22: git status clean for pre-seeded lessons (2-9) ----------------
+import { getInitialOfflineState } from '../src/api.js'
+{
+  // Lesson 2 starts with index.js already committed — status should be clean
+  const s2 = getInitialOfflineState(2)
+  const r = simulateCommandOffline('git status', s2, 2)
+  check('iter22: lesson 2 initial git status shows nothing to commit', r.output.includes('nothing to commit'))
+  check('iter22: lesson 2 initial git status has no untracked files', !r.output.includes('Untracked files'))
+}
+{
+  // Lesson 4: all files already committed
+  const s4 = getInitialOfflineState(4)
+  const r = simulateCommandOffline('git status', s4, 4)
+  check('iter22: lesson 4 initial git status shows nothing to commit', r.output.includes('nothing to commit'))
+}
+{
+  // Lesson 9: all files already committed
+  const s9 = getInitialOfflineState(9)
+  const r = simulateCommandOffline('git status', s9, 9)
+  check('iter22: lesson 9 initial git status shows nothing to commit', r.output.includes('nothing to commit'))
+}
+{
+  // Lesson 5: Checkout.jsx and styles.css are intentional WIP — must still show as untracked
+  const s5 = getInitialOfflineState(5)
+  const r = simulateCommandOffline('git status', s5, 5)
+  check('iter22: lesson 5 WIP files still show as untracked', r.output.includes('Untracked files'))
+}
+
+// --- Iter 43: git rm stages deletion; Iter 45 ensures commit processes it -------
+{
+  const s4 = getInitialOfflineState(4)
+  const r = simulateCommandOffline('git rm Dashboard.jsx', s4, 4)
+  check('iter43: git rm succeeds', r.status === 'success')
+  check('iter43: git rm removes from files array', !r.nextState.files.includes('Dashboard.jsx'))
+  check('iter43: git rm stages deletion in staged_deletions', (r.nextState.staged_deletions || []).includes('Dashboard.jsx'))
+  check('iter43: git rm output contains filename', r.output.includes('Dashboard.jsx'))
+}
+{
+  // git rm --cached keeps the file in workspace but stages deletion
+  const s4 = getInitialOfflineState(4)
+  const r = simulateCommandOffline('git rm --cached Dashboard.jsx', s4, 4)
+  check('iter43: git rm --cached succeeds', r.status === 'success')
+  check('iter43: git rm --cached keeps file in workspace', r.nextState.files.includes('Dashboard.jsx'))
+  check('iter43: git rm --cached stages deletion', (r.nextState.staged_deletions || []).includes('Dashboard.jsx'))
+}
+{
+  check('iter43: git rm nonexistent file errors', simulateCommandOffline('git rm notafile.js', getInitialOfflineState(4), 4).status === 'error')
+}
+
+// --- Iter 60: git merge --abort and git rebase --abort/--continue -----------
+{
+  // git merge --abort cancels active conflict
+  const s3 = getInitialOfflineState(3)
+  let r = simulateCommandOffline('git merge feature/ui', s3, 3)
+  check('iter60: merge produces conflict', r.nextState.conflict_active === true)
+  r = simulateCommandOffline('git merge --abort', r.nextState, 3)
+  check('iter60: merge --abort clears conflict', r.nextState.conflict_active === false)
+  check('iter60: merge --abort succeeds', r.status === 'success')
+  check('iter60: merge --abort when no conflict errors', simulateCommandOffline('git merge --abort', s3, 3).status === 'error')
+}
+{
+  // git rebase --abort and --continue
+  const s = initState()
+  let r = simulateCommandOffline('git add index.js', s, 0)
+  r = simulateCommandOffline('git commit -m "c1"', r.nextState, 0)
+  r = simulateCommandOffline('git rebase --abort', r.nextState, 0)
+  check('iter60: rebase --abort succeeds', r.status === 'success')
+  check('iter60: rebase --abort output indicates aborted', r.output.includes('aborted'))
+  r = simulateCommandOffline('git rebase --continue', r.nextState, 0)
+  check('iter60: rebase --continue succeeds', r.status === 'success')
+}
+
+// --- Iter 59: git remote rename/remove/get-url/set-url ----------------------
+{
+  const s = initState()
+  let r = simulateCommandOffline('git remote add origin https://github.com/you/repo.git', s, 0)
+  // rename
+  r = simulateCommandOffline('git remote rename origin upstream', r.nextState, 0)
+  check('iter59: git remote rename updates remoteName', r.nextState.remoteName === 'upstream')
+  // get-url
+  r = simulateCommandOffline('git remote get-url upstream', r.nextState, 0)
+  check('iter59: git remote get-url returns URL', r.output.includes('github.com'))
+  // set-url
+  r = simulateCommandOffline('git remote set-url upstream https://gitlab.com/you/repo.git', r.nextState, 0)
+  check('iter59: git remote set-url updates URL', r.nextState.remote.includes('gitlab.com'))
+  // remove
+  r = simulateCommandOffline('git remote remove upstream', r.nextState, 0)
+  check('iter59: git remote remove clears remote', r.nextState.remote === null)
+}
+
+// --- Iter 58: git config get/set/list ----------------------------------------
+{
+  const s = initState()
+  let r = simulateCommandOffline('git config user.name "Alice"', s, 0)
+  check('iter58: git config set succeeds', r.status === 'success')
+  check('iter58: git config set stores value', r.nextState.config['user.name'] === 'Alice')
+  r = simulateCommandOffline('git config user.name', r.nextState, 0)
+  check('iter58: git config get returns value', r.output === 'Alice')
+  r = simulateCommandOffline('git config --list', r.nextState, 0)
+  check('iter58: git config --list shows stored entry', r.output.includes('user.name=Alice'))
+}
+
+// --- Iter 57: git log --all shows commits from all branches, not just HEAD ---
+{
+  const s = initState()
+  let r = simulateCommandOffline('git add index.js', s, 0)
+  r = simulateCommandOffline('git commit -m "root"', r.nextState, 0)
+  r = simulateCommandOffline('git checkout -b feature', r.nextState, 0)
+  r = simulateCommandOffline('touch b.js', r.nextState, 0)
+  r = simulateCommandOffline('git add b.js', r.nextState, 0)
+  r = simulateCommandOffline('git commit -m "feature commit"', r.nextState, 0)
+  // Switch back to main so feature commit is NOT reachable from HEAD
+  r = simulateCommandOffline('git checkout main', r.nextState, 0)
+  const logMain = simulateCommandOffline('git log --oneline', r.nextState, 0)
+  check('iter57: git log without --all shows only main commits', logMain.output.split('\n').length === 1)
+  const logAll = simulateCommandOffline('git log --all --oneline', r.nextState, 0)
+  check('iter57: git log --all shows commits from all branches', logAll.output.split('\n').length === 2)
+  check('iter57: git log --all includes feature branch commit', logAll.output.includes('feature commit'))
+}
+
+// --- Iter 56: git stash pop/apply/drop stash@{N} respects index -------------
+{
+  const s5 = getInitialOfflineState(5)
+  // Build two stashes: stash first, then add a new untracked file and stash again
+  let r = simulateCommandOffline('git stash push -m "first"', s5, 5)
+  r = simulateCommandOffline('touch wip1.js', r.nextState, 5)
+  r = simulateCommandOffline('git stash push -m "second"', r.nextState, 5)
+  check('iter56: pre-condition: two stashes exist', r.nextState.stashes.length === 2)
+  // stash@{1} = the older one ("first")
+  const r2 = simulateCommandOffline('git stash pop stash@{1}', r.nextState, 5)
+  check('iter56: stash pop stash@{1} leaves one stash', r2.nextState.stashes.length === 1)
+  check('iter56: stash pop stash@{1} keeps the newer stash', r2.nextState.stashes[0].message === 'second')
+}
+{
+  // git stash drop stash@{N}
+  const s5 = getInitialOfflineState(5)
+  let r = simulateCommandOffline('git stash push -m "first"', s5, 5)
+  r = simulateCommandOffline('touch wip2.js', r.nextState, 5)
+  r = simulateCommandOffline('git stash push -m "second"', r.nextState, 5)
+  const r2 = simulateCommandOffline('git stash drop stash@{0}', r.nextState, 5)
+  check('iter56: stash drop stash@{0} removes newest', r2.nextState.stashes.length === 1)
+  check('iter56: stash drop stash@{0} keeps older stash', r2.nextState.stashes[0].message === 'first')
+}
+
+// --- Iter 55: git tag -a <name> creates annotated tag; git tag -d deletes ----
+{
+  const s4 = getInitialOfflineState(4)
+  // Lightweight tag
+  let r = simulateCommandOffline('git tag v1.0', s4, 4)
+  check('iter55: git tag v1.0 succeeds', r.status === 'success')
+  check('iter55: git tag v1.0 adds to tags list', r.nextState.tags.includes('v1.0'))
+  // Annotated tag with -a flag
+  r = simulateCommandOffline('git tag -a v2.0 -m "release"', s4, 4)
+  check('iter55: git tag -a v2.0 succeeds', r.status === 'success')
+  check('iter55: git tag -a extracts real name, not "-a"', r.nextState.tags.includes('v2.0') && !r.nextState.tags.includes('-a'))
+  // Delete tag
+  let r2 = simulateCommandOffline('git tag v1.0', s4, 4)
+  r2 = simulateCommandOffline('git tag -d v1.0', r2.nextState, 4)
+  check('iter55: git tag -d removes tag', !r2.nextState.tags.includes('v1.0'))
+  check('iter55: git tag -d nonexistent errors', simulateCommandOffline('git tag -d notexist', s4, 4).status === 'error')
+}
+
+// --- Iter 54: git show displays commit details --------------------------------
+{
+  const s = initState()
+  let r = simulateCommandOffline('git add index.js', s, 0)
+  r = simulateCommandOffline('git commit -m "initial commit"', r.nextState, 0)
+  const commitHash = r.nextState.commits[r.nextState.commits.length - 1].hash
+  // git show (HEAD)
+  const rHead = simulateCommandOffline('git show', r.nextState, 0)
+  check('iter54: git show succeeds', rHead.status === 'success')
+  check('iter54: git show includes commit message', rHead.output.includes('initial commit'))
+  // git show <hash>
+  const rHash = simulateCommandOffline(`git show ${commitHash}`, r.nextState, 0)
+  check('iter54: git show <hash> succeeds', rHash.status === 'success')
+  check('iter54: git show <hash> includes message', rHash.output.includes('initial commit'))
+  // git show <unknown>
+  const rBad = simulateCommandOffline('git show deadbeef', r.nextState, 0)
+  check('iter54: git show unknown hash errors', rBad.status === 'error')
+}
+
+// --- Iter 53: git stash push -m / save preserves message in stash list ------
+{
+  const s5 = getInitialOfflineState(5)
+  let r = simulateCommandOffline('git stash push -m "my wip"', s5, 5)
+  check('iter53: stash push -m succeeds', r.status === 'success')
+  const listR = simulateCommandOffline('git stash list', r.nextState, 5)
+  check('iter53: stash list shows custom message', listR.output.includes('my wip'))
+  check('iter53: stash list uses "On branch" format for named stash', listR.output.includes('On '))
+}
+{
+  const s5 = getInitialOfflineState(5)
+  let r = simulateCommandOffline('git stash save "save message"', s5, 5)
+  check('iter53: git stash save with message succeeds', r.status === 'success')
+  const listR = simulateCommandOffline('git stash list', r.nextState, 5)
+  check('iter53: git stash save message appears in list', listR.output.includes('save message'))
+}
+
+// --- Iter 52: git log -n N / -N / --max-count=N limits output ---------------
+{
+  // Build a state with 3 commits
+  const s = initState()
+  let r = simulateCommandOffline('git add index.js', s, 0)
+  r = simulateCommandOffline('git commit -m "c1"', r.nextState, 0)
+  r = simulateCommandOffline('touch b.js', r.nextState, 0)
+  r = simulateCommandOffline('git add b.js', r.nextState, 0)
+  r = simulateCommandOffline('git commit -m "c2"', r.nextState, 0)
+  r = simulateCommandOffline('touch c.js', r.nextState, 0)
+  r = simulateCommandOffline('git add c.js', r.nextState, 0)
+  r = simulateCommandOffline('git commit -m "c3"', r.nextState, 0)
+  const s3 = r.nextState // 3 commits
+  const rAll = simulateCommandOffline('git log --oneline', s3, 0)
+  check('iter52: git log without -n shows all 3 commits', rAll.output.split('\n').length === 3)
+  const r1 = simulateCommandOffline('git log -n 1 --oneline', s3, 0)
+  check('iter52: git log -n 1 shows only 1 commit', r1.output.split('\n').length === 1)
+  const r2 = simulateCommandOffline('git log -2 --oneline', s3, 0)
+  check('iter52: git log -2 shows only 2 commits', r2.output.split('\n').length === 2)
+  const r3 = simulateCommandOffline('git log --max-count=1 --oneline', s3, 0)
+  check('iter52: git log --max-count=1 shows only 1 commit', r3.output.split('\n').length === 1)
+}
+
+// --- Iter 51: git commit --amend replaces HEAD commit, not creates new one --
+{
+  const s = initState()
+  let r = simulateCommandOffline('git add index.js', s, 0)
+  r = simulateCommandOffline('git commit -m "original message"', r.nextState, 0)
+  const beforeLen = r.nextState.commits.length
+  r = simulateCommandOffline('git commit --amend -m "corrected message"', r.nextState, 0)
+  check('iter51: git commit --amend does not add a new commit', r.nextState.commits.length === beforeLen)
+  check('iter51: git commit --amend updates HEAD message', r.nextState.commits.find(c => c.is_head)?.message === 'corrected message')
+  check('iter51: git commit --amend succeeds', r.status === 'success')
+}
+{
+  // --amend with no staged changes and no -m keeps the existing message
+  const s = initState()
+  let r = simulateCommandOffline('git add index.js', s, 0)
+  r = simulateCommandOffline('git commit -m "keep this"', r.nextState, 0)
+  r = simulateCommandOffline('git commit --amend', r.nextState, 0)
+  check('iter51: git commit --amend with no -m keeps existing message', r.nextState.commits.find(c => c.is_head)?.message === 'keep this')
+}
+
+// --- Iter 50: git branch -m renames the current branch ----------------------
+{
+  const s4 = getInitialOfflineState(4)
+  const r = simulateCommandOffline('git branch -m new-history', s4, 4)
+  check('iter50: git branch -m succeeds', r.status === 'success')
+  check('iter50: git branch -m updates branch state', r.nextState.branch === 'new-history')
+  check('iter50: git branch -m adds new name to branches list', r.nextState.branches.includes('new-history'))
+  check('iter50: git branch -m removes old name from branches list', !r.nextState.branches.includes('main'))
+  check('iter50: git branch -m updates commit branch labels', r.nextState.commits.every(c => !c.branches.includes('main')))
+}
+{
+  // git branch -m <old> <new> explicit old branch name
+  const s4 = getInitialOfflineState(4)
+  let r = simulateCommandOffline('git checkout -b feature', s4, 4)
+  r = simulateCommandOffline('git branch -m feature renamed-feature', r.nextState, 4)
+  check('iter50: git branch -m <old> <new> renames target branch', r.nextState.branches.includes('renamed-feature'))
+  check('iter50: git branch -m <old> <new> removes old target', !r.nextState.branches.includes('feature'))
+}
+
+// --- Iter 49: git add -u only stages tracked files, not untracked -----------
+{
+  // Fresh state with one untracked file: -u should NOT stage it
+  const s = initState()
+  const r = simulateCommandOffline('git add -u', s, 0)
+  check('iter49: git add -u on repo with no prior commits stages nothing', r.nextState.staged.length === 0)
+}
+{
+  // Mixed state: -u stages tracked but not untracked
+  const s4 = getInitialOfflineState(4)
+  let r = simulateCommandOffline('touch brand-new.js', s4, 4)
+  r = simulateCommandOffline('git add -u', r.nextState, 4)
+  check('iter49: git add -u does not stage untracked file', !r.nextState.staged.includes('brand-new.js'))
+  check('iter49: git add -u stages tracked files', r.nextState.staged.some(f => (s4.committed_files || []).includes(f)))
+}
+
+// --- Iter 47: git checkout -- <file> discards working-tree changes ----------
+{
+  const s4 = getInitialOfflineState(4)
+  const r = simulateCommandOffline('git checkout -- Dashboard.jsx', s4, 4)
+  check('iter47: git checkout -- <file> succeeds', r.status === 'success')
+  check('iter47: git checkout -- <file> outputs Restored', r.output.includes('Restored'))
+}
+{
+  const r = simulateCommandOffline('git checkout --', getInitialOfflineState(4), 4)
+  check('iter47: git checkout -- with no file errors gracefully', r.status === 'error')
+}
+
+// --- Iter 46: git restore --staged . clears all staged files ----------------
+{
+  // git restore --staged . should unstage everything
+  const s = initState()
+  let r = simulateCommandOffline('git add index.js', s, 0)
+  check('iter46: pre-condition: file is staged', r.nextState.staged.includes('index.js'))
+  r = simulateCommandOffline('git restore --staged .', r.nextState, 0)
+  check('iter46: git restore --staged . unstages all files', r.nextState.staged.length === 0)
+  check('iter46: git restore --staged . succeeds', r.status === 'success')
+}
+{
+  // git restore --staged <file> still works for specific files
+  const s4 = getInitialOfflineState(4)
+  let r = simulateCommandOffline('git add Dashboard.jsx', s4, 4)
+  r = simulateCommandOffline('git restore --staged Dashboard.jsx', r.nextState, 4)
+  check('iter46: git restore --staged <file> unstages specific file', !r.nextState.staged.includes('Dashboard.jsx'))
+}
+
+// --- Iter 45: git rm + commit removes file from committed_files; status shows deleted: ---
+{
+  // Full workflow: git rm → git commit should actually finalize the deletion
+  const s4 = getInitialOfflineState(4)
+  let r = simulateCommandOffline('git rm Dashboard.jsx', s4, 4)
+  check('iter45: git status after rm shows deleted:', simulateCommandOffline('git status', r.nextState, 4).output.includes('deleted'))
+  r = simulateCommandOffline('git commit -m "remove Dashboard"', r.nextState, 4)
+  check('iter45: commit after git rm succeeds', r.status === 'success')
+  check('iter45: committed_files no longer contains removed file', !r.nextState.committed_files.includes('Dashboard.jsx'))
+  check('iter45: staged_deletions cleared after commit', (r.nextState.staged_deletions || []).length === 0)
+}
+
+// --- Iter 44: git commit -am only auto-stages tracked files, not untracked ----
+{
+  // Untracked-only workspace: -am should say "nothing to commit"
+  const s = initState()
+  const r = simulateCommandOffline('git commit -am "should not commit untracked"', s, 0)
+  check('iter44: commit -am with only untracked files says nothing to commit', r.output.includes('nothing to commit'))
+}
+{
+  // Mixed: -am stages tracked files but not the new untracked file
+  const s4 = getInitialOfflineState(4)
+  let r = simulateCommandOffline('touch newfile.js', s4, 4)
+  r = simulateCommandOffline('git commit -am "auto-stage tracked"', r.nextState, 4)
+  check('iter44: commit -am with tracked files succeeds', r.status === 'success')
+  check('iter44: commit -am does not include untracked file in committed_files', !r.nextState.committed_files.includes('newfile.js'))
+}
+{
+  // After git init + touch (no prior commits), -am should not commit the untracked file
+  const s = initState()
+  let r = simulateCommandOffline('touch readme.md', s, 0)
+  r = simulateCommandOffline('git commit -am "noop"', r.nextState, 0)
+  check('iter44: commit -am on clean repo with untracked file stays empty', r.nextState.commits.length === 0)
+}
+
+// --- Iter 42: git status shows modified: for tracked files, new file: for untracked ---
+{
+  // Untracked file staged → "new file:"
+  const s = initState()
+  const s2 = simulateCommandOffline('git add index.js', s, 0).nextState
+  const r = simulateCommandOffline('git status', s2, 0)
+  check('iter42: untracked file staged shows new file:', r.output.includes('new file'))
+  check('iter42: untracked file staged does NOT show modified:', !r.output.includes('modified'))
+}
+{
+  // Already-committed file staged → "modified:"
+  const s4 = getInitialOfflineState(4)
+  // Dashboard.jsx is in committed_files; stage it
+  const s2 = simulateCommandOffline('git add Dashboard.jsx', s4, 4).nextState
+  const r = simulateCommandOffline('git status', s2, 4)
+  check('iter42: committed file staged shows modified:', r.output.includes('modified'))
+  check('iter42: committed file staged does NOT show new file:', !r.output.includes('new file'))
+}
+
+// --- Iter 40: git diff <file> extracts filename correctly -------------------
+{
+  const s = initState()
+  const r = simulateCommandOffline('git diff index.js', s, 0)
+  check('iter40: git diff <file> succeeds', r.status === 'success')
+  check('iter40: git diff <file> shows filename, not "git"', r.output.includes('index.js') && !r.output.includes('a/git'))
+}
+{
+  // git diff (no file) shows unstaged files
+  const s = initState()
+  const r = simulateCommandOffline('git diff', s, 0)
+  check('iter40: git diff no file succeeds', r.status === 'success')
+  // index.js is untracked/unstaged, should appear in diff output
+  check('iter40: git diff no file includes untracked file', r.output.includes('index.js'))
+}
+{
+  // git diff HEAD (HEAD ref should not be treated as filename)
+  const s = initState()
+  const r = simulateCommandOffline('git diff HEAD', s, 0)
+  check('iter40: git diff HEAD does not diff a file named HEAD', !r.output.includes('a/HEAD'))
+}
+
+// --- Iter 38: git stash list shows newest stash as stash@{0} ----------------
+{
+  const s = initState()
+  const s1 = simulateCommandOffline('git stash', s, 0).nextState
+  // touch another file so we have something to stash again
+  const s2t = simulateCommandOffline('touch second.js', s1, 0).nextState
+  const s2 = simulateCommandOffline('git stash', s2t, 0).nextState
+  const listOut = simulateCommandOffline('git stash list', s2, 0).output
+  const lines = listOut.split('\n')
+  check('iter38: stash list has 2 entries', lines.length === 2)
+  // stash@{0} should be the most recent (second stash has 'second.js')
+  // stash@{0} is first line; stash@{1} is second line
+  check('iter38: stash list stash@{0} is on first line', lines[0].startsWith('stash@{0}'))
+  check('iter38: stash list stash@{1} is on second line', lines[1].startsWith('stash@{1}'))
+}
+
+// --- Iter 37: checkout/switch to existing branch uses last tip commit --------
+{
+  // Scenario: commit on main, checkout -b feature, commit on feature, go back to main,
+  // commit on main, then switch back to feature — should land on the feature tip, not root.
+  const s = initState()
+  const { s: sA } = run(['git add .', 'git commit -m "A on main"'], s, 0)
+  const { s: sB } = run(['git checkout -b feature'], sA, 0)
+  const { s: sC } = run(['touch f.js', 'git add .', 'git commit -m "B on feature"'], sB, 0)
+  const featureTipHash = sC.commits.find(c => c.message === 'B on feature').hash
+  // Return to main, make a new commit
+  const { s: sD } = run(['git checkout main', 'touch m.js', 'git add .', 'git commit -m "C on main"'], sC, 0)
+  // Switch back to feature
+  const sE = simulateCommandOffline('git checkout feature', sD, 0).nextState
+  check('iter37: checkout feature after divergence: HEAD is feature tip', sE.commits.find(c => c.is_head)?.hash === featureTipHash)
+  check('iter37: checkout feature: branch is feature', sE.branch === 'feature')
+  // git log from feature should show only A and B (not C on main)
+  const logE = simulateCommandOffline('git log --oneline', sE, 0)
+  check('iter37: git log on feature excludes main-only commit', !logE.output.includes('C on main'))
+  check('iter37: git log on feature includes feature commit', logE.output.includes('B on feature'))
+}
+{
+  // Same but using switch
+  const s = initState()
+  const { s: sA } = run(['git add .', 'git commit -m "A"'], s, 0)
+  const { s: sB } = run(['git switch -c feat2'], sA, 0)
+  const { s: sC } = run(['touch f2.js', 'git add .', 'git commit -m "B on feat2"'], sB, 0)
+  const feat2TipHash = sC.commits.find(c => c.message === 'B on feat2').hash
+  const { s: sD } = run(['git switch main', 'touch m2.js', 'git add .', 'git commit -m "C on main"'], sC, 0)
+  const sE = simulateCommandOffline('git switch feat2', sD, 0).nextState
+  check('iter37: switch feat2 HEAD is feat2 tip', sE.commits.find(c => c.is_head)?.hash === feat2TipHash)
+}
+
+// --- Iter 36: git reset moves branch pointer to new HEAD ---------------------
+{
+  // After reset, git log should show (HEAD -> main) on the new HEAD commit
+  const s4 = getInitialOfflineState(4)
+  // reset to d4d4d4d (which has branches: [] in the seed)
+  const r = simulateCommandOffline('git reset --hard d4d4d4d', s4, 4)
+  check('iter36: reset adds branch to new HEAD branches', r.nextState.commits.find(c => c.hash === 'd4d4d4d').branches.includes('main'))
+  const logR = simulateCommandOffline('git log --oneline', r.nextState, 4)
+  check('iter36: git log after reset shows HEAD->main ref', logR.output.includes('HEAD ->'))
+}
+{
+  // git reset HEAD~1: new HEAD should get the branch
+  const s = initState()
+  const { s: s3 } = run(['git add .', 'git commit -m "first"'], s, 0)
+  const { s: s5 } = run(['touch b.js', 'git add .', 'git commit -m "second"'], s3, 0)
+  const r = simulateCommandOffline('git reset HEAD~1', s5, 0)
+  const newHead = r.nextState.commits[r.nextState.commits.length - 1]
+  check('iter36: HEAD~1 reset: new HEAD has branch in branches', newHead.branches.includes('main'))
+  const logR = simulateCommandOffline('git log --oneline', r.nextState, 0)
+  check('iter36: git log after HEAD~1 shows HEAD->main ref', logR.output.includes('HEAD ->'))
+}
+
+// --- Iter 35: git revert uses is_head for parent lookup ----------------------
+{
+  // After two commits on main, revert must parent from the second commit, not first
+  const s = initState()
+  const { s: s3 } = run(['git add .', 'git commit -m "first"'], s, 0)
+  const firstHash = s3.commits[0].hash
+  const { s: s5 } = run(['touch b.js', 'git add .', 'git commit -m "second"'], s3, 0)
+  const secondHash = s5.commits[s5.commits.length - 1].hash
+  const r = simulateCommandOffline('git revert abc1234', s5, 0)
+  check('iter35: revert succeeds after two commits', r.status === 'success')
+  const revertC = r.nextState.commits[r.nextState.commits.length - 1]
+  check('iter35: revert parent is second commit (HEAD), not first', revertC.parents[0] === secondHash)
+  check('iter35: revert parent is NOT first commit', revertC.parents[0] !== firstHash)
+}
+
+// --- Iter 34: git cherry-pick sets correct parent ----------------------------
+{
+  const s = initState()
+  const { s: s3 } = run(['git add .', 'git commit -m "init"'], s, 0)
+  const initHash = s3.commits[0].hash
+  const r = simulateCommandOffline('git cherry-pick abc1234', s3, 0)
+  check('iter34: cherry-pick succeeds', r.status === 'success')
+  const picked = r.nextState.commits[r.nextState.commits.length - 1]
+  check('iter34: cherry-pick commit has non-empty parents', picked.parents.length > 0)
+  check('iter34: cherry-pick commit parent is the HEAD commit', picked.parents[0] === initHash)
+  check('iter34: cherry-pick commit is_head', picked.is_head === true)
+}
+
+// --- Iter 33: second-level checkout -b uses is_head, not branch name ---------
+{
+  // After checkout -b feature, root commit gets 'feature' stamped.
+  // A commit on feature means root and feature-commit both have 'feature'.
+  // checkout -b hotfix from feature must stamp the feature-commit, NOT root.
+  const s = initState()
+  const { s: s3 } = run(['git add .', 'git commit -m "init on main"'], s, 0)
+  const { s: s4 } = run(['git checkout -b feature'], s3, 0)
+  const { s: s5 } = run(['touch feat.js', 'git add .', 'git commit -m "work on feature"'], s4, 0)
+  const featureCommit = s5.commits.find(c => c.message === 'work on feature')
+  check('iter33: feature commit exists before second branch', !!featureCommit)
+  // Now create a second branch from feature
+  const s6 = simulateCommandOffline('git checkout -b hotfix', s5, 0).nextState
+  check('iter33: checkout -b hotfix sets hotfix as branch', s6.branch === 'hotfix')
+  // HEAD should be on the feature commit (not root)
+  const headAfterSwitch = s6.commits.find(c => c.is_head)
+  check('iter33: checkout -b hotfix HEAD is feature commit, not root', headAfterSwitch?.hash === featureCommit?.hash)
+  // Commit on hotfix must have feature commit as parent
+  const s7 = run(['touch hot.js', 'git add .', 'git commit -m "hotfix work"'], s6, 0).s
+  const hotfixCommit = s7.commits.find(c => c.message === 'hotfix work')
+  check('iter33: hotfix commit has non-empty parents', hotfixCommit?.parents.length > 0)
+  check('iter33: hotfix commit parent is feature commit', hotfixCommit?.parents[0] === featureCommit?.hash)
+}
+{
+  // Same for switch -c
+  const s = initState()
+  const { s: s3 } = run(['git add .', 'git commit -m "init"'], s, 0)
+  const { s: s4 } = run(['git checkout -b feature'], s3, 0)
+  const { s: s5 } = run(['touch f.js', 'git add .', 'git commit -m "feature work"'], s4, 0)
+  const featureCommit = s5.commits.find(c => c.message === 'feature work')
+  const s6 = simulateCommandOffline('git switch -c hotfix2', s5, 0).nextState
+  const { s: s7 } = run(['touch h.js', 'git add .', 'git commit -m "hotfix2 work"'], s6, 0)
+  const hotfixCommit = s7.commits.find(c => c.message === 'hotfix2 work')
+  check('iter33: switch -c hotfix2 commit has non-empty parents', hotfixCommit?.parents.length > 0)
+  check('iter33: switch -c hotfix2 commit parent is feature commit', hotfixCommit?.parents[0] === featureCommit?.hash)
 }
 
 // --- report ----------------------------------------------------------------

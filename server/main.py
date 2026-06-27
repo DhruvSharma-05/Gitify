@@ -1,17 +1,35 @@
+from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
-import os
+from pydantic import BaseModel, Field
+from typing import Annotated, List, Optional, Dict, Any
 import glob
+import logging
+import os
+import re
 import shlex
-import time
+import shutil
+import subprocess
+import sys
+import tempfile
 import threading
+import time
+import uuid
 import database
 import verifier
 
-app = FastAPI(title="Gitify API", version="0.1.0")
+logger = logging.getLogger("gitify")
+
+@asynccontextmanager
+async def app_lifespan(app: FastAPI):
+    """Startup: initialise the database schema and launch the sandbox sweeper."""
+    database.init_db()
+    threading.Thread(target=_sandbox_sweeper_loop, daemon=True).start()
+    yield
+    # (shutdown hooks go here if ever needed)
+
+app = FastAPI(title="Gitify API", version="0.1.0", lifespan=app_lifespan)
 
 cors_origins = [
     origin.strip()
@@ -33,13 +51,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize database schema on startup
-@app.on_event("startup")
-def startup_event():
-    database.init_db()
-    # Background reclamation of idle sandboxes so temp dirs don't accumulate.
-    threading.Thread(target=_sandbox_sweeper_loop, daemon=True).start()
-
 # Request/Response Validation Schemas
 class ProgressUpdate(BaseModel):
     lesson_id: int
@@ -49,7 +60,9 @@ class ProgressUpdate(BaseModel):
 
 class VerifyRequest(BaseModel):
     lesson_id: int
-    commands: Optional[List[str]] = []
+    # Cap total commands and per-command length to prevent DoS through the verify_lesson_*
+    # subprocess loops: 200 commands × 512 chars each is still far beyond any real student use.
+    commands: Optional[List[Annotated[str, Field(max_length=512)]]] = Field(default=[], max_length=200)
     state: Optional[Dict[str, Any]] = None
     username: Optional[str] = "student"
 
@@ -61,7 +74,7 @@ def get_progress(username: str = "student"):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[gitify] internal error: {e}")
+        logger.exception("[gitify] internal error")
         raise HTTPException(status_code=500, detail="Internal server error.")
 
 @app.post("/api/progress")
@@ -74,7 +87,7 @@ def update_progress(data: ProgressUpdate):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[gitify] internal error: {e}")
+        logger.exception("[gitify] internal error")
         raise HTTPException(status_code=500, detail="Internal server error.")
 
 @app.post("/api/exercises/verify")
@@ -122,11 +135,13 @@ def verify_exercise(data: VerifyRequest):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[gitify] internal error: {e}")
+        logger.exception("[gitify] internal error")
         raise HTTPException(status_code=500, detail="Internal server error.")
 
 class TerminalExecuteRequest(BaseModel):
-    command: str
+    # 4096 chars is far more than any real shell command; cap prevents DoS amplification
+    # via shlex.split / regex / git subprocess chains on arbitrarily large payloads.
+    command: str = Field(..., max_length=4096)
     session_id: str
     lesson_id: int
     username: Optional[str] = "student"
@@ -135,10 +150,6 @@ class ResetRequest(BaseModel):
     lesson_id: int
     session_id: str
     username: Optional[str] = "student"
-
-import tempfile
-import uuid
-import shutil
 
 # Per-lesson sandboxes: each (session_id, lesson_id) pair gets its own isolated
 # git repository on disk, seeded once with that lesson's baseline. This keeps every
@@ -211,6 +222,7 @@ def get_or_create_sandbox(session_id: str, lesson_id: int):
                 "last_used": time.time(),
                 "lock": threading.Lock(),
                 "ready": threading.Event(),
+                "seeding_error": None,  # set if initialize_sandbox raises
             }
             SESSION_SANDBOXES[key] = session_obj
             needs_seed = True
@@ -222,10 +234,24 @@ def get_or_create_sandbox(session_id: str, lesson_id: int):
     if needs_seed:
         try:
             verifier.initialize_sandbox(session_obj["base_path"], lesson_id)
+        except Exception as seed_exc:
+            session_obj["seeding_error"] = seed_exc
         finally:
             session_obj["ready"].set()
+        # Re-raise after unblocking the event so no thread waits forever
+        seeding_err = session_obj["seeding_error"]
+        if isinstance(seeding_err, BaseException):
+            raise RuntimeError(
+                f"Sandbox seeding failed for lesson {lesson_id}: {seeding_err}"
+            ) from seeding_err
     else:
         session_obj["ready"].wait(timeout=30)
+        # Propagate a seeding failure to this waiting thread as well
+        seeding_err = session_obj.get("seeding_error")
+        if isinstance(seeding_err, BaseException):
+            raise RuntimeError(
+                f"Sandbox seeding failed for lesson {lesson_id}: {seeding_err}"
+            ) from seeding_err
     return key, session_obj
 
 def _sweep_idle_sandboxes():
@@ -243,7 +269,7 @@ def _sandbox_sweeper_loop():
         try:
             _sweep_idle_sandboxes()
         except Exception as e:
-            print(f"[gitify] sandbox sweeper error: {e}")
+            logger.exception("[gitify] sandbox sweeper error")
 
 def ensure_lesson_remote(base_path: str, lesson_id: int):
     """Lesson 1 ships a bare remote on disk; once the student runs `git init`, wire it
@@ -278,11 +304,15 @@ def build_sync_state(base_path: str, cwd_rel: str = "") -> Dict[str, Any]:
         if stash_out.strip():
             for idx, line in enumerate(stash_out.strip().split("\n")):
                 label = line.split(":", 2)[-1].strip() if ":" in line else line
+                # Query the actual files touched by this stash entry
+                _, sf_out, _ = verifier.run_git_command(
+                    base_path, ["stash", "show", "--name-only", f"stash@{{{idx}}}"])
+                stash_files = [f.strip() for f in sf_out.strip().split("\n") if f.strip()] if sf_out.strip() else []
                 stashes_list.append({
                     "id": idx,
                     "name": f"stash@{{{idx}}}",
                     "label": label,
-                    "files": ["Checkout.jsx", "styles.css"]
+                    "files": stash_files
                 })
 
         _, log_out, _ = verifier.run_git_command(base_path, ["log", "--oneline", "-n", "10"])
@@ -344,15 +374,25 @@ def resolve_writable_path(base_path: str, cwd_rel: str, user_path: str) -> str:
 
 def expand_file_args(base_path: str, cwd_rel: str, args: List[str]) -> List[str]:
     """Expands shell globs (*, ?, []) in file arguments against the current directory.
-    Tokens without glob chars (or with no matches) are returned unchanged."""
+    Tokens without glob chars (or with no matches) are returned unchanged.
+
+    Security: absolute paths (e.g. /etc/passwd or C:\\Windows\\*) are forced relative
+    by stripping leading separators and Windows drive letters before joining with the
+    sandbox base_dir, so globs can never escape the sandbox boundary.
+    """
     base_dir = resolve_sandbox_path(base_path, cwd_rel)
     out = []
     for a in args:
         if any(c in a for c in "*?["):
-            matches = sorted(glob.glob(os.path.join(base_dir, a)))
+            # Sanitize: strip Windows drive letter (e.g. "C:") then leading separators
+            safe_a = re.sub(r'^[A-Za-z]:', '', a).lstrip('/\\')
+            matches = sorted(glob.glob(os.path.join(base_dir, safe_a)))
             if matches:
                 out.extend(os.path.relpath(m, base_dir) for m in matches)
                 continue
+            # No match: still append the sanitized form so absolute paths don't leak through
+            out.append(safe_a)
+            continue
         out.append(a)
     return out
 
@@ -453,10 +493,9 @@ def run_sandbox_command(base_path: str, cwd_rel: str, parts: List[str], stdin=No
             invert = any("v" in f for f in flags)
             countonly = any("c" in f for f in flags)
             number = any("n" in f for f in flags)
-            import re as _re
             try:
-                rx = _re.compile(pattern, _re.IGNORECASE if ignore else 0)
-            except _re.error:
+                rx = re.compile(pattern, re.IGNORECASE if ignore else 0)
+            except re.error:
                 rx = None
             matched = []
             for idx, line in enumerate(text.splitlines(), 1):
@@ -655,7 +694,7 @@ def run_pipeline(base_path, cwd_state, segment):
     if not ran:
         return 0, "", ""
 
-    if redir is not None and code == 0:
+    if redir is not None:
         mode, fname = redir
         try:
             tgt_path = resolve_writable_path(base_path, cwd_state["rel"], fname)
@@ -758,7 +797,7 @@ def execute_terminal_command(data: TerminalExecuteRequest):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[execute] internal error: {e}")
+        logger.exception("[execute] internal error")
         raise HTTPException(status_code=500, detail="Internal server error while running command.")
 
 @app.post("/api/exercises/reset")
@@ -778,15 +817,7 @@ def reset_exercise_sandbox(data: ResetRequest):
 
         # Wipe database progress + checkpoints for this lesson to start fresh!
         database.update_user_progress(data.lesson_id, False, 0, data.username)
-        conn = database.get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT id FROM users WHERE username = ?", (data.username,))
-        user = cursor.fetchone()
-        if user:
-            user_id = user["id"]
-            cursor.execute("DELETE FROM checkpoints WHERE user_id = ? AND lesson_id = ?", (user_id, data.lesson_id))
-            conn.commit()
-        conn.close()
+        database.delete_user_checkpoints(data.lesson_id, data.username)
 
         # Load baseline checklists + sync state from the freshly seeded sandbox
         _, _, subtasks = verifier.check_sandbox_state(temp_dir, data.lesson_id)
@@ -801,7 +832,7 @@ def reset_exercise_sandbox(data: ResetRequest):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[gitify] internal error: {e}")
+        logger.exception("[gitify] internal error")
         raise HTTPException(status_code=500, detail="Internal server error.")
 
 
@@ -829,7 +860,7 @@ def enter_lesson(data: ResetRequest):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[gitify] internal error: {e}")
+        logger.exception("[gitify] internal error")
         raise HTTPException(status_code=500, detail="Internal server error.")
 
 @app.get("/api/exercises/checkpoints")
@@ -840,7 +871,7 @@ def load_checkpoints(lesson_id: int, username: str = "student"):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[gitify] internal error: {e}")
+        logger.exception("[gitify] internal error")
         raise HTTPException(status_code=500, detail="Internal server error.")
 
 class CommitDetailsRequest(BaseModel):
@@ -859,9 +890,8 @@ def get_commit_details(data: CommitDetailsRequest):
         if not os.path.exists(os.path.join(base_path, ".git")):
             raise HTTPException(status_code=400, detail="Git repository not initialized in sandbox.")
 
-        import re as _re
         safe_hash = data.commit_hash.strip()
-        if not _re.match(r'^[0-9a-f]{4,40}$', safe_hash, _re.IGNORECASE):
+        if not re.match(r'^[0-9a-f]{4,40}$', safe_hash, re.IGNORECASE):
             raise HTTPException(status_code=400, detail="Invalid commit hash.")
 
         code, stdout, stderr = verifier.run_git_command(base_path, ["show", "--stat", safe_hash])
@@ -875,15 +905,17 @@ def get_commit_details(data: CommitDetailsRequest):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[gitify] internal error: {e}")
+        logger.exception("[gitify] internal error")
         raise HTTPException(status_code=500, detail="Internal server error.")
 
 
 class WriteFileRequest(BaseModel):
     session_id: str
     lesson_id: int
-    filename: str
-    content: str
+    # Filename must be a simple name; 256 chars is the POSIX filename limit.
+    filename: str = Field(..., max_length=256)
+    # 2 MB is generous for any legitimate sandbox file edit.
+    content: str = Field(..., max_length=2_097_152)
 
 @app.post("/api/terminal/write-file")
 def write_sandbox_file(data: WriteFileRequest):
@@ -896,9 +928,11 @@ def write_sandbox_file(data: WriteFileRequest):
 
         base_path = session_obj["base_path"]
 
-        # Security: only allow simple filenames, no path traversal
+        # Security: only allow simple filenames, no path traversal.
+        # os.path.basename strips all directory separators (prevents writing inside .git/).
+        # The equality check blocks the bare '.git' entry itself.
         filename = os.path.basename(data.filename)
-        if not filename or filename.startswith(".git"):
+        if not filename or filename == ".git":
             raise HTTPException(status_code=400, detail="Invalid filename.")
 
         with session_obj["lock"]:
@@ -916,7 +950,7 @@ def write_sandbox_file(data: WriteFileRequest):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[gitify] internal error: {e}")
+        logger.exception("[gitify] internal error")
         raise HTTPException(status_code=500, detail="Internal server error.")
 
 
@@ -933,7 +967,6 @@ class RebaseInteractiveRequest(BaseModel):
 @app.post("/api/terminal/rebase-interactive")
 def execute_rebase_interactive(data: RebaseInteractiveRequest):
     """Applies an interactive rebase plan to the sandbox repository."""
-    import subprocess
     try:
         sb_key = sandbox_key(normalize_session_id(data.session_id), data.lesson_id)
         session_obj = SESSION_SANDBOXES.get(sb_key)
@@ -950,8 +983,7 @@ def execute_rebase_interactive(data: RebaseInteractiveRequest):
             raise HTTPException(status_code=400, detail="Rebase plan cannot exceed 20 commits.")
 
         # Build the rebase-todo content
-        import re as _re
-        _hash_re = _re.compile(r'^[0-9a-f]{4,40}$', _re.IGNORECASE)
+        _hash_re = re.compile(r'^[0-9a-f]{4,40}$', re.IGNORECASE)
         todo_lines = []
         for item in data.plan:
             action = item.action.strip().lower()
@@ -971,18 +1003,16 @@ def execute_rebase_interactive(data: RebaseInteractiveRequest):
         todo_content = "\n".join(todo_lines) + "\n"
 
         # Write todo to a temp file and use it as GIT_SEQUENCE_EDITOR
-        import tempfile as tmpmod
-        import sys as _sys
-        todo_file = tmpmod.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8")
+        todo_file = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8")
         todo_file.write(todo_content)
         todo_file.close()
 
         # Write a small Python helper that copies our pre-built todo over git's file.
         # Using Python avoids shell-quoting differences ($1 vs %1) across platforms.
-        helper_file = tmpmod.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8")
+        helper_file = tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8")
         helper_file.write(f"import shutil, sys\nshutil.copy2({repr(todo_file.name)}, sys.argv[1])\n")
         helper_file.close()
-        editor_script = f'{_sys.executable} "{helper_file.name}"'
+        editor_script = f'{sys.executable} "{helper_file.name}"'
 
         env = os.environ.copy()
         env["GIT_SEQUENCE_EDITOR"] = editor_script
@@ -1032,7 +1062,7 @@ def execute_rebase_interactive(data: RebaseInteractiveRequest):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[gitify] internal error: {e}")
+        logger.exception("[gitify] internal error")
         raise HTTPException(status_code=500, detail="Internal server error.")
 
 

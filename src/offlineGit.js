@@ -218,7 +218,7 @@ function simulateForkCommand(commandText, state) {
 // Commands the in-memory simulator can faithfully reproduce. Anything else — shell
 // operators, or tools the simulator doesn't implement — is refused with a clear note
 // rather than silently behaving differently from the live backend.
-const OFFLINE_SUPPORTED_CMDS = ['ls', 'cat', 'touch', 'rm', 'clear', 'git']
+const OFFLINE_SUPPORTED_CMDS = ['ls', 'cat', 'touch', 'rm', 'clear', 'git', 'echo', 'pwd']
 
 function simulateBisectCommand(commandText, state) {
   const next = JSON.parse(JSON.stringify(state))
@@ -392,6 +392,12 @@ export function simulateCommandOffline(commandText, state, lessonId) {
   else if (baseCmd === "clear") {
     output = "CLEAR_CONSOLE"
   }
+  else if (baseCmd === "echo") {
+    output = parts.slice(1).join(' ').replace(/^["']|["']$/g, '')
+  }
+  else if (baseCmd === "pwd") {
+    output = '/workspace' + (nextState.pwd ? '/' + nextState.pwd : '')
+  }
   else if (baseCmd === "git") {
     const sub = parts[1]
     if (!sub) {
@@ -413,11 +419,7 @@ export function simulateCommandOffline(commandText, state, lessonId) {
       }
       else if (sub === "status") {
         const stagedFiles = nextState.staged
-        // Files that appear in at least one commit are tracked; don't show them as untracked
-        const committedFiles = new Set(nextState.commits.flatMap(c => c.branches ? [] : []).concat(
-          nextState.commits.length > 0 ? nextState.files.filter(() => false) : []
-        ))
-        // Simpler: once a file has ever been committed it's tracked — mark via committed_files set
+        // Files recorded in committed_files are tracked (populated by git commit and seeded initial states).
         const trackedFiles = new Set(nextState.committed_files || [])
         const untracked = nextState.files.filter(f => !stagedFiles.includes(f) && !trackedFiles.has(f))
 
@@ -428,12 +430,15 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           out += `Your branch is up to date.\n\n`
         }
 
+        const stagedDels = nextState.staged_deletions || []
         if (nextState.conflict_active) {
           out += `You have unmerged paths.\n  (fix conflicts and run "git commit")\n\nUnmerged paths:\n  (use "git add <file>..." to mark resolution)\n\tboth modified:   config.js\n\n`
-        } else if (stagedFiles.length > 0) {
+        } else if (stagedFiles.length > 0 || stagedDels.length > 0) {
           out += `Changes to be committed:\n  (use "git restore --staged <file>..." to unstage)\n`
+          const alreadyTracked = new Set(nextState.committed_files || [])
+          stagedDels.forEach(f => { out += `\tdeleted:   ${f}\n` })
           stagedFiles.forEach(f => {
-            out += `\tnew file:   ${f}\n`
+            out += `\t${alreadyTracked.has(f) ? 'modified' : 'new file'}:   ${f}\n`
           })
           out += `\n`
         }
@@ -457,7 +462,12 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           output = "Nothing specified, nothing added."
           status = "error"
         } else {
-          if (filePattern === "." || filePattern === "-A" || filePattern === "--all" || filePattern === "-u") {
+          if (filePattern === "-u") {
+            // -u: stage tracked modified files only (mirrors real `git add -u` behavior)
+            const tracked = new Set(nextState.committed_files || [])
+            nextState.staged = nextState.files.filter(f => tracked.has(f))
+            output = ""
+          } else if (filePattern === "." || filePattern === "-A" || filePattern === "--all") {
             nextState.staged = [...nextState.files]
             if (nextState.conflict_active) {
               nextState.conflict_resolved = true
@@ -491,26 +501,46 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           const longMsg = parts.find(p => p.startsWith("--message="))
           msg = longMsg ? longMsg.slice("--message=".length).replace(/^["']|["']$/g, "") : "Minor updates"
         }
-        // -a / -am: auto-stage all tracked files (mirrors real `git commit -a` behavior)
+
+        // git commit --amend: replace HEAD commit's message (and absorb any staged changes)
+        if (parts.includes("--amend")) {
+          const headCommit = nextState.commits.find(c => c.is_head)
+          if (!headCommit) {
+            output = "fatal: You have nothing to amend."; status = "error"
+          } else {
+            const amendMsg = msg !== "Minor updates" ? msg : headCommit.message
+            headCommit.message = amendMsg
+            nextState.committed_files = Array.from(new Set([...(nextState.committed_files || []), ...nextState.staged]))
+            nextState.staged = []
+            output = `[${nextState.branch} ${headCommit.hash}] ${amendMsg}\n Date: 1 second ago`
+          }
+        } else {
+
+        // -a / -am: auto-stage tracked modified files only (mirrors real `git commit -a` behavior).
+        // Untracked files must be explicitly `git add`-ed first.
         const hasAFlag = parts.some(p => /^-[a-zA-Z]*a/.test(p)) || parts.includes("--all")
-        if (hasAFlag && nextState.staged.length === 0 && nextState.files.length > 0) {
-          nextState.staged = [...nextState.files]
+        if (hasAFlag && nextState.staged.length === 0) {
+          const tracked = new Set(nextState.committed_files || [])
+          nextState.staged = nextState.files.filter(f => tracked.has(f))
         }
 
-        if (nextState.staged.length === 0 && !nextState.conflict_resolved) {
+        const stagedDeletions = nextState.staged_deletions || []
+        if (nextState.staged.length === 0 && stagedDeletions.length === 0 && !nextState.conflict_resolved) {
           output = `On branch ${nextState.branch}\nnothing to commit, working tree clean`
         } else {
           const hash = Math.random().toString(16).substring(2, 9)
           const fullHash = hash + '0'.repeat(33)
-          
+          const activeBranch = nextState.branch
+          // Find the true HEAD before clearing is_head flags; using is_head avoids
+          // false matches when multiple commits share a branch name (e.g. after
+          // checkout -b stamps the new branch onto the root commit).
+          const currentHead = nextState.commits.find(c => c.is_head)
+
           nextState.commits = nextState.commits.map(c => ({
             ...c,
-            is_head: c.branches.includes(nextState.branch) ? false : c.is_head
+            is_head: c.branches.includes(activeBranch) ? false : c.is_head
           }))
 
-          const activeBranch = nextState.branch
-          const currentHead = nextState.commits.find(c => c.branches.includes(activeBranch))
-          
           const newCommit = {
             hash: hash,
             full_hash: fullHash,
@@ -521,19 +551,52 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           }
 
           nextState.commits.push(newCommit)
+          // Capture staged count before clearing so the output reports files committed, not total workspace files
+          const committedCount = (nextState.staged.length + stagedDeletions.length) || 1
           // Track which files have been committed so git status knows they're tracked
           nextState.committed_files = Array.from(new Set([...(nextState.committed_files || []), ...nextState.staged]))
+          // Apply staged deletions: remove deleted files from committed_files
+          nextState.committed_files = nextState.committed_files.filter(f => !stagedDeletions.includes(f))
           nextState.staged = []
-          output = `[${activeBranch} ${hash}] ${msg}\n ${nextState.files.length} files changed`
+          nextState.staged_deletions = []
+          output = `[${activeBranch} ${hash}] ${msg}\n ${committedCount} file${committedCount !== 1 ? 's' : ''} changed`
         }
+        } // end of non-amend branch
       }
       else if (sub === "log") {
         if (nextState.commits.length === 0) {
           output = `fatal: your current branch '${nextState.branch}' does not have any commits yet`
           status = "error"
         } else {
+          // --all: show commits from every branch, not just HEAD's reachable chain
+          const showAll = parts.includes("--all")
+          const headCommit = nextState.commits.find(c => c.is_head)
+          let reachable = nextState.commits
+          if (!showAll && headCommit) {
+            // Filter to commits reachable from HEAD by walking the parent chain.
+            // Falls back to all commits if HEAD is ambiguous (no is_head set).
+            const seen = new Set()
+            const queue = [headCommit.hash]
+            while (queue.length > 0) {
+              const h = queue.shift()
+              if (!h || seen.has(h)) continue
+              const found = nextState.commits.find(c => c.hash === h)
+              if (!found) continue
+              seen.add(h)
+              found.parents.forEach(p => queue.push(p))
+            }
+            reachable = nextState.commits.filter(c => seen.has(c.hash))
+          }
           const oneline = parts.includes("--oneline") || parts.includes("--one-line")
-          const reversed = [...nextState.commits].reverse()
+          // -n N / -N / --max-count=N: limit the number of commits shown
+          let maxCount = Infinity
+          const shortN = parts.find(p => /^-\d+$/.test(p))
+          if (shortN) maxCount = parseInt(shortN.slice(1), 10)
+          const nIdx = parts.indexOf('-n')
+          if (nIdx !== -1 && parts[nIdx + 1]) maxCount = parseInt(parts[nIdx + 1], 10) || maxCount
+          const maxFlag = parts.find(p => p.startsWith('--max-count='))
+          if (maxFlag) maxCount = parseInt(maxFlag.split('=')[1], 10) || maxCount
+          const reversed = [...reachable].reverse().slice(0, maxCount)
           if (oneline) {
             output = reversed.map(c => {
               const brText = c.branches.length > 0 ? ` (${c.is_head ? 'HEAD -> ' : ''}${c.branches.join(', ')})` : ''
@@ -552,6 +615,7 @@ export function simulateCommandOffline(commandText, state, lessonId) {
         const branchArg = parts[3] || parts[2]
         const isDelete = flag === "-d" || flag === "-D" || flag === "--delete"
         const isVerbose = flag === "-v" || flag === "--verbose" || flag === "-a" || flag === "--all"
+        const isRename = flag === "-m" || flag === "-M" || flag === "--move"
         if (!flag || isVerbose) {
           const list = nextState.branches.map(b => (b === nextState.branch ? `* ${b}` : `  ${b}`))
           output = list.join("\n")
@@ -564,6 +628,19 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             nextState.branches = nextState.branches.filter(b => b !== delName)
             nextState.commits = nextState.commits.map(c => ({ ...c, branches: c.branches.filter(b => b !== delName) }))
             output = `Deleted branch ${delName}.`
+          }
+        } else if (isRename) {
+          // git branch -m [<old>] <new>: rename a branch
+          const oldName = parts[4] ? parts[3] : nextState.branch
+          const newName = parts[4] ? parts[4] : parts[3]
+          if (!newName) { output = "fatal: branch name required"; status = "error" }
+          else if (!nextState.branches.includes(oldName)) { output = `error: branch '${oldName}' not found`; status = "error" }
+          else if (nextState.branches.includes(newName)) { output = `fatal: A branch named '${newName}' already exists.`; status = "error" }
+          else {
+            nextState.branches = nextState.branches.map(b => b === oldName ? newName : b)
+            nextState.commits = nextState.commits.map(c => ({ ...c, branches: c.branches.map(b => b === oldName ? newName : b) }))
+            if (nextState.branch === oldName) nextState.branch = newName
+            output = ""
           }
         } else {
           const newBranchName = flag
@@ -583,11 +660,20 @@ export function simulateCommandOffline(commandText, state, lessonId) {
       else if (sub === "checkout") {
         let targetBranch = parts[2]
         const isBFlag = parts[2] === "-b"
+        const isDashDash = parts[2] === "--"
         if (isBFlag) {
           targetBranch = parts[3]
         }
 
-        if (!targetBranch) {
+        if (isDashDash) {
+          // git checkout -- <file>: discard working-tree changes (restore from HEAD)
+          const filename = parts[3]
+          if (!filename) {
+            output = "fatal: you must specify path(s) to restore"; status = "error"
+          } else {
+            output = `Restored '${filename}'`
+          }
+        } else if (!targetBranch) {
           output = "fatal: Branch name required."
           status = "error"
         } else {
@@ -597,19 +683,28 @@ export function simulateCommandOffline(commandText, state, lessonId) {
               status = "error"
             } else {
               nextState.branches.push(targetBranch)
+              // Stamp the new branch onto the HEAD commit so the next commit
+              // can find its parent via branches.includes(activeBranch).
+              const headCommit = nextState.commits.find(c => c.is_head)
+              if (headCommit) headCommit.branches.push(targetBranch)
               nextState.branch = targetBranch
               nextState.commits = nextState.commits.map(c => ({
                 ...c,
-                is_head: c.branches.includes(targetBranch)
+                is_head: c.branches.includes(targetBranch) && c.is_head
               }))
               output = `Switched to a new branch '${targetBranch}'`
             }
           } else {
             if (nextState.branches.includes(targetBranch)) {
               nextState.branch = targetBranch
+              // Use the last commit with targetBranch (insertion order = most recent tip).
+              // Multiple commits can share a branch name after checkout -b stamping, so
+              // branches.includes() alone would return the root, not the branch tip.
+              const withBranch = nextState.commits.filter(c => c.branches.includes(targetBranch))
+              const tipHash = withBranch.length > 0 ? withBranch[withBranch.length - 1].hash : null
               nextState.commits = nextState.commits.map(c => ({
                 ...c,
-                is_head: c.branches.includes(targetBranch)
+                is_head: c.hash === tipHash
               }))
               output = `Switched to branch '${targetBranch}'`
             } else {
@@ -621,7 +716,15 @@ export function simulateCommandOffline(commandText, state, lessonId) {
       }
       else if (sub === "merge") {
         const mergeSrc = parts[2]
-        if (!mergeSrc) {
+        if (mergeSrc === "--abort") {
+          if (!nextState.conflict_active) {
+            output = "fatal: There is no merge in progress (MERGE_HEAD missing)."; status = "error"
+          } else {
+            nextState.conflict_active = false
+            nextState.conflict_triggered = false
+            output = "Merge aborted."
+          }
+        } else if (!mergeSrc) {
           output = "fatal: Branch to merge required."
           status = "error"
         } else if (!nextState.branches.includes(mergeSrc)) {
@@ -648,46 +751,78 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             output = "No stash entries found."
             status = "error"
           } else {
-            const top = nextState.stashes[nextState.stashes.length - 1]
-            if (top.files) top.files.forEach(f => { if (!nextState.files.includes(f)) nextState.files.push(f) })
-            if (action === "pop") nextState.stashes.pop()
-            if (!nextState.files.includes("Checkout.jsx")) nextState.files.push("Checkout.jsx")
-            if (!nextState.files.includes("styles.css")) nextState.files.push("styles.css")
-            output = action === "pop"
-              ? "Dropped refs/stash@{0} (offline)"
-              : "Applied stash@{0} (offline)"
+            // Parse optional stash@{N} reference; default to top (stash@{0})
+            const stashRef = parts[3]
+            const dispIdx = stashRef ? parseInt((stashRef.match(/\{(\d+)\}/) || [, 0])[1], 10) : 0
+            const arrIdx = nextState.stashes.length - 1 - dispIdx
+            if (arrIdx < 0 || arrIdx >= nextState.stashes.length) {
+              output = `error: ${stashRef} is not a valid reference`; status = "error"
+            } else {
+              const entry = nextState.stashes[arrIdx]
+              // Restore only the files that were actually stashed
+              if (entry.files) entry.files.forEach(f => { if (!nextState.files.includes(f)) nextState.files.push(f) })
+              if (action === "pop") nextState.stashes.splice(arrIdx, 1)
+              output = action === "pop"
+                ? `Dropped refs/${stashRef || 'stash@{0}'}`
+                : `Applied ${stashRef || 'stash@{0}'}`
+            }
           }
         } else if (action === "list") {
           if (nextState.stashes.length === 0) {
             output = "(empty stash)"
           } else {
-            output = nextState.stashes.map((s, i) => `stash@{${i}}: WIP on ${s.label || nextState.branch}: stashed changes`).join("\n")
+            // stash@{0} is the most recent stash (top of stack), so display in reverse order
+            output = [...nextState.stashes].reverse().map((s, i) => {
+              const br = s.label || nextState.branch
+              return s.message ? `stash@{${i}}: On ${br}: ${s.message}` : `stash@{${i}}: WIP on ${br}: stashed changes`
+            }).join("\n")
           }
         } else if (action === "show") {
           if (nextState.stashes.length === 0) {
             output = "No stash entries found."; status = "error"
           } else {
             const top = nextState.stashes[nextState.stashes.length - 1]
-            output = (top.files || ["Checkout.jsx", "styles.css"]).map(f => ` M ${f}`).join("\n")
+            output = (top.files || []).map(f => ` M ${f}`).join("\n") || "(empty stash)"
           }
         } else if (action === "drop") {
           if (nextState.stashes.length === 0) {
             output = "No stash entries found."; status = "error"
           } else {
-            nextState.stashes.pop()
-            output = "Dropped refs/stash@{0}"
+            const stashRef = parts[3]
+            const dispIdx = stashRef ? parseInt((stashRef.match(/\{(\d+)\}/) || [, 0])[1], 10) : 0
+            const arrIdx = nextState.stashes.length - 1 - dispIdx
+            if (arrIdx < 0 || arrIdx >= nextState.stashes.length) {
+              output = `error: ${stashRef} is not a valid reference`; status = "error"
+            } else {
+              nextState.stashes.splice(arrIdx, 1)
+              output = `Dropped ${stashRef || 'stash@{0}'}`
+            }
           }
         } else {
-          // git stash (no subcommand) = git stash push
-          nextState.stashes.push({
-            id: nextState.stashes.length,
-            name: `stash@{${nextState.stashes.length}}`,
-            label: nextState.branch,
-            files: ["Checkout.jsx", "styles.css"]
-          })
-          nextState.stashed_offline = true
-          nextState.files = nextState.files.filter(f => f !== "Checkout.jsx" && f !== "styles.css")
-          output = `Saved working directory and index state WIP on ${nextState.branch}: WIP stash`
+          // git stash / git stash push [-m "msg"] / git stash save "msg"
+          const mIdx = parts.indexOf('-m')
+          const stashMsg = action === 'save'
+            ? (parts[3] ? parts.slice(3).join(' ').replace(/^["']|["']$/g, '') : null)
+            : (mIdx !== -1 && parts[mIdx + 1] ? parts.slice(mIdx + 1).join(' ').replace(/^["']|["']$/g, '') : null)
+          const committed = new Set(nextState.committed_files || [])
+          const toStash = nextState.files.filter(f => !committed.has(f))
+          if (toStash.length === 0 && nextState.staged.length === 0) {
+            output = "No local changes to save"
+          } else {
+            const savedFiles = [...toStash, ...nextState.staged.filter(f => !toStash.includes(f))]
+            nextState.stashes.push({
+              id: nextState.stashes.length,
+              name: `stash@{${nextState.stashes.length}}`,
+              label: nextState.branch,
+              message: stashMsg || null,
+              files: savedFiles
+            })
+            nextState.stashed_offline = true
+            nextState.files = nextState.files.filter(f => !toStash.includes(f))
+            nextState.staged = nextState.staged.filter(f => !savedFiles.includes(f))
+            const msgSuffix = stashMsg ? `: ${stashMsg}` : ': WIP stash'
+            output = `Saved working directory and index state On ${nextState.branch}${msgSuffix}`
+          }
         }
       }
       else if (sub === "cherry-pick") {
@@ -696,12 +831,13 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           output = "fatal: Commit hash required."
           status = "error"
         } else {
+          const cherryHead = nextState.commits.find(c => c.is_head)
           const newCommit = {
             hash: 'b7a91c0',
             full_hash: 'b7a91c01c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1',
             message: "Fix tax rounding",
             branches: [nextState.branch],
-            parents: [],
+            parents: cherryHead ? [cherryHead.hash] : [],
             is_head: true
           }
           nextState.commits = nextState.commits.map(c => ({
@@ -737,25 +873,71 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           output = "fatal: Commit hash required."
           status = "error"
         } else {
+          const activeBranch = nextState.branch
+          const revertHead = nextState.commits.find(c => c.is_head)
           const newCommit = {
             hash: 'rev1234',
             full_hash: 'rev12345c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1',
             message: "Revert \"Skip null metric check\"",
-            branches: [nextState.branch],
-            parents: [],
+            branches: [activeBranch],
+            parents: revertHead ? [revertHead.hash] : [],
             is_head: true
           }
-          nextState.commits = nextState.commits.map(c => ({
-            ...c,
-            is_head: false
-          }))
+          nextState.commits = nextState.commits.map(c => ({ ...c, is_head: false }))
           nextState.commits.push(newCommit)
-          output = `[${nextState.branch} rev1234] Revert "Skip null metric check"`
+          output = `[${activeBranch} rev1234] Revert "Skip null metric check"`
+        }
+      }
+      else if (sub === "reset") {
+        const flags = parts.slice(2).filter(a => a.startsWith('-'))
+        const targets = parts.slice(2).filter(a => !a.startsWith('-'))
+        const isHard = flags.includes('--hard')
+        const target = targets[0] // HEAD, HEAD~N, or a hash
+        const fileArg = targets[1] // only for `git reset HEAD <file>`
+
+        if (!target || target === 'HEAD') {
+          // git reset [HEAD] [<file>] — unstage file(s)
+          if (fileArg) {
+            nextState.staged = nextState.staged.filter(f => f !== fileArg)
+          } else {
+            nextState.staged = []
+          }
+          output = ""
+        } else if (target.startsWith('HEAD~')) {
+          const n = parseInt(target.slice('HEAD~'.length), 10) || 1
+          const newLen = Math.max(0, nextState.commits.length - n)
+          nextState.commits = nextState.commits.slice(0, newLen)
+          if (isHard) nextState.staged = []
+          const head = nextState.commits[newLen - 1]
+          nextState.commits = nextState.commits.map((c, i) => ({ ...c, is_head: i === newLen - 1 }))
+          // Move the branch pointer to the new HEAD so git log shows (HEAD -> branch)
+          if (head && !head.branches.includes(nextState.branch)) head.branches.push(nextState.branch)
+          output = head ? `HEAD is now at ${head.hash} ${head.message}` : "HEAD is now at (empty)"
+        } else {
+          // hash-based reset: truncate commits after the target
+          const idx = nextState.commits.findIndex(c => c.hash === target || c.full_hash?.startsWith(target))
+          if (idx === -1) {
+            output = `fatal: ambiguous argument '${target}': unknown revision`; status = "error"
+          } else {
+            nextState.commits = nextState.commits.slice(0, idx + 1)
+            if (isHard) nextState.staged = []
+            const head = nextState.commits[idx]
+            nextState.commits = nextState.commits.map((c, i) => ({ ...c, is_head: i === idx }))
+            // Move the branch pointer to the new HEAD so git log shows (HEAD -> branch)
+            if (head && !head.branches.includes(nextState.branch)) head.branches.push(nextState.branch)
+            output = `HEAD is now at ${head.hash} ${head.message}`
+          }
         }
       }
       else if (sub === "rebase") {
         const isInteractive = parts.includes("-i")
-        if (isInteractive) {
+        const isAbort = parts.includes("--abort")
+        const isContinue = parts.includes("--continue")
+        if (isAbort) {
+          output = "Rebase aborted."
+        } else if (isContinue) {
+          output = "Successfully rebased and updated."
+        } else if (isInteractive) {
           nextState.commits = nextState.commits.filter(c => !c.message.includes("debug payment state"))
           nextState.commits = nextState.commits.filter(c => !c.message.includes("Fix typo"))
           output = "Successfully rebased and updated timeline offline."
@@ -774,6 +956,8 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             output = `fatal: a branch named '${targetBranch}' already exists`; status = "error"
           } else {
             nextState.branches.push(targetBranch)
+            const headCommit = nextState.commits.find(c => c.is_head)
+            if (headCommit) headCommit.branches.push(targetBranch)
             nextState.branch = targetBranch
             output = `Switched to a new branch '${targetBranch}'`
           }
@@ -782,7 +966,9 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             output = `fatal: invalid reference: ${targetBranch}`; status = "error"
           } else {
             nextState.branch = targetBranch
-            nextState.commits = nextState.commits.map(c => ({ ...c, is_head: c.branches.includes(targetBranch) }))
+            const withBranch = nextState.commits.filter(c => c.branches.includes(targetBranch))
+            const tipHash = withBranch.length > 0 ? withBranch[withBranch.length - 1].hash : null
+            nextState.commits = nextState.commits.map(c => ({ ...c, is_head: c.hash === tipHash }))
             output = `Switched to branch '${targetBranch}'`
           }
         }
@@ -792,9 +978,17 @@ export function simulateCommandOffline(commandText, state, lessonId) {
         const isStaged = parts.includes("--staged") || parts.includes("-S")
         const filename = parts.find(p => !p.startsWith("-") && p !== "restore" && p !== "git")
         if (isStaged && filename) {
-          nextState.staged = nextState.staged.filter(f => f !== filename)
+          // '.' and ':/' are "all files" wildcards; clear the entire staged list
+          if (filename === '.' || filename === ':/' || filename === '*') {
+            nextState.staged = []
+          } else {
+            nextState.staged = nextState.staged.filter(f => f !== filename)
+          }
           output = ""
         } else if (!isStaged && filename) {
+          if (filename === '.' || filename === ':/' || filename === '*') {
+            nextState.files = [...(nextState.committed_files || [])]
+          }
           output = `Restored '${filename}'`
         } else {
           output = "fatal: you must specify path(s) to restore"; status = "error"
@@ -803,7 +997,8 @@ export function simulateCommandOffline(commandText, state, lessonId) {
       // git diff — show unstaged changes or diff between HEAD and staged
       else if (sub === "diff") {
         const isCached = parts.includes("--cached") || parts.includes("--staged")
-        const targetFile = parts.find(p => !p.startsWith("-") && p !== "diff")
+        // Slice past 'git' and 'diff'; exclude flags and HEAD refs to get the optional filename arg
+        const targetFile = parts.slice(2).find(p => !p.startsWith("-") && !p.match(/^HEAD/))
         const showFiles = targetFile ? [targetFile] : (isCached ? nextState.staged : nextState.files.filter(f => !nextState.staged.includes(f)))
         if (showFiles.length === 0) {
           output = ""
@@ -814,21 +1009,111 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           }).join("\n\n")
         }
       }
-      // git remote — add/show remotes
+      // git rm — stage file deletion (remove from working tree unless --cached)
+      else if (sub === "rm") {
+        const isCached = parts.includes("--cached")
+        const filename = parts.slice(2).find(p => !p.startsWith("-"))
+        if (!filename) {
+          output = "fatal: No pathspec given"; status = "error"
+        } else if (!nextState.files.includes(filename) && !(nextState.committed_files || []).includes(filename)) {
+          output = `fatal: pathspec '${filename}' did not match any files`; status = "error"
+        } else {
+          if (!isCached) {
+            nextState.files = nextState.files.filter(f => f !== filename)
+            delete nextState.fileContents[filename]
+          }
+          nextState.staged = nextState.staged.filter(f => f !== filename)
+          // Stage the deletion so `git commit` will remove the file from committed_files
+          if (!nextState.staged_deletions) nextState.staged_deletions = []
+          if (!nextState.staged_deletions.includes(filename)) nextState.staged_deletions.push(filename)
+          output = `rm '${filename}'`
+        }
+      }
+      // git remote — add/show/rename/remove/get-url remotes
       else if (sub === "remote") {
         const action = parts[2]
+        const remName = parts[3]
         if (!action || action === "-v" || action === "--verbose") {
+          const name = nextState.remoteName || "origin"
           output = nextState.remote
-            ? `origin\t${nextState.remote} (fetch)\norigin\t${nextState.remote} (push)`
+            ? `${name}\t${nextState.remote} (fetch)\n${name}\t${nextState.remote} (push)`
             : "(no remotes configured)"
         } else if (action === "add") {
-          const remoteName = parts[3] || "origin"
-          const remoteUrl = parts[4] || "https://github.com/you/repo.git"
-          nextState.remote = remoteUrl
-          nextState.remoteName = remoteName
+          nextState.remoteName = remName || "origin"
+          nextState.remote = parts[4] || "https://github.com/you/repo.git"
           output = ""
+        } else if (action === "rename") {
+          const newName = parts[4]
+          if (!remName || !newName) { output = "usage: git remote rename <old> <new>"; status = "error" }
+          else { nextState.remoteName = newName; output = "" }
+        } else if (action === "remove" || action === "rm") {
+          if (!remName) { output = "usage: git remote remove <name>"; status = "error" }
+          else { nextState.remote = null; nextState.remoteName = null; output = "" }
+        } else if (action === "get-url") {
+          if (!nextState.remote) { output = `error: No such remote '${remName || 'origin'}'`; status = "error" }
+          else output = nextState.remote
+        } else if (action === "set-url") {
+          const newUrl = parts[4]
+          if (!newUrl) { output = "usage: git remote set-url <name> <url>"; status = "error" }
+          else { nextState.remote = newUrl; output = "" }
         } else {
           output = `git remote: '${action}' is not a git command`; status = "error"
+        }
+      }
+      // git tag — list, create (lightweight or annotated), or delete tags
+      else if (sub === "tag") {
+        if (!nextState.tags) nextState.tags = []
+        const isDelete = parts.includes("-d") || parts.includes("--delete")
+        // Tag name is the first non-flag argument after 'tag'
+        const tagName = parts.slice(2).find(p => !p.startsWith("-"))
+        if (isDelete) {
+          if (!tagName) { output = "error: tag name required"; status = "error" }
+          else if (!nextState.tags.includes(tagName)) { output = `error: tag '${tagName}' not found`; status = "error" }
+          else { nextState.tags = nextState.tags.filter(t => t !== tagName); output = `Deleted tag '${tagName}'` }
+        } else if (!tagName) {
+          output = nextState.tags.length ? nextState.tags.join('\n') : '(no tags)'
+        } else if (nextState.tags.includes(tagName)) {
+          output = `fatal: tag '${tagName}' already exists`; status = "error"
+        } else {
+          nextState.tags.push(tagName)
+          output = ""
+        }
+      }
+      // git config — get/set/list configuration values
+      else if (sub === "config") {
+        const isList = parts.includes("--list") || parts.includes("-l")
+        if (isList) {
+          const entries = Object.entries(nextState.config || {}).map(([k, v]) => `${k}=${v}`)
+          output = entries.length ? entries.join('\n') : 'user.name=Student\nuser.email=student@gitify.edu'
+        } else {
+          // git config [--global] <key> [<value>]
+          const keyIdx = parts.findIndex(p => !p.startsWith('-') && p !== 'git' && p !== 'config')
+          const key = keyIdx !== -1 ? parts[keyIdx] : null
+          const value = keyIdx !== -1 && parts[keyIdx + 1]
+            ? parts.slice(keyIdx + 1).join(' ').replace(/^["']|["']$/g, '') : null
+          if (!key) { output = "usage: git config [--global] key [value]"; status = "error" }
+          else if (value !== null) {
+            if (!nextState.config) nextState.config = {}
+            nextState.config[key] = value
+            output = ""
+          } else {
+            const val = (nextState.config || {})[key]
+            if (val === undefined) { output = `error: key does not contain a section: ${key}`; status = "error" }
+            else output = val
+          }
+        }
+      }
+      // git show [<hash>] — display commit details
+      else if (sub === "show") {
+        const hashArg = parts[2] && !parts[2].startsWith('-') ? parts[2] : null
+        const target = hashArg
+          ? nextState.commits.find(c => c.hash === hashArg || c.full_hash?.startsWith(hashArg))
+          : nextState.commits.find(c => c.is_head)
+        if (!target) {
+          output = `fatal: ambiguous argument '${hashArg || 'HEAD'}': unknown revision or path`; status = "error"
+        } else {
+          const brText = target.branches.length > 0 ? ` (${target.is_head ? 'HEAD -> ' : ''}${target.branches.join(', ')})` : ''
+          output = `commit ${target.full_hash}${brText}\nAuthor: Gitify Offline Student <student@gitify.edu>\nDate:   Wed Jun 10 2026\n\n    ${target.message}\n`
         }
       }
       else {
@@ -836,7 +1121,7 @@ export function simulateCommandOffline(commandText, state, lessonId) {
         status = "error"
       }
     }
-  } 
+  }
   else {
     output = `bash: ${baseCmd}: command not found`
     status = "error"
