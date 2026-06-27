@@ -1,0 +1,30 @@
+name: Qodo PR Reviewer
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+  issue_comment:
+    types: [created]
+
+jobs:
+  pr_agent_job:
+    if: ${{ github.event.sender.type != 'Bot' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: write
+    name: Provide Qodo PR Verdict
+    steps:
+      - id: pr-agent
+        uses: qodo-ai/pr-agent@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # To use Qodo Merge Pro keys instead, uncomment the line below and comment the OPENAI_KEY line
+          # QODO_MERGE_KEY: ${{ secrets.QODO_MERGE_KEY }}
+        with:
+          # Only run the review command on PR open (and not describe/improve which might modify the PR description)
+          github_action_config.auto_review: "true"
+          github_action_config.auto_describe: "false"
+          github_action_config.auto_improve: "false"
