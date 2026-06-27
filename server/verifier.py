@@ -150,7 +150,8 @@ def verify_lesson_5(commands):
     """
     with tempfile.TemporaryDirectory() as temp_dir:
         run_git_command(temp_dir, ["init", "-b", "feature/payments"])
-        
+        run_git_command(temp_dir, ["commit", "--allow-empty", "-m", "Initial commit"])
+
         run_git_command(temp_dir, ["checkout", "-b", "hotfix/invoice"])
         with open(os.path.join(temp_dir, "Invoice.jsx"), "w") as f:
             f.write("// tax calculations")
