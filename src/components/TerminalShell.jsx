@@ -7,7 +7,7 @@ import { simulateCommandOffline, checkOfflineProgress } from '../offlineGit.js'
 const GIT_SUBCOMMANDS = [
   'status', 'log', 'add', 'commit', 'checkout', 'branch', 'merge',
   'stash', 'rebase', 'pull', 'push', 'remote', 'switch', 'restore',
-  'diff', 'bisect', 'fetch', 'revert', 'cherry-pick', 'tag', 'reset', 'rm', 'show', 'config'
+  'diff', 'bisect', 'fetch', 'revert', 'cherry-pick', 'tag', 'reset', 'rm', 'show', 'config', 'blame'
 ]
 const ALLOWED_BASE_CMDS = [
   'git', 'gh', 'ls', 'cat', 'cd', 'pwd', 'echo', 'touch', 'mkdir',
@@ -100,6 +100,13 @@ function welcomeBanner(lessonId) {
       { type: 'system', text: 'Welcome — Lesson 8: Fork & Contribute (simulated GitHub workflow)' },
       { type: 'system', text: 'Goal: fork a project, clone it, commit a fix, push, then open and merge a pull request.' },
       { type: 'system', text: 'Start by forking the repo:  gh repo fork octo/awesome-lib   (open the Cheatsheet for every command)' }
+    ]
+  }
+  if (lessonId === 10) {
+    return [
+      { type: 'system', text: 'Welcome — Lesson 10: Blame & History Archaeology (read-only investigation)' },
+      { type: 'system', text: 'Goal: find who wrote each line, when a function first appeared, and inspect that commit.' },
+      { type: 'system', text: 'Try:  git blame pricing.js  →  git log -S "applyDiscount"  →  git show c33d4e5' }
     ]
   }
   return [
@@ -267,6 +274,34 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
       const check = checkOfflineProgress(ns, 8)
       if (onSyncState) {
         onSyncState({ fork: ns.fork, subtasks: check.subtasks, verified: check.verified, validation_message: check.msg })
+      }
+      if (check.verified) {
+        setHistory(prev => [...prev, { type: 'success', text: `✓ EXERCISE SOLVED: ${check.msg}` }])
+        if (onSuccess) onSuccess()
+      }
+      return
+    }
+
+    // Lesson 10 (Blame & History Archaeology) is a read-only investigation over a
+    // fixed history — run it entirely in-browser like lesson 8.
+    if (lessonId === 10) {
+      setIsExecuting(false)
+      const result = simulateCommandOffline(rawCmd, offlineState, 10)
+      const ns = result.nextState
+      setOfflineState(ns)
+      if (result.output === 'CLEAR_CONSOLE') { setHistory([]); return }
+      setHistory(prev => [...prev, { type: result.status === 'success' ? 'output' : 'error', text: result.output || '(No output)' }])
+      const check = checkOfflineProgress(ns, 10)
+      if (onSyncState) {
+        onSyncState({
+          subtasks: check.subtasks,
+          verified: check.verified,
+          validation_message: check.msg,
+          commits_graph: ns.commits,
+          file_contents: ns.fileContents,
+          files: ns.files,
+          blame: ns.blame
+        })
       }
       if (check.verified) {
         setHistory(prev => [...prev, { type: 'success', text: `✓ EXERCISE SOLVED: ${check.msg}` }])

@@ -1,5 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react'
 import { Target, Check, AlertTriangle, CornerUpLeft, RotateCcw, Eye } from 'lucide-react'
+import './HistoryLesson.css'
+
 import PretextCanvas from './PretextCanvas.jsx'
 import { useToast } from './Toast.jsx'
 

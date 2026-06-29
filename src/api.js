@@ -119,6 +119,23 @@ export function getInitialOfflineState(lessonId) {
     // Lesson 8 is a simulated GitHub fork/PR workflow (not real local git).
     base.scenario = 'fork'
     base.fork = { fork: false, clone: false, commit: false, push: false, pr: false, merge: false, sync: false }
+  } else if (lessonId === 10) {
+    // Lesson 10 (blame & history archaeology) — a read-only, fully-simulated lesson.
+    base.initialized = true
+    base.files = ['pricing.js', 'README.md']
+    base.fileContents = {
+      'pricing.js': "export function orderTotal(items, pct) {\n  const base = items.reduce((s, i) => s + i.price * i.qty, 0);\n  const tax = applyTax(base);\n  const off = applyDiscount(base, pct);\n  const total = Math.round((base + tax - off) * 100) / 100;\n  return total.toLocaleString('en-US', { style: 'currency', currency: 'USD' });\n}\n",
+      'README.md': '# Pricing Service\nComputes order totals with tax and discounts.\n'
+    }
+    base.committed_files = ['pricing.js', 'README.md']
+    base.blame = { blamed: false, searched: false, inspected: false }
+    base.commits = [
+      { hash: 'a11b2c3', full_hash: 'a11b2c3000000000000000000000000000000000', message: 'Create pricing module', branches: [], parents: [], is_head: false },
+      { hash: 'b22c3d4', full_hash: 'b22c3d4000000000000000000000000000000000', message: 'Add tax calculation', branches: [], parents: ['a11b2c3'], is_head: false },
+      { hash: 'c33d4e5', full_hash: 'c33d4e5000000000000000000000000000000000', message: 'Add discount support', branches: [], parents: ['b22c3d4'], is_head: false },
+      { hash: 'd44e5f6', full_hash: 'd44e5f6000000000000000000000000000000000', message: 'Round totals to cents', branches: [], parents: ['c33d4e5'], is_head: false },
+      { hash: 'e55f6g7', full_hash: 'e55f6g7000000000000000000000000000000000', message: 'Fix currency formatting', branches: ['main'], parents: ['d44e5f6'], is_head: true }
+    ]
   } else if (lessonId === 9) {
     base.initialized = true
     base.files = ['cart.js', 'test.js', 'ui.js', 'discount.js', 'logger.js', 'README.md']
@@ -208,6 +225,12 @@ export function getInitialSubtasks(lessonId) {
         { id: "bisect_bad", title: "Mark HEAD as bad ('git bisect bad')", completed: false },
         { id: "bisect_good", title: "Mark old commit as good ('git bisect good <hash>')", completed: false },
         { id: "bisect_reset", title: "Reset bisect and return to main ('git bisect reset')", completed: false }
+      ]
+    case 10:
+      return [
+        { id: "blame_file", title: "Annotate each line ('git blame pricing.js')", completed: false },
+        { id: "pickaxe_search", title: "Find when a function appeared ('git log -S \"applyDiscount\"')", completed: false },
+        { id: "inspect_commit", title: "Inspect the commit that introduced it ('git show c33d4e5')", completed: false }
       ]
     default:
       return []

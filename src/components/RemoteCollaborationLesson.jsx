@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import './RemoteCollaborationLesson.css'
 import PretextCanvas from './PretextCanvas.jsx'
 
 const team = [

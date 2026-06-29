@@ -267,11 +267,18 @@ check('shell-ops: real "|" pipe is blocked', simulateCommandOffline('cat x | gre
   check('reset: lesson 4 reset_done satisfied after hard reset', p.verified === true)
 }
 {
-  // git reset HEAD~1 — remove last commit
+  // git reset HEAD~1 with two commits removes the last one and moves HEAD back.
   const s = initState()
   const s2 = simulateCommandOffline('git add .', s, 0).nextState
   const s3 = simulateCommandOffline('git commit -m "first"', s2, 0).nextState
-  check('reset: HEAD~1 removes last commit', simulateCommandOffline('git reset HEAD~1', s3, 0).nextState.commits.length === 0)
+  const s4 = simulateCommandOffline('git commit -m "second"', simulateCommandOffline('git add .', s3, 0).nextState, 0).nextState
+  const r = simulateCommandOffline('git reset HEAD~1', s4, 0)
+  check('reset: HEAD~1 removes the last of two commits', r.nextState.commits.length === 1)
+  check('reset: HEAD~1 leaves first commit as HEAD', r.nextState.commits.find(c => c.is_head)?.message === 'first')
+  // On a single-commit repo HEAD~1 is past the root → error, matching real git
+  // (which fails with "ambiguous argument 'HEAD~1'"). Previously this silently
+  // emptied history, which neither real git nor any lesson expects.
+  check('reset: HEAD~1 past the root errors', simulateCommandOffline('git reset HEAD~1', s3, 0).status === 'error')
 }
 
 // --- iter27: git revert sets correct parent --------------------------------
@@ -324,7 +331,7 @@ check('shell-ops: real "|" pipe is blocked', simulateCommandOffline('cat x | gre
 }
 
 // --- Iter 22: git status clean for pre-seeded lessons (2-9) ----------------
-import { getInitialOfflineState } from '../src/api.js'
+import { getInitialOfflineState, getInitialSubtasks } from '../src/api.js'
 {
   // Lesson 2 starts with index.js already committed — status should be clean
   const s2 = getInitialOfflineState(2)
@@ -839,6 +846,198 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter33: switch -c hotfix2 commit has non-empty parents', hotfixCommit?.parents.length > 0)
   check('iter33: switch -c hotfix2 commit parent is feature commit', hotfixCommit?.parents[0] === featureCommit?.hash)
 }
+
+// --- iter61: branch ref only marks the tip, not every commit on the branch --
+{
+  // Two commits on main: the ref label "main" must live only on the new tip.
+  const s = initState()
+  const { s: s2 } = run(['git add .', 'git commit -m "init"', 'git add .', 'git commit -m "second"'], s, 0)
+  const tip = s2.commits[s2.commits.length - 1]
+  const root = s2.commits[0]
+  check('iter61: tip commit carries the main label', tip.branches.includes('main'))
+  check('iter61: tip commit is HEAD', tip.is_head === true)
+  check('iter61: old commit drops the main label', !root.branches.includes('main'))
+  const log = simulateCommandOffline('git log --oneline', s2, 0)
+  check('iter61: git log shows (HEAD -> main) on tip only', (log.output.match(/main/g) || []).length === 1)
+}
+{
+  // After branching off and committing on the feature branch, the shared
+  // commit keeps main but loses the feature label (which moves to the new tip).
+  const s = initState()
+  const { s: s3 } = run(['git add .', 'git commit -m "init"'], s, 0)
+  const { s: s5 } = run(['git checkout -b feature/x', 'touch f.js', 'git add .', 'git commit -m "feat"'], s3, 0)
+  const shared = s5.commits.find(c => c.message === 'init')
+  const tip = s5.commits.find(c => c.message === 'feat')
+  check('iter61: shared commit keeps main after branch commit', shared.branches.includes('main'))
+  check('iter61: shared commit drops feature/x label', !shared.branches.includes('feature/x'))
+  check('iter61: feature tip carries only feature/x', tip.branches.includes('feature/x') && !tip.branches.includes('main'))
+}
+{
+  // revert moves the branch ref forward too — only the revert commit shows main.
+  const s = initState()
+  const { s: s2 } = run(['git add .', 'git commit -m "first"', 'git add .', 'git commit -m "second"'], s, 0)
+  const r = simulateCommandOffline('git revert abc1234', s2, 0)
+  const mainLabels = r.nextState.commits.filter(c => c.branches.includes('main'))
+  check('iter61: after revert only one commit carries main', mainLabels.length === 1)
+  check('iter61: revert commit is the one carrying main', mainLabels[0].is_head === true)
+}
+{
+  // cherry-pick likewise forwards the ref.
+  const s = initState()
+  const { s: s2 } = run(['git add .', 'git commit -m "first"', 'git add .', 'git commit -m "second"'], s, 0)
+  const r = simulateCommandOffline('git cherry-pick abc1234', s2, 0)
+  const mainLabels = r.nextState.commits.filter(c => c.branches.includes('main'))
+  check('iter61: after cherry-pick only one commit carries main', mainLabels.length === 1)
+}
+
+// --- iter62: git merge integrates source branch into history ----------------
+const lesson2State = () => ({
+  initialized: true, branch: 'main', files: ['index.js'], fileContents: { 'index.js': '//' },
+  staged: [], commits: [
+    { hash: 'c1c1c1c', full_hash: 'c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1', message: 'Init setup', branches: ['main'], parents: [], is_head: true }
+  ], stashes: [], branches: ['main'], committed_files: ['index.js'], lessonId: 2,
+})
+{
+  // Fast-forward: merge a feature branch whose tip descends from main's tip.
+  const { s } = run(['git checkout -b feature/auth', 'touch auth.js', 'git add .', 'git commit -m "add auth"', 'git checkout main', 'git merge feature/auth'], lesson2State(), 2)
+  const log = simulateCommandOffline('git log --oneline', s, 2).output
+  check('iter62: ff merge brings feature commit into main log', log.includes('add auth'))
+  check('iter62: ff merge keeps init commit in main log', log.includes('Init setup'))
+  check('iter62: ff merge sets merged_offline for verification', s.merged_offline === true)
+  check('iter62: lesson 2 verifies after merge', checkOfflineProgress(s, 2).verified === true)
+  const head = s.commits.find(c => c.is_head)
+  check('iter62: ff merge HEAD is the feature tip', head.message === 'add auth')
+  check('iter62: ff merge main label rides the new tip', head.branches.includes('main'))
+}
+{
+  // Divergent: both branches have a unique commit → a merge commit is created.
+  const base = lesson2State()
+  const { s: sBranch } = run(['git checkout -b feature/auth', 'touch a.js', 'git add .', 'git commit -m "feat work"'], base, 2)
+  // add a divergent commit on main
+  const { s: sMain } = run(['git checkout main', 'touch m.js', 'git add .', 'git commit -m "main work"'], sBranch, 2)
+  const r = simulateCommandOffline('git merge feature/auth', sMain, 2)
+  const mergeCommit = r.nextState.commits.find(c => c.parents.length > 1)
+  check('iter62: divergent merge creates a merge commit', !!mergeCommit)
+  check('iter62: merge commit has two parents', mergeCommit && mergeCommit.parents.length === 2)
+  const log = simulateCommandOffline('git log --oneline', r.nextState, 2).output
+  check('iter62: divergent merge log shows both branch tips', log.includes('feat work') && log.includes('main work'))
+}
+{
+  // Already-merged source → "Already up to date." (no new commit).
+  const { s } = run(['git checkout -b feature/auth', 'touch a.js', 'git add .', 'git commit -m "feat"', 'git checkout main', 'git merge feature/auth'], lesson2State(), 2)
+  const before = s.commits.length
+  const r = simulateCommandOffline('git merge feature/auth', s, 2)
+  check('iter62: re-merging already-merged branch is up to date', r.output.includes('Already up to date'))
+  check('iter62: re-merge does not add a commit', r.nextState.commits.length === before)
+}
+
+// --- iter63: git push advances the origin/<branch> remote-tracking ref ------
+{
+  const { s } = run(['git add .', 'git commit -m "init"'], initState(), 1)
+  const r = simulateCommandOffline('git push', s, 1)
+  const head = r.nextState.commits.find(c => c.is_head)
+  check('iter63: push stamps origin/main on the tip', head.branches.includes('origin/main'))
+  check('iter63: push output is not the misleading up-to-date line', !r.output.includes('Everything up-to-date'))
+  check('iter63: push sets pushed_offline for verification', r.nextState.pushed_offline === true)
+  const log = simulateCommandOffline('git log --oneline', r.nextState, 1).output
+  check('iter63: git log shows origin/main after push', log.includes('origin/main'))
+  // lesson 1 still verifies through the full flow
+  const full = run(['git init', 'git add .', 'git commit -m "init"', 'git push'], lesson0State(), 1).s
+  full.lessonId = 1
+  check('iter63: lesson 1 verifies after push', checkOfflineProgress(full, 1).verified === true)
+  // pushing again with nothing new is up to date
+  const r2 = simulateCommandOffline('git push', r.nextState, 1)
+  check('iter63: second push with no new commits is up to date', r2.output.includes('Everything up-to-date'))
+}
+
+// --- iter64: git reset resolves target via parent chain, not array position -
+{
+  // Branched history where insertion order != HEAD's parent chain:
+  //   main: A <- B (HEAD);  feature: A <- F  (F inserted last in the array)
+  const branched = () => ({
+    initialized: true, branch: 'main', files: [], fileContents: {}, staged: [], stashes: [],
+    branches: ['main', 'feature'], committed_files: [], lessonId: 0,
+    commits: [
+      { hash: 'aaa', full_hash: 'aaa' + '0'.repeat(37), message: 'A', branches: [], parents: [], is_head: false },
+      { hash: 'bbb', full_hash: 'bbb' + '0'.repeat(37), message: 'B', branches: ['main'], parents: ['aaa'], is_head: true },
+      { hash: 'fff', full_hash: 'fff' + '0'.repeat(37), message: 'F', branches: ['feature'], parents: ['aaa'], is_head: false },
+    ],
+  })
+  const r = simulateCommandOffline('git reset --hard HEAD~1', branched(), 0)
+  const head = r.nextState.commits.find(c => c.is_head)
+  check('iter64: reset HEAD~1 moves HEAD to the parent (A), not stays on B', head?.hash === 'aaa')
+  check('iter64: reset HEAD~1 keeps sibling branch commit F', r.nextState.commits.some(c => c.hash === 'fff'))
+  check('iter64: reset HEAD~1 drops the old HEAD commit B', !r.nextState.commits.some(c => c.hash === 'bbb'))
+  check('iter64: reset moves main ref onto the new HEAD', head?.branches.includes('main'))
+  check('iter64: reset leaves feature ref intact', r.nextState.commits.find(c => c.hash === 'fff').branches.includes('feature'))
+  // hash-based reset is likewise parent-chain correct
+  const r2 = simulateCommandOffline('git reset --hard aaa', branched(), 0)
+  check('iter64: reset <hash> keeps sibling F', r2.nextState.commits.some(c => c.hash === 'fff'))
+  check('iter64: reset <hash> drops B', !r2.nextState.commits.some(c => c.hash === 'bbb'))
+  // out-of-range HEAD~N errors instead of silently emptying history
+  const r3 = simulateCommandOffline('git reset HEAD~9', branched(), 0)
+  check('iter64: reset HEAD~9 (beyond root) errors', r3.status === 'error')
+}
+
+// --- iter65: resolving a conflicted merge produces a two-parent merge commit -
+{
+  let s = getInitialOfflineState(3)
+  const featureTip = s.commits.find(c => c.branches.includes('feature/ui')).hash
+  const mainTip = s.commits.find(c => c.is_head).hash
+  s = simulateCommandOffline('git merge feature/ui', s, 3).nextState
+  check('iter65: conflict merge records merge_source', s.merge_source === 'feature/ui')
+  s = simulateCommandOffline('git add config.js', s, 3).nextState
+  // After staging the resolution, the stage_resolved subtask is complete.
+  const staged = checkOfflineProgress(s, 3).subtasks.find(t => t.id === 'stage_resolved')
+  check('iter65: stage_resolved subtask complete after add', staged.completed === true)
+  const r = simulateCommandOffline('git commit -m "Merge feature/ui"', s, 3)
+  const head = r.nextState.commits.find(c => c.is_head)
+  check('iter65: resolved-conflict commit has two parents', head.parents.length === 2)
+  check('iter65: merge commit parents are main tip and feature tip', head.parents.includes(mainTip) && head.parents.includes(featureTip))
+  check('iter65: merge_source cleared after commit', !r.nextState.merge_source)
+  // After committing, the commit_merge subtask is complete (commits >= 4).
+  const committed = checkOfflineProgress(r.nextState, 3).subtasks.find(t => t.id === 'commit_merge')
+  check('iter65: commit_merge subtask complete after commit', committed.completed === true)
+  // A normal (non-merge) commit remains single-parent
+  const r2 = simulateCommandOffline('git commit -m "follow up"', simulateCommandOffline('touch x.js', simulateCommandOffline('git add .', r.nextState, 3).nextState, 3).nextState, 3)
+  const followUp = r2.nextState.commits.find(c => c.message === 'follow up')
+  check('iter65: subsequent normal commit is single-parent', !followUp || followUp.parents.length === 1)
+  // Aborting the merge clears merge_source so a later commit is not a merge
+  let sa = getInitialOfflineState(3)
+  sa = simulateCommandOffline('git merge feature/ui', sa, 3).nextState
+  sa = simulateCommandOffline('git merge --abort', sa, 3).nextState
+  check('iter65: merge --abort clears merge_source', !sa.merge_source)
+}
+
+// --- Lesson 10: blame & history archaeology --------------------------------
+{
+  const seq = ['git blame pricing.js', 'git log -S "applyDiscount"', 'git show c33d4e5']
+  const { s, outs } = run(seq, getInitialOfflineState(10), 10)
+  const chk = checkOfflineProgress(s, 10)
+  check('blame: full workflow verifies', chk.verified === true)
+  check('blame: all 3 subtasks complete', chk.subtasks.length === 3 && chk.subtasks.every(t => t.completed))
+  check('blame: every step succeeded', outs.every(o => o.status === 'success'))
+  check('blame: blame output attributes the discount line to c33d4e5', outs[0].output.includes('c33d4e5') && outs[0].output.includes('applyDiscount'))
+  check('blame: pickaxe finds the introducing commit', outs[1].output.includes('c33d4e5') && outs[1].output.includes('Add discount support'))
+  check('blame: show reveals the added line as a diff', outs[2].output.includes('+  const off = applyDiscount'))
+}
+// blame guards
+check('blame: bare git blame errors', simulateCommandOffline('git blame', getInitialOfflineState(10), 10).status === 'error')
+check('blame: blame on unknown file errors', simulateCommandOffline('git blame nope.js', getInitialOfflineState(10), 10).status === 'error')
+{
+  // git log -S with a term that never existed reports no commits and still counts as a search
+  const r = simulateCommandOffline('git log -S "neverHere"', getInitialOfflineState(10), 10)
+  check('blame: pickaxe with no match reports none', r.output.includes('no commits'))
+  check('blame: pickaxe still marks searched', r.nextState.blame.searched === true)
+}
+{
+  // git show on a non-culprit commit does not satisfy the inspect objective
+  const r = simulateCommandOffline('git show a11b2c3', getInitialOfflineState(10), 10)
+  check('blame: show on non-culprit does not set inspected', !r.nextState.blame.inspected)
+  check('blame: show on non-culprit still succeeds', r.status === 'success')
+}
+check('blame: partial progress not verified', checkOfflineProgress(run(['git blame pricing.js'], getInitialOfflineState(10), 10).s, 10).verified === false)
+check('blame: getInitialSubtasks(10) has three items', getInitialSubtasks(10).length === 3)
 
 // --- report ----------------------------------------------------------------
 if (failures.length) {
