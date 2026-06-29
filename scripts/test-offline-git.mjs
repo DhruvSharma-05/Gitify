@@ -840,6 +840,49 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter33: switch -c hotfix2 commit parent is feature commit', hotfixCommit?.parents[0] === featureCommit?.hash)
 }
 
+// --- iter61: branch ref only marks the tip, not every commit on the branch --
+{
+  // Two commits on main: the ref label "main" must live only on the new tip.
+  const s = initState()
+  const { s: s2 } = run(['git add .', 'git commit -m "init"', 'git add .', 'git commit -m "second"'], s, 0)
+  const tip = s2.commits[s2.commits.length - 1]
+  const root = s2.commits[0]
+  check('iter61: tip commit carries the main label', tip.branches.includes('main'))
+  check('iter61: tip commit is HEAD', tip.is_head === true)
+  check('iter61: old commit drops the main label', !root.branches.includes('main'))
+  const log = simulateCommandOffline('git log --oneline', s2, 0)
+  check('iter61: git log shows (HEAD -> main) on tip only', (log.output.match(/main/g) || []).length === 1)
+}
+{
+  // After branching off and committing on the feature branch, the shared
+  // commit keeps main but loses the feature label (which moves to the new tip).
+  const s = initState()
+  const { s: s3 } = run(['git add .', 'git commit -m "init"'], s, 0)
+  const { s: s5 } = run(['git checkout -b feature/x', 'touch f.js', 'git add .', 'git commit -m "feat"'], s3, 0)
+  const shared = s5.commits.find(c => c.message === 'init')
+  const tip = s5.commits.find(c => c.message === 'feat')
+  check('iter61: shared commit keeps main after branch commit', shared.branches.includes('main'))
+  check('iter61: shared commit drops feature/x label', !shared.branches.includes('feature/x'))
+  check('iter61: feature tip carries only feature/x', tip.branches.includes('feature/x') && !tip.branches.includes('main'))
+}
+{
+  // revert moves the branch ref forward too — only the revert commit shows main.
+  const s = initState()
+  const { s: s2 } = run(['git add .', 'git commit -m "first"', 'git add .', 'git commit -m "second"'], s, 0)
+  const r = simulateCommandOffline('git revert abc1234', s2, 0)
+  const mainLabels = r.nextState.commits.filter(c => c.branches.includes('main'))
+  check('iter61: after revert only one commit carries main', mainLabels.length === 1)
+  check('iter61: revert commit is the one carrying main', mainLabels[0].is_head === true)
+}
+{
+  // cherry-pick likewise forwards the ref.
+  const s = initState()
+  const { s: s2 } = run(['git add .', 'git commit -m "first"', 'git add .', 'git commit -m "second"'], s, 0)
+  const r = simulateCommandOffline('git cherry-pick abc1234', s2, 0)
+  const mainLabels = r.nextState.commits.filter(c => c.branches.includes('main'))
+  check('iter61: after cherry-pick only one commit carries main', mainLabels.length === 1)
+}
+
 // --- report ----------------------------------------------------------------
 if (failures.length) {
   console.error(`offline-git tests: ${passed} passed, ${failures.length} FAILED`)

@@ -536,9 +536,14 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           // checkout -b stamps the new branch onto the root commit).
           const currentHead = nextState.commits.find(c => c.is_head)
 
+          // Move the branch ref forward: the previous tip of activeBranch must
+          // drop the label so only the new commit (the new tip) carries it —
+          // matching real git and the seeded-state convention. Leaving the label
+          // on the old tip made `git log` show "(main)" on every commit.
           nextState.commits = nextState.commits.map(c => ({
             ...c,
-            is_head: c.branches.includes(activeBranch) ? false : c.is_head
+            is_head: false,
+            branches: c.branches.filter(b => b !== activeBranch)
           }))
 
           const newCommit = {
@@ -840,9 +845,11 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             parents: cherryHead ? [cherryHead.hash] : [],
             is_head: true
           }
+          // Move the branch ref forward onto the new tip (see git commit handler).
           nextState.commits = nextState.commits.map(c => ({
             ...c,
-            is_head: false
+            is_head: false,
+            branches: c.branches.filter(b => b !== nextState.branch)
           }))
           nextState.commits.push(newCommit)
           output = `[${nextState.branch} b7a91c0] Fix tax rounding\n 1 file changed`
@@ -883,7 +890,8 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             parents: revertHead ? [revertHead.hash] : [],
             is_head: true
           }
-          nextState.commits = nextState.commits.map(c => ({ ...c, is_head: false }))
+          // Move the branch ref forward onto the new tip (see git commit handler).
+          nextState.commits = nextState.commits.map(c => ({ ...c, is_head: false, branches: c.branches.filter(b => b !== activeBranch) }))
           nextState.commits.push(newCommit)
           output = `[${activeBranch} rev1234] Revert "Skip null metric check"`
         }

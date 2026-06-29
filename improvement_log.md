@@ -64,6 +64,7 @@
 | 58 | CORRECTNESS/UX | `offlineGit.js`: `git config` fell through to "Unknown git subcommand"; added handler for `--list`, `config key value` (set), and `config key` (get); also added `config` to `GIT_SUBCOMMANDS`; 4 new assertions | PASS |
 | 59 | CORRECTNESS | `offlineGit.js`: `git remote rename/remove/get-url/set-url` fell through to "not a git command"; added all four operations plus fixed `-v` to use `remoteName` not hardcoded "origin"; 4 new assertions | PASS |
 | 60 | CORRECTNESS | `offlineGit.js`: `git merge --abort` errored with "not something we can merge"; `git rebase --abort` returned "Rebase complete." (wrong); added abort/continue guards before existing merge/rebase logic; 7 new assertions | PASS |
+| 61 | CORRECTNESS/UX | `offlineGit.js`: `git commit`/`cherry-pick`/`revert` left the branch ref label on the old tip, so `git log` showed `(main)` on every commit instead of only the current tip; now the ref forwards to the new commit (strip `activeBranch` from prior commits' `branches`), matching real git and the seeded-state convention; 10 new assertions | PASS |
 
 ---
 
