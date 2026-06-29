@@ -146,6 +146,18 @@ export function checkOfflineProgress(state, lessonId) {
       ? "Culprit found and bisect session closed!"
       : "Use git bisect start → bad → good → reset to hunt down the bug."
   }
+  else if (lessonId === 10) {
+    const a = state.blame || {}
+    subtasks = [
+      { id: "blame_file", title: "Annotate each line ('git blame pricing.js')", completed: !!a.blamed },
+      { id: "pickaxe_search", title: "Find when a function appeared ('git log -S \"applyDiscount\"')", completed: !!a.searched },
+      { id: "inspect_commit", title: "Inspect the commit that introduced it ('git show c33d4e5')", completed: !!a.inspected }
+    ]
+    verified = !!(a.blamed && a.searched && a.inspected)
+    msg = verified
+      ? "History traced — you found who wrote the line, when it appeared, and why!"
+      : "Use git blame, then git log -S to pickaxe-search, then git show on the culprit commit."
+  }
 
   return { verified, msg, subtasks }
 }
@@ -310,6 +322,126 @@ function simulateBisectCommand(commandText, state) {
   return { nextState: next, output, status }
 }
 
+// Lesson 10 (blame & history archaeology) is a read-only simulation. It covers
+// `git blame` (line-by-line authorship), the `git log -S` pickaxe (which commit
+// added/removed a string), and `git show` (inspect a commit). The history is
+// fixed so the answers are deterministic for grading.
+const BLAME_COMMITS = [
+  { hash: 'a11b2c3', author: 'Alex',  date: '2024-01-05', message: 'Create pricing module' },
+  { hash: 'b22c3d4', author: 'Sam',   date: '2024-02-11', message: 'Add tax calculation' },
+  { hash: 'c33d4e5', author: 'Mira',  date: '2024-03-02', message: 'Add discount support' }, // introduces applyDiscount
+  { hash: 'd44e5f6', author: 'Alex',  date: '2024-03-19', message: 'Round totals to cents' },
+  { hash: 'e55f6g7', author: 'Sam',   date: '2024-04-08', message: 'Fix currency formatting' },
+]
+// Each source line of pricing.js with the commit that last touched it.
+const BLAME_LINES = [
+  { hash: 'a11b2c3', code: 'export function orderTotal(items, pct) {' },
+  { hash: 'a11b2c3', code: '  const base = items.reduce((s, i) => s + i.price * i.qty, 0);' },
+  { hash: 'b22c3d4', code: '  const tax = applyTax(base);' },
+  { hash: 'c33d4e5', code: '  const off = applyDiscount(base, pct);' },
+  { hash: 'd44e5f6', code: '  const total = Math.round((base + tax - off) * 100) / 100;' },
+  { hash: 'e55f6g7', code: "  return total.toLocaleString('en-US', { style: 'currency', currency: 'USD' });" },
+  { hash: 'a11b2c3', code: '}' },
+]
+
+function simulateBlameCommand(commandText, state) {
+  const next = JSON.parse(JSON.stringify(state))
+  if (!next.blame) next.blame = { blamed: false, searched: false, inspected: false }
+  const b = next.blame
+  const cmd = commandText.trim()
+  const parts = cmd.split(/\s+/)
+  let output = ''
+  let status = 'success'
+
+  const commitByHash = (h) => BLAME_COMMITS.find(c => c.hash === h || c.hash.startsWith(h) || h.startsWith(c.hash))
+
+  if (parts[0] === 'clear') return { nextState: next, output: 'CLEAR_CONSOLE', status: 'success' }
+  if (parts[0] === 'ls') {
+    output = (next.files || []).join('  ') || '(empty directory)'
+    return { nextState: next, output, status }
+  }
+  if (parts[0] === 'cat') {
+    const fn = parts[1]
+    if (!fn) { return { nextState: next, output: 'cat: missing filename', status: 'error' } }
+    if (fn === 'pricing.js') { return { nextState: next, output: BLAME_LINES.map(l => l.code).join('\n'), status: 'success' } }
+    const content = (next.fileContents || {})[fn]
+    return { nextState: next, output: content || `cat: ${fn}: No such file or directory`, status: content ? 'success' : 'error' }
+  }
+
+  if (parts[0] !== 'git') {
+    return { nextState: next, output: `bash: ${parts[0]}: command not found`, status: 'error' }
+  }
+
+  const sub = parts[1]
+
+  if (sub === 'blame') {
+    const file = parts.find((p, i) => i >= 2 && !p.startsWith('-'))
+    if (!file) { return { nextState: next, output: "fatal: no path specified.\nusage: git blame <file>", status: 'error' } }
+    if (file !== 'pricing.js') { return { nextState: next, output: `fatal: no such path '${file}' in HEAD`, status: 'error' } }
+    b.blamed = true
+    output = BLAME_LINES.map((l, i) => {
+      const c = commitByHash(l.hash)
+      const author = (c.author + '      ').slice(0, 6)
+      const lineNo = String(i + 1).padStart(2, ' ')
+      return `${l.hash} (${author} ${c.date} ${lineNo}) ${l.code}`
+    }).join('\n')
+    return { nextState: next, output, status }
+  }
+
+  if (sub === 'log') {
+    // Pickaxe: git log -S "<string>"  →  commits that changed how often <string> appears.
+    const sIdx = parts.findIndex(p => p === '-S' || p === '-G')
+    const inlineS = parts.find(p => p.startsWith('-S') && p.length > 2)
+    let term = null
+    if (sIdx !== -1 && parts[sIdx + 1]) term = parts.slice(sIdx + 1).join(' ').replace(/^["']|["']$/g, '')
+    else if (inlineS) term = inlineS.slice(2).replace(/^["']|["']$/g, '')
+
+    if (term) {
+      b.searched = true
+      // Find the commit whose line introduced the term (first commit, oldest-first, whose code contains it).
+      const introHashes = []
+      BLAME_LINES.forEach(l => { if (l.code.includes(term) && !introHashes.includes(l.hash)) introHashes.push(l.hash) })
+      const matches = introHashes.map(commitByHash).filter(Boolean)
+      if (matches.length === 0) {
+        output = `(no commits added or removed "${term}")`
+      } else {
+        output = matches.map(c => `commit ${c.hash}\nAuthor: ${c.author}\nDate:   ${c.date}\n\n    ${c.message}\n`).join('\n')
+      }
+      return { nextState: next, output, status }
+    }
+
+    // Plain git log
+    const oneline = parts.includes('--oneline')
+    const ordered = [...BLAME_COMMITS].reverse()
+    output = oneline
+      ? ordered.map((c, i) => `${c.hash}${i === 0 ? ' (HEAD -> main)' : ''} ${c.message}`).join('\n')
+      : ordered.map((c, i) => `commit ${c.hash}${i === 0 ? ' (HEAD -> main)' : ''}\nAuthor: ${c.author}\nDate:   ${c.date}\n\n    ${c.message}\n`).join('\n')
+    return { nextState: next, output, status }
+  }
+
+  if (sub === 'show') {
+    const ref = parts[2]
+    const c = ref && !ref.startsWith('-') ? commitByHash(ref) : BLAME_COMMITS[BLAME_COMMITS.length - 1]
+    if (!c) { return { nextState: next, output: `fatal: ambiguous argument '${ref}': unknown revision`, status: 'error' } }
+    if (c.hash === 'c33d4e5') b.inspected = true
+    const added = BLAME_LINES.filter(l => l.hash === c.hash)
+    const diff = added.length
+      ? `\ndiff --git a/pricing.js b/pricing.js\n--- a/pricing.js\n+++ b/pricing.js\n${added.map(l => `+${l.code}`).join('\n')}`
+      : ''
+    output = `commit ${c.hash} (${c.hash === 'e55f6g7' ? 'HEAD -> main' : c.message})\nAuthor: ${c.author}\nDate:   ${c.date}\n\n    ${c.message}\n${diff}`
+    return { nextState: next, output, status }
+  }
+
+  if (sub === 'status') {
+    output = 'On branch main\nnothing to commit, working tree clean'
+    return { nextState: next, output, status }
+  }
+
+  output = `git: '${sub}' is not part of this lesson. Try git blame, git log -S, git show, or git log.`
+  status = 'error'
+  return { nextState: next, output, status }
+}
+
 export function simulateCommandOffline(commandText, state, lessonId) {
   // Lesson 8 (fork & contribute) is a GitHub-workflow simulation with its own interpreter.
   if (lessonId === 8 || state.scenario === 'fork') {
@@ -319,6 +451,12 @@ export function simulateCommandOffline(commandText, state, lessonId) {
   // Lesson 9 (bisect) is a guided simulation of the bisect algorithm.
   if (lessonId === 9) {
     return simulateBisectCommand(commandText, state)
+  }
+
+  // Lesson 10 (blame & history search) is a read-only archaeology simulation
+  // covering git blame, the git log -S pickaxe, and git show.
+  if (lessonId === 10) {
+    return simulateBlameCommand(commandText, state)
   }
 
   const parts = commandText.trim().split(/\s+/)
@@ -536,17 +674,32 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           // checkout -b stamps the new branch onto the root commit).
           const currentHead = nextState.commits.find(c => c.is_head)
 
+          // Move the branch ref forward: the previous tip of activeBranch must
+          // drop the label so only the new commit (the new tip) carries it —
+          // matching real git and the seeded-state convention. Leaving the label
+          // on the old tip made `git log` show "(main)" on every commit.
           nextState.commits = nextState.commits.map(c => ({
             ...c,
-            is_head: c.branches.includes(activeBranch) ? false : c.is_head
+            is_head: false,
+            branches: c.branches.filter(b => b !== activeBranch)
           }))
+
+          const parents = currentHead ? [currentHead.hash] : []
+          // If this commit finishes a conflicted merge, it is a merge commit:
+          // add the merged branch's tip as a second parent so the graph shows
+          // the merge topology rather than a linear commit.
+          if (nextState.merge_source) {
+            const srcTip = [...nextState.commits].reverse().find(c => c.branches.includes(nextState.merge_source))
+            if (srcTip && !parents.includes(srcTip.hash)) parents.push(srcTip.hash)
+            nextState.merge_source = null
+          }
 
           const newCommit = {
             hash: hash,
             full_hash: fullHash,
             message: msg,
             branches: [activeBranch],
-            parents: currentHead ? [currentHead.hash] : [],
+            parents,
             is_head: true
           }
 
@@ -722,6 +875,7 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           } else {
             nextState.conflict_active = false
             nextState.conflict_triggered = false
+            nextState.merge_source = null
             output = "Merge aborted."
           }
         } else if (!mergeSrc) {
@@ -734,13 +888,58 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           if (nextState.lessonId === 3 && mergeSrc === "feature/ui" && nextState.branch === "main") {
             nextState.conflict_active = true
             nextState.conflict_triggered = true
+            // Remember the branch being merged so the resolving commit becomes a
+            // two-parent merge commit (set in the git commit handler).
+            nextState.merge_source = mergeSrc
             nextState.fileContents['config.js'] =
               "export const config = {\n  api: '/v1',\n  retries: 3,\n<<<<<<< HEAD\n  theme: 'dark',\n=======\n  theme: 'light',\n>>>>>>> feature/ui\n};\n"
             output = "Auto-merging config.js\nCONFLICT (content): Merge conflict in config.js\nAutomatic merge failed; fix conflicts and then commit the result."
             status = "error"
           } else {
+            // Integrate the source branch into the current branch's history so
+            // `git log` reflects the merge. Previously only a flag was set, leaving
+            // the merged commits invisible on the current branch.
             nextState.merged_offline = true
-            output = `Updating ${nextState.branch}... Fast-forward merge of '${mergeSrc}' complete.`
+            const srcTip = [...nextState.commits].reverse().find(c => c.branches.includes(mergeSrc))
+            const curTip = nextState.commits.find(c => c.is_head)
+            const activeBranch = nextState.branch
+            const reachable = (startHash) => {
+              const seen = new Set(); const q = [startHash]
+              while (q.length) {
+                const h = q.shift()
+                if (!h || seen.has(h)) continue
+                seen.add(h)
+                const c = nextState.commits.find(x => x.hash === h)
+                if (c) c.parents.forEach(p => q.push(p))
+              }
+              return seen
+            }
+            if (!srcTip || !curTip || srcTip.hash === curTip.hash) {
+              output = `Already up to date.`
+            } else if (reachable(srcTip.hash).has(curTip.hash)) {
+              // Fast-forward: current tip is an ancestor of source tip — advance the ref.
+              curTip.branches = curTip.branches.filter(b => b !== activeBranch)
+              if (!srcTip.branches.includes(activeBranch)) srcTip.branches.push(activeBranch)
+              nextState.commits = nextState.commits.map(c => ({ ...c, is_head: c.hash === srcTip.hash }))
+              output = `Updating ${curTip.hash}..${srcTip.hash}\nFast-forward\nMerge of '${mergeSrc}' complete.`
+            } else if (reachable(curTip.hash).has(srcTip.hash)) {
+              output = `Already up to date.`
+            } else {
+              // Divergent histories: create a merge commit with two parents.
+              const hash = Math.random().toString(16).substring(2, 9)
+              const mergeCommit = {
+                hash,
+                full_hash: hash + '0'.repeat(33),
+                message: `Merge branch '${mergeSrc}' into ${activeBranch}`,
+                branches: [activeBranch],
+                parents: [curTip.hash, srcTip.hash],
+                is_head: true
+              }
+              curTip.branches = curTip.branches.filter(b => b !== activeBranch)
+              nextState.commits = nextState.commits.map(c => ({ ...c, is_head: false }))
+              nextState.commits.push(mergeCommit)
+              output = `Merge made by the 'ort' strategy.`
+            }
           }
         }
       }
@@ -840,9 +1039,11 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             parents: cherryHead ? [cherryHead.hash] : [],
             is_head: true
           }
+          // Move the branch ref forward onto the new tip (see git commit handler).
           nextState.commits = nextState.commits.map(c => ({
             ...c,
-            is_head: false
+            is_head: false,
+            branches: c.branches.filter(b => b !== nextState.branch)
           }))
           nextState.commits.push(newCommit)
           output = `[${nextState.branch} b7a91c0] Fix tax rounding\n 1 file changed`
@@ -865,7 +1066,20 @@ export function simulateCommandOffline(commandText, state, lessonId) {
       }
       else if (sub === "push") {
         nextState.pushed_offline = true
-        output = "Everything up-to-date"
+        const activeBranch = nextState.branch
+        const remoteRef = `origin/${activeBranch}`
+        const headCommit = nextState.commits.find(c => c.is_head)
+        if (!headCommit || headCommit.branches.includes(remoteRef)) {
+          output = "Everything up-to-date"
+        } else {
+          // Advance the remote-tracking ref to the local tip so the graph/log
+          // show origin/<branch>. Previously push only set a flag, leaving the
+          // remote-tracking concept invisible.
+          nextState.commits = nextState.commits.map(c => ({ ...c, branches: c.branches.filter(b => b !== remoteRef) }))
+          const tip = nextState.commits.find(c => c.is_head)
+          tip.branches.push(remoteRef)
+          output = `Enumerating objects: 3, done.\nTo origin\n   ${tip.hash}  ${activeBranch} -> ${activeBranch}`
+        }
       }
       else if (sub === "revert") {
         const hash = parts[2]
@@ -883,7 +1097,8 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             parents: revertHead ? [revertHead.hash] : [],
             is_head: true
           }
-          nextState.commits = nextState.commits.map(c => ({ ...c, is_head: false }))
+          // Move the branch ref forward onto the new tip (see git commit handler).
+          nextState.commits = nextState.commits.map(c => ({ ...c, is_head: false, branches: c.branches.filter(b => b !== activeBranch) }))
           nextState.commits.push(newCommit)
           output = `[${activeBranch} rev1234] Revert "Skip null metric check"`
         }
@@ -903,29 +1118,56 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             nextState.staged = []
           }
           output = ""
-        } else if (target.startsWith('HEAD~')) {
-          const n = parseInt(target.slice('HEAD~'.length), 10) || 1
-          const newLen = Math.max(0, nextState.commits.length - n)
-          nextState.commits = nextState.commits.slice(0, newLen)
-          if (isHard) nextState.staged = []
-          const head = nextState.commits[newLen - 1]
-          nextState.commits = nextState.commits.map((c, i) => ({ ...c, is_head: i === newLen - 1 }))
-          // Move the branch pointer to the new HEAD so git log shows (HEAD -> branch)
-          if (head && !head.branches.includes(nextState.branch)) head.branches.push(nextState.branch)
-          output = head ? `HEAD is now at ${head.hash} ${head.message}` : "HEAD is now at (empty)"
         } else {
-          // hash-based reset: truncate commits after the target
-          const idx = nextState.commits.findIndex(c => c.hash === target || c.full_hash?.startsWith(target))
-          if (idx === -1) {
+          // Resolve the reset target to a concrete commit, then move the current
+          // branch (and HEAD) there. HEAD~N walks HEAD's parent chain; a hash is
+          // resolved directly. Never resolve by array position — in a branched
+          // history that drops the wrong commits and leaves HEAD misplaced.
+          let targetCommit
+          if (target.startsWith('HEAD~')) {
+            const n = parseInt(target.slice('HEAD~'.length), 10) || 1
+            let cur = nextState.commits.find(c => c.is_head)
+            for (let i = 0; i < n && cur; i++) {
+              cur = nextState.commits.find(c => c.hash === (cur.parents || [])[0])
+            }
+            targetCommit = cur
+          } else {
+            targetCommit = nextState.commits.find(c => c.hash === target || c.full_hash?.startsWith(target))
+          }
+
+          if (!targetCommit) {
             output = `fatal: ambiguous argument '${target}': unknown revision`; status = "error"
           } else {
-            nextState.commits = nextState.commits.slice(0, idx + 1)
             if (isHard) nextState.staged = []
-            const head = nextState.commits[idx]
-            nextState.commits = nextState.commits.map((c, i) => ({ ...c, is_head: i === idx }))
-            // Move the branch pointer to the new HEAD so git log shows (HEAD -> branch)
-            if (head && !head.branches.includes(nextState.branch)) head.branches.push(nextState.branch)
-            output = `HEAD is now at ${head.hash} ${head.message}`
+            const activeBranch = nextState.branch
+            // Keep commits reachable from the new target, plus everything still
+            // referenced by another branch/remote ref (those survive after the
+            // current branch ref moves back). Drop only the now-unreachable commits.
+            const reachableFrom = (startHash) => {
+              const seen = new Set(); const q = [startHash]
+              while (q.length) {
+                const h = q.shift()
+                if (!h || seen.has(h)) continue
+                seen.add(h)
+                const c = nextState.commits.find(x => x.hash === h)
+                if (c) (c.parents || []).forEach(p => q.push(p))
+              }
+              return seen
+            }
+            const keep = reachableFrom(targetCommit.hash)
+            nextState.commits
+              .filter(c => c.branches.some(b => b !== activeBranch))
+              .forEach(tip => reachableFrom(tip.hash).forEach(h => keep.add(h)))
+            nextState.commits = nextState.commits
+              .filter(c => keep.has(c.hash))
+              .map(c => ({
+                ...c,
+                is_head: c.hash === targetCommit.hash,
+                branches: c.hash === targetCommit.hash
+                  ? Array.from(new Set([...c.branches, activeBranch]))
+                  : c.branches.filter(b => b !== activeBranch)
+              }))
+            output = `HEAD is now at ${targetCommit.hash} ${targetCommit.message}`
           }
         }
       }

@@ -3,7 +3,7 @@ import {
   GitFork, Download, GitCommitHorizontal, Upload, GitPullRequest,
   GitMerge, RefreshCw, Check, Target, Terminal
 } from 'lucide-react'
-
+import './ForkLesson.css'
 const BASE = [{ id: 'a1c', kind: 'base' }, { id: 'b2d', kind: 'base' }, { id: 'c3e', kind: 'base' }]
 const FEATURE = { id: 'f9a', kind: 'feature' }
 const MATE = { id: 'm4b', kind: 'mate' }
