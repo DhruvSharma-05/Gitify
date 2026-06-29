@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import './StashCherryPickLesson.css'
 import PretextCanvas from './PretextCanvas.jsx'
 import { apiUrl } from '../api.js'
 

@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react'
+import './MergeConflictsLesson.css'
 import PretextCanvas from './PretextCanvas.jsx'
 import { useToast } from './Toast.jsx'
 import { apiUrl } from '../api.js'
