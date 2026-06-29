@@ -883,6 +883,47 @@ import { getInitialOfflineState } from '../src/api.js'
   check('iter61: after cherry-pick only one commit carries main', mainLabels.length === 1)
 }
 
+// --- iter62: git merge integrates source branch into history ----------------
+const lesson2State = () => ({
+  initialized: true, branch: 'main', files: ['index.js'], fileContents: { 'index.js': '//' },
+  staged: [], commits: [
+    { hash: 'c1c1c1c', full_hash: 'c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1', message: 'Init setup', branches: ['main'], parents: [], is_head: true }
+  ], stashes: [], branches: ['main'], committed_files: ['index.js'], lessonId: 2,
+})
+{
+  // Fast-forward: merge a feature branch whose tip descends from main's tip.
+  const { s } = run(['git checkout -b feature/auth', 'touch auth.js', 'git add .', 'git commit -m "add auth"', 'git checkout main', 'git merge feature/auth'], lesson2State(), 2)
+  const log = simulateCommandOffline('git log --oneline', s, 2).output
+  check('iter62: ff merge brings feature commit into main log', log.includes('add auth'))
+  check('iter62: ff merge keeps init commit in main log', log.includes('Init setup'))
+  check('iter62: ff merge sets merged_offline for verification', s.merged_offline === true)
+  check('iter62: lesson 2 verifies after merge', checkOfflineProgress(s, 2).verified === true)
+  const head = s.commits.find(c => c.is_head)
+  check('iter62: ff merge HEAD is the feature tip', head.message === 'add auth')
+  check('iter62: ff merge main label rides the new tip', head.branches.includes('main'))
+}
+{
+  // Divergent: both branches have a unique commit → a merge commit is created.
+  const base = lesson2State()
+  const { s: sBranch } = run(['git checkout -b feature/auth', 'touch a.js', 'git add .', 'git commit -m "feat work"'], base, 2)
+  // add a divergent commit on main
+  const { s: sMain } = run(['git checkout main', 'touch m.js', 'git add .', 'git commit -m "main work"'], sBranch, 2)
+  const r = simulateCommandOffline('git merge feature/auth', sMain, 2)
+  const mergeCommit = r.nextState.commits.find(c => c.parents.length > 1)
+  check('iter62: divergent merge creates a merge commit', !!mergeCommit)
+  check('iter62: merge commit has two parents', mergeCommit && mergeCommit.parents.length === 2)
+  const log = simulateCommandOffline('git log --oneline', r.nextState, 2).output
+  check('iter62: divergent merge log shows both branch tips', log.includes('feat work') && log.includes('main work'))
+}
+{
+  // Already-merged source → "Already up to date." (no new commit).
+  const { s } = run(['git checkout -b feature/auth', 'touch a.js', 'git add .', 'git commit -m "feat"', 'git checkout main', 'git merge feature/auth'], lesson2State(), 2)
+  const before = s.commits.length
+  const r = simulateCommandOffline('git merge feature/auth', s, 2)
+  check('iter62: re-merging already-merged branch is up to date', r.output.includes('Already up to date'))
+  check('iter62: re-merge does not add a commit', r.nextState.commits.length === before)
+}
+
 // --- report ----------------------------------------------------------------
 if (failures.length) {
   console.error(`offline-git tests: ${passed} passed, ${failures.length} FAILED`)

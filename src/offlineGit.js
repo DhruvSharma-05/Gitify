@@ -744,8 +744,50 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             output = "Auto-merging config.js\nCONFLICT (content): Merge conflict in config.js\nAutomatic merge failed; fix conflicts and then commit the result."
             status = "error"
           } else {
+            // Integrate the source branch into the current branch's history so
+            // `git log` reflects the merge. Previously only a flag was set, leaving
+            // the merged commits invisible on the current branch.
             nextState.merged_offline = true
-            output = `Updating ${nextState.branch}... Fast-forward merge of '${mergeSrc}' complete.`
+            const srcTip = [...nextState.commits].reverse().find(c => c.branches.includes(mergeSrc))
+            const curTip = nextState.commits.find(c => c.is_head)
+            const activeBranch = nextState.branch
+            const reachable = (startHash) => {
+              const seen = new Set(); const q = [startHash]
+              while (q.length) {
+                const h = q.shift()
+                if (!h || seen.has(h)) continue
+                seen.add(h)
+                const c = nextState.commits.find(x => x.hash === h)
+                if (c) c.parents.forEach(p => q.push(p))
+              }
+              return seen
+            }
+            if (!srcTip || !curTip || srcTip.hash === curTip.hash) {
+              output = `Already up to date.`
+            } else if (reachable(srcTip.hash).has(curTip.hash)) {
+              // Fast-forward: current tip is an ancestor of source tip — advance the ref.
+              curTip.branches = curTip.branches.filter(b => b !== activeBranch)
+              if (!srcTip.branches.includes(activeBranch)) srcTip.branches.push(activeBranch)
+              nextState.commits = nextState.commits.map(c => ({ ...c, is_head: c.hash === srcTip.hash }))
+              output = `Updating ${curTip.hash}..${srcTip.hash}\nFast-forward\nMerge of '${mergeSrc}' complete.`
+            } else if (reachable(curTip.hash).has(srcTip.hash)) {
+              output = `Already up to date.`
+            } else {
+              // Divergent histories: create a merge commit with two parents.
+              const hash = Math.random().toString(16).substring(2, 9)
+              const mergeCommit = {
+                hash,
+                full_hash: hash + '0'.repeat(33),
+                message: `Merge branch '${mergeSrc}' into ${activeBranch}`,
+                branches: [activeBranch],
+                parents: [curTip.hash, srcTip.hash],
+                is_head: true
+              }
+              curTip.branches = curTip.branches.filter(b => b !== activeBranch)
+              nextState.commits = nextState.commits.map(c => ({ ...c, is_head: false }))
+              nextState.commits.push(mergeCommit)
+              output = `Merge made by the 'ort' strategy.`
+            }
           }
         }
       }
