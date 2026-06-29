@@ -146,6 +146,18 @@ export function checkOfflineProgress(state, lessonId) {
       ? "Culprit found and bisect session closed!"
       : "Use git bisect start → bad → good → reset to hunt down the bug."
   }
+  else if (lessonId === 10) {
+    const a = state.blame || {}
+    subtasks = [
+      { id: "blame_file", title: "Annotate each line ('git blame pricing.js')", completed: !!a.blamed },
+      { id: "pickaxe_search", title: "Find when a function appeared ('git log -S \"applyDiscount\"')", completed: !!a.searched },
+      { id: "inspect_commit", title: "Inspect the commit that introduced it ('git show c33d4e5')", completed: !!a.inspected }
+    ]
+    verified = !!(a.blamed && a.searched && a.inspected)
+    msg = verified
+      ? "History traced — you found who wrote the line, when it appeared, and why!"
+      : "Use git blame, then git log -S to pickaxe-search, then git show on the culprit commit."
+  }
 
   return { verified, msg, subtasks }
 }
@@ -310,6 +322,126 @@ function simulateBisectCommand(commandText, state) {
   return { nextState: next, output, status }
 }
 
+// Lesson 10 (blame & history archaeology) is a read-only simulation. It covers
+// `git blame` (line-by-line authorship), the `git log -S` pickaxe (which commit
+// added/removed a string), and `git show` (inspect a commit). The history is
+// fixed so the answers are deterministic for grading.
+const BLAME_COMMITS = [
+  { hash: 'a11b2c3', author: 'Alex',  date: '2024-01-05', message: 'Create pricing module' },
+  { hash: 'b22c3d4', author: 'Sam',   date: '2024-02-11', message: 'Add tax calculation' },
+  { hash: 'c33d4e5', author: 'Mira',  date: '2024-03-02', message: 'Add discount support' }, // introduces applyDiscount
+  { hash: 'd44e5f6', author: 'Alex',  date: '2024-03-19', message: 'Round totals to cents' },
+  { hash: 'e55f6g7', author: 'Sam',   date: '2024-04-08', message: 'Fix currency formatting' },
+]
+// Each source line of pricing.js with the commit that last touched it.
+const BLAME_LINES = [
+  { hash: 'a11b2c3', code: 'export function orderTotal(items, pct) {' },
+  { hash: 'a11b2c3', code: '  const base = items.reduce((s, i) => s + i.price * i.qty, 0);' },
+  { hash: 'b22c3d4', code: '  const tax = applyTax(base);' },
+  { hash: 'c33d4e5', code: '  const off = applyDiscount(base, pct);' },
+  { hash: 'd44e5f6', code: '  const total = Math.round((base + tax - off) * 100) / 100;' },
+  { hash: 'e55f6g7', code: "  return total.toLocaleString('en-US', { style: 'currency', currency: 'USD' });" },
+  { hash: 'a11b2c3', code: '}' },
+]
+
+function simulateBlameCommand(commandText, state) {
+  const next = JSON.parse(JSON.stringify(state))
+  if (!next.blame) next.blame = { blamed: false, searched: false, inspected: false }
+  const b = next.blame
+  const cmd = commandText.trim()
+  const parts = cmd.split(/\s+/)
+  let output = ''
+  let status = 'success'
+
+  const commitByHash = (h) => BLAME_COMMITS.find(c => c.hash === h || c.hash.startsWith(h) || h.startsWith(c.hash))
+
+  if (parts[0] === 'clear') return { nextState: next, output: 'CLEAR_CONSOLE', status: 'success' }
+  if (parts[0] === 'ls') {
+    output = (next.files || []).join('  ') || '(empty directory)'
+    return { nextState: next, output, status }
+  }
+  if (parts[0] === 'cat') {
+    const fn = parts[1]
+    if (!fn) { return { nextState: next, output: 'cat: missing filename', status: 'error' } }
+    if (fn === 'pricing.js') { return { nextState: next, output: BLAME_LINES.map(l => l.code).join('\n'), status: 'success' } }
+    const content = (next.fileContents || {})[fn]
+    return { nextState: next, output: content || `cat: ${fn}: No such file or directory`, status: content ? 'success' : 'error' }
+  }
+
+  if (parts[0] !== 'git') {
+    return { nextState: next, output: `bash: ${parts[0]}: command not found`, status: 'error' }
+  }
+
+  const sub = parts[1]
+
+  if (sub === 'blame') {
+    const file = parts.find((p, i) => i >= 2 && !p.startsWith('-'))
+    if (!file) { return { nextState: next, output: "fatal: no path specified.\nusage: git blame <file>", status: 'error' } }
+    if (file !== 'pricing.js') { return { nextState: next, output: `fatal: no such path '${file}' in HEAD`, status: 'error' } }
+    b.blamed = true
+    output = BLAME_LINES.map((l, i) => {
+      const c = commitByHash(l.hash)
+      const author = (c.author + '      ').slice(0, 6)
+      const lineNo = String(i + 1).padStart(2, ' ')
+      return `${l.hash} (${author} ${c.date} ${lineNo}) ${l.code}`
+    }).join('\n')
+    return { nextState: next, output, status }
+  }
+
+  if (sub === 'log') {
+    // Pickaxe: git log -S "<string>"  →  commits that changed how often <string> appears.
+    const sIdx = parts.findIndex(p => p === '-S' || p === '-G')
+    const inlineS = parts.find(p => p.startsWith('-S') && p.length > 2)
+    let term = null
+    if (sIdx !== -1 && parts[sIdx + 1]) term = parts.slice(sIdx + 1).join(' ').replace(/^["']|["']$/g, '')
+    else if (inlineS) term = inlineS.slice(2).replace(/^["']|["']$/g, '')
+
+    if (term) {
+      b.searched = true
+      // Find the commit whose line introduced the term (first commit, oldest-first, whose code contains it).
+      const introHashes = []
+      BLAME_LINES.forEach(l => { if (l.code.includes(term) && !introHashes.includes(l.hash)) introHashes.push(l.hash) })
+      const matches = introHashes.map(commitByHash).filter(Boolean)
+      if (matches.length === 0) {
+        output = `(no commits added or removed "${term}")`
+      } else {
+        output = matches.map(c => `commit ${c.hash}\nAuthor: ${c.author}\nDate:   ${c.date}\n\n    ${c.message}\n`).join('\n')
+      }
+      return { nextState: next, output, status }
+    }
+
+    // Plain git log
+    const oneline = parts.includes('--oneline')
+    const ordered = [...BLAME_COMMITS].reverse()
+    output = oneline
+      ? ordered.map((c, i) => `${c.hash}${i === 0 ? ' (HEAD -> main)' : ''} ${c.message}`).join('\n')
+      : ordered.map((c, i) => `commit ${c.hash}${i === 0 ? ' (HEAD -> main)' : ''}\nAuthor: ${c.author}\nDate:   ${c.date}\n\n    ${c.message}\n`).join('\n')
+    return { nextState: next, output, status }
+  }
+
+  if (sub === 'show') {
+    const ref = parts[2]
+    const c = ref && !ref.startsWith('-') ? commitByHash(ref) : BLAME_COMMITS[BLAME_COMMITS.length - 1]
+    if (!c) { return { nextState: next, output: `fatal: ambiguous argument '${ref}': unknown revision`, status: 'error' } }
+    if (c.hash === 'c33d4e5') b.inspected = true
+    const added = BLAME_LINES.filter(l => l.hash === c.hash)
+    const diff = added.length
+      ? `\ndiff --git a/pricing.js b/pricing.js\n--- a/pricing.js\n+++ b/pricing.js\n${added.map(l => `+${l.code}`).join('\n')}`
+      : ''
+    output = `commit ${c.hash} (${c.hash === 'e55f6g7' ? 'HEAD -> main' : c.message})\nAuthor: ${c.author}\nDate:   ${c.date}\n\n    ${c.message}\n${diff}`
+    return { nextState: next, output, status }
+  }
+
+  if (sub === 'status') {
+    output = 'On branch main\nnothing to commit, working tree clean'
+    return { nextState: next, output, status }
+  }
+
+  output = `git: '${sub}' is not part of this lesson. Try git blame, git log -S, git show, or git log.`
+  status = 'error'
+  return { nextState: next, output, status }
+}
+
 export function simulateCommandOffline(commandText, state, lessonId) {
   // Lesson 8 (fork & contribute) is a GitHub-workflow simulation with its own interpreter.
   if (lessonId === 8 || state.scenario === 'fork') {
@@ -319,6 +451,12 @@ export function simulateCommandOffline(commandText, state, lessonId) {
   // Lesson 9 (bisect) is a guided simulation of the bisect algorithm.
   if (lessonId === 9) {
     return simulateBisectCommand(commandText, state)
+  }
+
+  // Lesson 10 (blame & history search) is a read-only archaeology simulation
+  // covering git blame, the git log -S pickaxe, and git show.
+  if (lessonId === 10) {
+    return simulateBlameCommand(commandText, state)
   }
 
   const parts = commandText.trim().split(/\s+/)

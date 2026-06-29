@@ -21,6 +21,7 @@ const RemoteCollaborationLesson = lazy(() => import('./components/RemoteCollabor
 const RebaseLesson = lazy(() => import('./components/RebaseLesson.jsx'))
 const ForkLesson = lazy(() => import('./components/ForkLesson.jsx'))
 const BisectLesson = lazy(() => import('./components/BisectLesson.jsx'))
+const BlameLesson = lazy(() => import('./components/BlameLesson.jsx'))
 
 const lessonFallback = (
   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px', gap: '10px', color: '#8b949e' }}>
@@ -28,7 +29,7 @@ const lessonFallback = (
   </div>
 )
 
-const lessonOrder = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+const lessonOrder = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -138,6 +139,18 @@ export default function App() {
     if (currentLesson === 8) {
       setSubtasks(getInitialSubtasks(8))
       setTerminalHydration({ branch: 'main', files: [], pwd: '', nonce: Date.now() })
+      return
+    }
+
+    // Lesson 10 is a fully client-simulated, read-only history investigation —
+    // seed its checklist, commit graph, and files locally (no backend sandbox).
+    if (currentLesson === 10) {
+      const local = getInitialOfflineState(10)
+      setSubtasks(getInitialSubtasks(10))
+      setCommitsGraph(local.commits || [])
+      setFileContents(local.fileContents || {})
+      setWorkspaceFiles(local.files || [])
+      setTerminalHydration({ branch: local.branch, files: local.files, pwd: '', nonce: Date.now() })
       return
     }
 
@@ -401,6 +414,8 @@ export default function App() {
               <ForkLesson setTerminalSyncListener={setTerminalSyncListener} />
             ) : currentLesson === 9 ? (
               <BisectLesson onSuccess={() => handleVerifySuccess(9)} setTerminalSyncListener={setTerminalSyncListener} />
+            ) : currentLesson === 10 ? (
+              <BlameLesson onSuccess={() => handleVerifySuccess(10)} setTerminalSyncListener={setTerminalSyncListener} />
             ) : (
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '18px' }}>
                 <div style={{ marginBottom: '8px' }}>

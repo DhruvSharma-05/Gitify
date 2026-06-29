@@ -331,7 +331,7 @@ check('shell-ops: real "|" pipe is blocked', simulateCommandOffline('cat x | gre
 }
 
 // --- Iter 22: git status clean for pre-seeded lessons (2-9) ----------------
-import { getInitialOfflineState } from '../src/api.js'
+import { getInitialOfflineState, getInitialSubtasks } from '../src/api.js'
 {
   // Lesson 2 starts with index.js already committed — status should be clean
   const s2 = getInitialOfflineState(2)
@@ -1008,6 +1008,36 @@ const lesson2State = () => ({
   sa = simulateCommandOffline('git merge --abort', sa, 3).nextState
   check('iter65: merge --abort clears merge_source', !sa.merge_source)
 }
+
+// --- Lesson 10: blame & history archaeology --------------------------------
+{
+  const seq = ['git blame pricing.js', 'git log -S "applyDiscount"', 'git show c33d4e5']
+  const { s, outs } = run(seq, getInitialOfflineState(10), 10)
+  const chk = checkOfflineProgress(s, 10)
+  check('blame: full workflow verifies', chk.verified === true)
+  check('blame: all 3 subtasks complete', chk.subtasks.length === 3 && chk.subtasks.every(t => t.completed))
+  check('blame: every step succeeded', outs.every(o => o.status === 'success'))
+  check('blame: blame output attributes the discount line to c33d4e5', outs[0].output.includes('c33d4e5') && outs[0].output.includes('applyDiscount'))
+  check('blame: pickaxe finds the introducing commit', outs[1].output.includes('c33d4e5') && outs[1].output.includes('Add discount support'))
+  check('blame: show reveals the added line as a diff', outs[2].output.includes('+  const off = applyDiscount'))
+}
+// blame guards
+check('blame: bare git blame errors', simulateCommandOffline('git blame', getInitialOfflineState(10), 10).status === 'error')
+check('blame: blame on unknown file errors', simulateCommandOffline('git blame nope.js', getInitialOfflineState(10), 10).status === 'error')
+{
+  // git log -S with a term that never existed reports no commits and still counts as a search
+  const r = simulateCommandOffline('git log -S "neverHere"', getInitialOfflineState(10), 10)
+  check('blame: pickaxe with no match reports none', r.output.includes('no commits'))
+  check('blame: pickaxe still marks searched', r.nextState.blame.searched === true)
+}
+{
+  // git show on a non-culprit commit does not satisfy the inspect objective
+  const r = simulateCommandOffline('git show a11b2c3', getInitialOfflineState(10), 10)
+  check('blame: show on non-culprit does not set inspected', !r.nextState.blame.inspected)
+  check('blame: show on non-culprit still succeeds', r.status === 'success')
+}
+check('blame: partial progress not verified', checkOfflineProgress(run(['git blame pricing.js'], getInitialOfflineState(10), 10).s, 10).verified === false)
+check('blame: getInitialSubtasks(10) has three items', getInitialSubtasks(10).length === 3)
 
 // --- report ----------------------------------------------------------------
 if (failures.length) {
