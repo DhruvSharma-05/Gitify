@@ -267,11 +267,18 @@ check('shell-ops: real "|" pipe is blocked', simulateCommandOffline('cat x | gre
   check('reset: lesson 4 reset_done satisfied after hard reset', p.verified === true)
 }
 {
-  // git reset HEAD~1 — remove last commit
+  // git reset HEAD~1 with two commits removes the last one and moves HEAD back.
   const s = initState()
   const s2 = simulateCommandOffline('git add .', s, 0).nextState
   const s3 = simulateCommandOffline('git commit -m "first"', s2, 0).nextState
-  check('reset: HEAD~1 removes last commit', simulateCommandOffline('git reset HEAD~1', s3, 0).nextState.commits.length === 0)
+  const s4 = simulateCommandOffline('git commit -m "second"', simulateCommandOffline('git add .', s3, 0).nextState, 0).nextState
+  const r = simulateCommandOffline('git reset HEAD~1', s4, 0)
+  check('reset: HEAD~1 removes the last of two commits', r.nextState.commits.length === 1)
+  check('reset: HEAD~1 leaves first commit as HEAD', r.nextState.commits.find(c => c.is_head)?.message === 'first')
+  // On a single-commit repo HEAD~1 is past the root → error, matching real git
+  // (which fails with "ambiguous argument 'HEAD~1'"). Previously this silently
+  // emptied history, which neither real git nor any lesson expects.
+  check('reset: HEAD~1 past the root errors', simulateCommandOffline('git reset HEAD~1', s3, 0).status === 'error')
 }
 
 // --- iter27: git revert sets correct parent --------------------------------
@@ -941,6 +948,35 @@ const lesson2State = () => ({
   // pushing again with nothing new is up to date
   const r2 = simulateCommandOffline('git push', r.nextState, 1)
   check('iter63: second push with no new commits is up to date', r2.output.includes('Everything up-to-date'))
+}
+
+// --- iter64: git reset resolves target via parent chain, not array position -
+{
+  // Branched history where insertion order != HEAD's parent chain:
+  //   main: A <- B (HEAD);  feature: A <- F  (F inserted last in the array)
+  const branched = () => ({
+    initialized: true, branch: 'main', files: [], fileContents: {}, staged: [], stashes: [],
+    branches: ['main', 'feature'], committed_files: [], lessonId: 0,
+    commits: [
+      { hash: 'aaa', full_hash: 'aaa' + '0'.repeat(37), message: 'A', branches: [], parents: [], is_head: false },
+      { hash: 'bbb', full_hash: 'bbb' + '0'.repeat(37), message: 'B', branches: ['main'], parents: ['aaa'], is_head: true },
+      { hash: 'fff', full_hash: 'fff' + '0'.repeat(37), message: 'F', branches: ['feature'], parents: ['aaa'], is_head: false },
+    ],
+  })
+  const r = simulateCommandOffline('git reset --hard HEAD~1', branched(), 0)
+  const head = r.nextState.commits.find(c => c.is_head)
+  check('iter64: reset HEAD~1 moves HEAD to the parent (A), not stays on B', head?.hash === 'aaa')
+  check('iter64: reset HEAD~1 keeps sibling branch commit F', r.nextState.commits.some(c => c.hash === 'fff'))
+  check('iter64: reset HEAD~1 drops the old HEAD commit B', !r.nextState.commits.some(c => c.hash === 'bbb'))
+  check('iter64: reset moves main ref onto the new HEAD', head?.branches.includes('main'))
+  check('iter64: reset leaves feature ref intact', r.nextState.commits.find(c => c.hash === 'fff').branches.includes('feature'))
+  // hash-based reset is likewise parent-chain correct
+  const r2 = simulateCommandOffline('git reset --hard aaa', branched(), 0)
+  check('iter64: reset <hash> keeps sibling F', r2.nextState.commits.some(c => c.hash === 'fff'))
+  check('iter64: reset <hash> drops B', !r2.nextState.commits.some(c => c.hash === 'bbb'))
+  // out-of-range HEAD~N errors instead of silently emptying history
+  const r3 = simulateCommandOffline('git reset HEAD~9', branched(), 0)
+  check('iter64: reset HEAD~9 (beyond root) errors', r3.status === 'error')
 }
 
 // --- report ----------------------------------------------------------------

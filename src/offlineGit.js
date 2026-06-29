@@ -966,29 +966,56 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             nextState.staged = []
           }
           output = ""
-        } else if (target.startsWith('HEAD~')) {
-          const n = parseInt(target.slice('HEAD~'.length), 10) || 1
-          const newLen = Math.max(0, nextState.commits.length - n)
-          nextState.commits = nextState.commits.slice(0, newLen)
-          if (isHard) nextState.staged = []
-          const head = nextState.commits[newLen - 1]
-          nextState.commits = nextState.commits.map((c, i) => ({ ...c, is_head: i === newLen - 1 }))
-          // Move the branch pointer to the new HEAD so git log shows (HEAD -> branch)
-          if (head && !head.branches.includes(nextState.branch)) head.branches.push(nextState.branch)
-          output = head ? `HEAD is now at ${head.hash} ${head.message}` : "HEAD is now at (empty)"
         } else {
-          // hash-based reset: truncate commits after the target
-          const idx = nextState.commits.findIndex(c => c.hash === target || c.full_hash?.startsWith(target))
-          if (idx === -1) {
+          // Resolve the reset target to a concrete commit, then move the current
+          // branch (and HEAD) there. HEAD~N walks HEAD's parent chain; a hash is
+          // resolved directly. Never resolve by array position — in a branched
+          // history that drops the wrong commits and leaves HEAD misplaced.
+          let targetCommit
+          if (target.startsWith('HEAD~')) {
+            const n = parseInt(target.slice('HEAD~'.length), 10) || 1
+            let cur = nextState.commits.find(c => c.is_head)
+            for (let i = 0; i < n && cur; i++) {
+              cur = nextState.commits.find(c => c.hash === (cur.parents || [])[0])
+            }
+            targetCommit = cur
+          } else {
+            targetCommit = nextState.commits.find(c => c.hash === target || c.full_hash?.startsWith(target))
+          }
+
+          if (!targetCommit) {
             output = `fatal: ambiguous argument '${target}': unknown revision`; status = "error"
           } else {
-            nextState.commits = nextState.commits.slice(0, idx + 1)
             if (isHard) nextState.staged = []
-            const head = nextState.commits[idx]
-            nextState.commits = nextState.commits.map((c, i) => ({ ...c, is_head: i === idx }))
-            // Move the branch pointer to the new HEAD so git log shows (HEAD -> branch)
-            if (head && !head.branches.includes(nextState.branch)) head.branches.push(nextState.branch)
-            output = `HEAD is now at ${head.hash} ${head.message}`
+            const activeBranch = nextState.branch
+            // Keep commits reachable from the new target, plus everything still
+            // referenced by another branch/remote ref (those survive after the
+            // current branch ref moves back). Drop only the now-unreachable commits.
+            const reachableFrom = (startHash) => {
+              const seen = new Set(); const q = [startHash]
+              while (q.length) {
+                const h = q.shift()
+                if (!h || seen.has(h)) continue
+                seen.add(h)
+                const c = nextState.commits.find(x => x.hash === h)
+                if (c) (c.parents || []).forEach(p => q.push(p))
+              }
+              return seen
+            }
+            const keep = reachableFrom(targetCommit.hash)
+            nextState.commits
+              .filter(c => c.branches.some(b => b !== activeBranch))
+              .forEach(tip => reachableFrom(tip.hash).forEach(h => keep.add(h)))
+            nextState.commits = nextState.commits
+              .filter(c => keep.has(c.hash))
+              .map(c => ({
+                ...c,
+                is_head: c.hash === targetCommit.hash,
+                branches: c.hash === targetCommit.hash
+                  ? Array.from(new Set([...c.branches, activeBranch]))
+                  : c.branches.filter(b => b !== activeBranch)
+              }))
+            output = `HEAD is now at ${targetCommit.hash} ${targetCommit.message}`
           }
         }
       }
