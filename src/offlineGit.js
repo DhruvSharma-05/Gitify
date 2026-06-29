@@ -546,12 +546,22 @@ export function simulateCommandOffline(commandText, state, lessonId) {
             branches: c.branches.filter(b => b !== activeBranch)
           }))
 
+          const parents = currentHead ? [currentHead.hash] : []
+          // If this commit finishes a conflicted merge, it is a merge commit:
+          // add the merged branch's tip as a second parent so the graph shows
+          // the merge topology rather than a linear commit.
+          if (nextState.merge_source) {
+            const srcTip = [...nextState.commits].reverse().find(c => c.branches.includes(nextState.merge_source))
+            if (srcTip && !parents.includes(srcTip.hash)) parents.push(srcTip.hash)
+            nextState.merge_source = null
+          }
+
           const newCommit = {
             hash: hash,
             full_hash: fullHash,
             message: msg,
             branches: [activeBranch],
-            parents: currentHead ? [currentHead.hash] : [],
+            parents,
             is_head: true
           }
 
@@ -727,6 +737,7 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           } else {
             nextState.conflict_active = false
             nextState.conflict_triggered = false
+            nextState.merge_source = null
             output = "Merge aborted."
           }
         } else if (!mergeSrc) {
@@ -739,6 +750,9 @@ export function simulateCommandOffline(commandText, state, lessonId) {
           if (nextState.lessonId === 3 && mergeSrc === "feature/ui" && nextState.branch === "main") {
             nextState.conflict_active = true
             nextState.conflict_triggered = true
+            // Remember the branch being merged so the resolving commit becomes a
+            // two-parent merge commit (set in the git commit handler).
+            nextState.merge_source = mergeSrc
             nextState.fileContents['config.js'] =
               "export const config = {\n  api: '/v1',\n  retries: 3,\n<<<<<<< HEAD\n  theme: 'dark',\n=======\n  theme: 'light',\n>>>>>>> feature/ui\n};\n"
             output = "Auto-merging config.js\nCONFLICT (content): Merge conflict in config.js\nAutomatic merge failed; fix conflicts and then commit the result."

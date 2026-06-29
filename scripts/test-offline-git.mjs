@@ -979,6 +979,36 @@ const lesson2State = () => ({
   check('iter64: reset HEAD~9 (beyond root) errors', r3.status === 'error')
 }
 
+// --- iter65: resolving a conflicted merge produces a two-parent merge commit -
+{
+  let s = getInitialOfflineState(3)
+  const featureTip = s.commits.find(c => c.branches.includes('feature/ui')).hash
+  const mainTip = s.commits.find(c => c.is_head).hash
+  s = simulateCommandOffline('git merge feature/ui', s, 3).nextState
+  check('iter65: conflict merge records merge_source', s.merge_source === 'feature/ui')
+  s = simulateCommandOffline('git add config.js', s, 3).nextState
+  // After staging the resolution, the stage_resolved subtask is complete.
+  const staged = checkOfflineProgress(s, 3).subtasks.find(t => t.id === 'stage_resolved')
+  check('iter65: stage_resolved subtask complete after add', staged.completed === true)
+  const r = simulateCommandOffline('git commit -m "Merge feature/ui"', s, 3)
+  const head = r.nextState.commits.find(c => c.is_head)
+  check('iter65: resolved-conflict commit has two parents', head.parents.length === 2)
+  check('iter65: merge commit parents are main tip and feature tip', head.parents.includes(mainTip) && head.parents.includes(featureTip))
+  check('iter65: merge_source cleared after commit', !r.nextState.merge_source)
+  // After committing, the commit_merge subtask is complete (commits >= 4).
+  const committed = checkOfflineProgress(r.nextState, 3).subtasks.find(t => t.id === 'commit_merge')
+  check('iter65: commit_merge subtask complete after commit', committed.completed === true)
+  // A normal (non-merge) commit remains single-parent
+  const r2 = simulateCommandOffline('git commit -m "follow up"', simulateCommandOffline('touch x.js', simulateCommandOffline('git add .', r.nextState, 3).nextState, 3).nextState, 3)
+  const followUp = r2.nextState.commits.find(c => c.message === 'follow up')
+  check('iter65: subsequent normal commit is single-parent', !followUp || followUp.parents.length === 1)
+  // Aborting the merge clears merge_source so a later commit is not a merge
+  let sa = getInitialOfflineState(3)
+  sa = simulateCommandOffline('git merge feature/ui', sa, 3).nextState
+  sa = simulateCommandOffline('git merge --abort', sa, 3).nextState
+  check('iter65: merge --abort clears merge_source', !sa.merge_source)
+}
+
 // --- report ----------------------------------------------------------------
 if (failures.length) {
   console.error(`offline-git tests: ${passed} passed, ${failures.length} FAILED`)
