@@ -924,6 +924,25 @@ const lesson2State = () => ({
   check('iter62: re-merge does not add a commit', r.nextState.commits.length === before)
 }
 
+// --- iter63: git push advances the origin/<branch> remote-tracking ref ------
+{
+  const { s } = run(['git add .', 'git commit -m "init"'], initState(), 1)
+  const r = simulateCommandOffline('git push', s, 1)
+  const head = r.nextState.commits.find(c => c.is_head)
+  check('iter63: push stamps origin/main on the tip', head.branches.includes('origin/main'))
+  check('iter63: push output is not the misleading up-to-date line', !r.output.includes('Everything up-to-date'))
+  check('iter63: push sets pushed_offline for verification', r.nextState.pushed_offline === true)
+  const log = simulateCommandOffline('git log --oneline', r.nextState, 1).output
+  check('iter63: git log shows origin/main after push', log.includes('origin/main'))
+  // lesson 1 still verifies through the full flow
+  const full = run(['git init', 'git add .', 'git commit -m "init"', 'git push'], lesson0State(), 1).s
+  full.lessonId = 1
+  check('iter63: lesson 1 verifies after push', checkOfflineProgress(full, 1).verified === true)
+  // pushing again with nothing new is up to date
+  const r2 = simulateCommandOffline('git push', r.nextState, 1)
+  check('iter63: second push with no new commits is up to date', r2.output.includes('Everything up-to-date'))
+}
+
 // --- report ----------------------------------------------------------------
 if (failures.length) {
   console.error(`offline-git tests: ${passed} passed, ${failures.length} FAILED`)

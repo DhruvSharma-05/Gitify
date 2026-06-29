@@ -914,7 +914,20 @@ export function simulateCommandOffline(commandText, state, lessonId) {
       }
       else if (sub === "push") {
         nextState.pushed_offline = true
-        output = "Everything up-to-date"
+        const activeBranch = nextState.branch
+        const remoteRef = `origin/${activeBranch}`
+        const headCommit = nextState.commits.find(c => c.is_head)
+        if (!headCommit || headCommit.branches.includes(remoteRef)) {
+          output = "Everything up-to-date"
+        } else {
+          // Advance the remote-tracking ref to the local tip so the graph/log
+          // show origin/<branch>. Previously push only set a flag, leaving the
+          // remote-tracking concept invisible.
+          nextState.commits = nextState.commits.map(c => ({ ...c, branches: c.branches.filter(b => b !== remoteRef) }))
+          const tip = nextState.commits.find(c => c.is_head)
+          tip.branches.push(remoteRef)
+          output = `Enumerating objects: 3, done.\nTo origin\n   ${tip.hash}  ${activeBranch} -> ${activeBranch}`
+        }
       }
       else if (sub === "revert") {
         const hash = parts[2]
