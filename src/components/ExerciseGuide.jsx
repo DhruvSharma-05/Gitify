@@ -127,6 +127,11 @@ export default function ExerciseGuide({
           goal: "Rewrite payments branch commit history. Squash typo tweaks, drop the temporary debug state commit, and reword the card decline commit.",
           tips: "Run 'git rebase -i HEAD~5'. Set action to 'squash' for 'Fix typo', 'drop' for 'debug payment state', and 'reword' for declined cards."
         }
+      case 10:
+        return {
+          goal: "A line in pricing.js looks suspicious. Use git blame to see who last touched each line, the git log -S pickaxe to find the commit that introduced applyDiscount, and git show to inspect that commit's diff.",
+          tips: "Run 'git blame pricing.js', then 'git log -S \"applyDiscount\"' to find the introducing commit (c33d4e5), then 'git show c33d4e5' to read its change."
+        }
       default:
         return {
           goal: "Complete git tasks in terminal sandbox.",

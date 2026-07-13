@@ -21,6 +21,7 @@ const RemoteCollaborationLesson = lazy(() => import('./components/RemoteCollabor
 const RebaseLesson = lazy(() => import('./components/RebaseLesson.jsx'))
 const ForkLesson = lazy(() => import('./components/ForkLesson.jsx'))
 const BisectLesson = lazy(() => import('./components/BisectLesson.jsx'))
+const BlameLesson = lazy(() => import('./components/BlameLesson.jsx'))
 
 const lessonFallback = (
   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px', gap: '10px', color: '#8b949e' }}>
@@ -28,7 +29,7 @@ const lessonFallback = (
   </div>
 )
 
-const lessonOrder = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+const lessonOrder = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -40,7 +41,21 @@ export default function App() {
     }
     return 0
   })
-  const [completedLessons, setCompletedLessons] = useState([])
+  const [completedLessons, setCompletedLessons] = useState(() => {
+    const saved = localStorage.getItem('gitify_completed_lessons')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch (e) {
+        return []
+      }
+    }
+    return []
+  })
+
+  useEffect(() => {
+    localStorage.setItem('gitify_completed_lessons', JSON.stringify(completedLessons))
+  }, [completedLessons])
 
   useEffect(() => {
     localStorage.setItem('gitify_current_lesson', currentLesson)
@@ -69,7 +84,14 @@ export default function App() {
   const [isExerciseMode, setIsExerciseMode] = useState(false)
   const [isSolved, setIsSolved] = useState(false)
   const [resetTrigger, setResetTrigger] = useState(0)
-  const [sessionId, setSessionId] = useState(null)
+  const [sessionId, setSessionId] = useState(() => {
+    let activeSession = localStorage.getItem("gitify_session_id")
+    if (!activeSession || activeSession === "null" || activeSession === "undefined") {
+      activeSession = `session_${Math.random().toString(36).substring(2, 11)}`
+      localStorage.setItem("gitify_session_id", activeSession)
+    }
+    return activeSession
+  })
 
   // Live IDE dynamic states
   const [fileContents, setFileContents] = useState({})
@@ -93,16 +115,6 @@ export default function App() {
   const currentLessonIndex = lessonOrder.indexOf(currentLesson)
   const nextLesson = lessonOrder[currentLessonIndex + 1]
 
-  // Initialize Session ID
-  useEffect(() => {
-    let activeSession = localStorage.getItem("gitify_session_id")
-    if (!activeSession || activeSession === "null" || activeSession === "undefined") {
-      activeSession = `session_${Math.random().toString(36).substring(2, 11)}`
-      localStorage.setItem("gitify_session_id", activeSession)
-    }
-    setSessionId(activeSession)
-  }, [])
-
   // Query progression on start
   useEffect(() => {
     fetch(apiUrl('/api/progress?username=student'))
@@ -118,26 +130,31 @@ export default function App() {
       .catch(err => console.warn("Backend not running or progress unavailable:", err))
   }, [])
 
-  // On entering a lesson: clear transient UI, then hydrate that lesson's own
-  // sandbox (its branch, files, commit DAG, checklist) from the backend. Each
-  // lesson keeps its own independent terminal/repo, seeded on first visit.
   useEffect(() => {
     setIsSolved(false)
-    setSubtasks([])
     setIsExerciseMode(false)
-    setFileContents({})
-    setCommitsGraph([])
-    setWorkspaceFiles([])
-    setTerminalHydration(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
 
-    if (!sessionId || currentLesson === 0 || currentLesson === 'contributors') return
+    if (!sessionId || currentLesson === 0 || currentLesson === 'contributors') {
+      setSubtasks([])
+      setFileContents({})
+      setCommitsGraph([])
+      setWorkspaceFiles([])
+      setTerminalHydration(null)
+      return
+    }
 
-    // Lesson 8 is a self-contained, simulated GitHub workflow — seed its checklist
-    // locally and let the terminal drive it (no backend sandbox).
-    if (currentLesson === 8) {
-      setSubtasks(getInitialSubtasks(8))
-      setTerminalHydration({ branch: 'main', files: [], pwd: '', nonce: Date.now() })
+    // Set offline baseline state immediately so that elements render on page load without blockages
+    const local = getInitialOfflineState(currentLesson)
+    setCommitsGraph(local.commits || [])
+    setFileContents(local.fileContents || {})
+    setWorkspaceFiles(local.files || [])
+    setSubtasks(getInitialSubtasks(currentLesson))
+    setTerminalHydration({ branch: local.branch || 'main', files: local.files || [], pwd: '', nonce: Date.now() })
+
+    // Lesson 8 is a self-contained, simulated GitHub workflow
+    // Lesson 10 is a fully client-simulated, read-only history investigation
+    if (currentLesson === 8 || currentLesson === 10) {
       return
     }
 
@@ -160,12 +177,7 @@ export default function App() {
       .catch(err => {
         if (cancelled) return
         console.warn('Lesson enter failed, using offline seed:', err)
-        const local = getInitialOfflineState(currentLesson)
-        setCommitsGraph(local.commits || [])
-        setFileContents(local.fileContents || {})
-        setWorkspaceFiles(local.files || [])
-        setSubtasks(getInitialSubtasks(currentLesson))
-        setTerminalHydration({ branch: local.branch, files: local.files, pwd: '', nonce: Date.now() })
+        // Baseline is already loaded, no further action required
       })
     return () => { cancelled = true }
   }, [currentLesson, sessionId])
@@ -401,6 +413,8 @@ export default function App() {
               <ForkLesson setTerminalSyncListener={setTerminalSyncListener} />
             ) : currentLesson === 9 ? (
               <BisectLesson onSuccess={() => handleVerifySuccess(9)} setTerminalSyncListener={setTerminalSyncListener} />
+            ) : currentLesson === 10 ? (
+              <BlameLesson onSuccess={() => handleVerifySuccess(10)} setTerminalSyncListener={setTerminalSyncListener} />
             ) : (
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '18px' }}>
                 <div style={{ marginBottom: '8px' }}>
