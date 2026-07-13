@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import './RebaseLesson.css'
 import PretextCanvas from './PretextCanvas.jsx'
 
 const startingCommits = [

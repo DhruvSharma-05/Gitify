@@ -307,7 +307,7 @@
 
 .incoming-line::before {
   top: 104px;
-  width: 55%;
+  width: 170px;
   background: #ec4899;
 }
 
@@ -337,9 +337,23 @@
   animation: scaleIn 0.35s ease;
 }
 
-.merged .incoming-line::before {
-  transform: rotate(-18deg);
-  transform-origin: right center;
+.incoming-line::after {
+  content: '';
+  position: absolute;
+  top: 104px;
+  left: 200px;
+  width: 70px;
+  height: 3px;
+  background: #ec4899;
+  transform: rotate(-42deg);
+  transform-origin: left center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 0;
+}
+
+.merged .incoming-line::after {
+  opacity: 1;
 }
 
 .action-row {
