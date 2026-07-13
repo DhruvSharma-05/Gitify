@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Target, Check, AlertTriangle, Search, RotateCcw, Zap } from 'lucide-react'
+import './HistoryLesson.css'
 import PretextCanvas from './PretextCanvas.jsx'
 import { useToast } from './Toast.jsx'
 
@@ -20,11 +21,42 @@ const COMMITS = [
 // Git bisects [good+1 .. bad] = [1..6], midpoint = index 3 → bad → narrows [1..2],
 // midpoint = index 1 → good → narrows [2..2], midpoint = index 2 → good → culprit = index 3.
 const BISECT_STEPS = [
-  { lo: 0, hi: 6, testing: 3, label: 'Step 1 — midpoint of [good..bad] range (index 3)' },
-  { lo: 0, hi: 2, testing: 1, label: 'Step 2 — commit 3 was bad, search older half' },
-  { lo: 2, hi: 2, testing: 2, label: 'Step 3 — commit 1 was good, one candidate left' },
-  { lo: 3, hi: 3, testing: 3, label: 'Culprit found — commit 3 is the first bad!' },
+  {
+    lo: 0, hi: 6, testing: 3,
+    title: 'Step 1 of 3',
+    label: 'Git checks out the middle commit of the 7 and asks: is it good or bad?',
+    plain: 'Whatever the answer, half the commits get ruled out in one test.',
+  },
+  {
+    lo: 0, hi: 2, testing: 1,
+    title: 'Step 2 of 3',
+    label: 'The middle commit was bad — so the bug is at or before it. Git ignores the newer half and tests the middle of what remains.',
+    plain: '4 commits eliminated. Only the older half is left to search.',
+  },
+  {
+    lo: 2, hi: 3, testing: 2,
+    title: 'Step 3 of 3',
+    label: 'That commit was good — so the bug came after it. One suspect remains.',
+    plain: 'Down to the last candidate. One more test pins it down.',
+  },
+  {
+    lo: 3, hi: 3, testing: 3,
+    title: 'Found it',
+    label: 'The first bad commit is "Refactor cart total" — found in 3 tests, not 7.',
+    plain: 'Git prints the culprit’s hash and message. Bug located.',
+  },
 ]
+
+// How each commit reads at a given step. We only claim what bisect actually
+// knows: the culprit (once reached) is the first bad commit, the tested commit
+// is "testing", commits still inside [lo..hi] are the live search window, and
+// everything outside it has been "eliminated" (ruled out this round).
+function nodeVerdict(idx, step, isCulpritStep) {
+  if (isCulpritStep && idx === step.testing) return 'bad'
+  if (idx === step.testing) return 'testing'
+  if (idx >= step.lo && idx <= step.hi) return 'window'
+  return 'eliminated'
+}
 
 export default function BisectLesson({ onSuccess, setTerminalSyncListener } = {}) {
   const toast = useToast()
@@ -122,49 +154,58 @@ export default function BisectLesson({ onSuccess, setTerminalSyncListener } = {}
             midpoint commit — you test it and report <code>good</code> or <code>bad</code>.
           </p>
 
-          {/* Commit timeline with range highlight */}
+          {/* Legend so the colours are self-explanatory for a first-timer */}
+          <div className="bisect-legend">
+            <span><i className="dot window" /> still to search</span>
+            <span><i className="dot testing" /> testing now</span>
+            <span><i className="dot eliminated" /> ruled out</span>
+            <span><i className="dot bad" /> first bad commit</span>
+          </div>
+
+          {/* Oldest → newest commit timeline; each node shows its bisect verdict */}
           <div className="timeline-scroller">
-            <div className="history-track" style={{ flexDirection: 'row', gap: '8px', flexWrap: 'wrap' }}>
+            <div className="history-track bisect-track">
               {COMMITS.map((c, idx) => {
-                const inRange  = idx >= step.lo && idx <= step.hi
-                const testing  = idx === step.testing
-                const isBad    = isCulpritStep && c.bad
+                const verdict = nodeVerdict(idx, step, isCulpritStep)
                 return (
                   <div
                     key={c.hash}
-                    className={`history-node${testing ? ' selected' : ''}${isBad ? ' bad' : ''}`}
-                    style={{ minWidth: '120px', opacity: inRange ? 1 : 0.35 }}
+                    className={`history-node bisect-node ${verdict}`}
                   >
-                    {testing && <span className="head-pointer">{isCulpritStep ? 'CULPRIT' : 'TESTING'}</span>}
+                    {verdict === 'testing' && <span className="head-pointer">TESTING</span>}
+                    {verdict === 'bad' && <span className="head-pointer bad">FIRST BAD</span>}
                     <span className="node-dot"></span>
                     <strong>{c.hash}</strong>
                     <em style={{ fontSize: '0.78rem' }}>{c.message}</em>
                     <small>{c.author}</small>
-                    {isBad && <span className="commit-tag bad">first bad</span>}
                   </div>
                 )
               })}
             </div>
           </div>
 
-          <div style={{ marginTop: '12px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <span style={{ color: '#8b949e', fontSize: '0.82rem' }}>{step.label}</span>
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
-              <button
-                className="history-action ghost"
-                onClick={() => { setBisectStep(0); setRevealed(false) }}
-                disabled={bisectStep === 0}
-              >
-                <RotateCcw size={13} strokeWidth={2} /> Reset
-              </button>
-              <button
-                className="history-action"
-                onClick={() => setBisectStep((s) => Math.min(s + 1, BISECT_STEPS.length - 1))}
-                disabled={isCulpritStep}
-              >
-                {isCulpritStep ? 'Done' : 'Next step →'}
-              </button>
-            </div>
+          {/* Plain-language explanation of the current step */}
+          <div className="bisect-step-note">
+            <span className="bisect-step-title">{step.title}</span>
+            <p>{step.label}</p>
+            <p className="bisect-step-plain">{step.plain}</p>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+            <button
+              className="history-action ghost"
+              onClick={() => { setBisectStep(0); setRevealed(false) }}
+              disabled={bisectStep === 0}
+            >
+              <RotateCcw size={13} strokeWidth={2} /> Start over
+            </button>
+            <button
+              className="history-action"
+              onClick={() => setBisectStep((s) => Math.min(s + 1, BISECT_STEPS.length - 1))}
+              disabled={isCulpritStep}
+            >
+              {isCulpritStep ? 'Done' : 'Next step →'}
+            </button>
           </div>
 
           <div className="git-cmd-line" style={{ marginTop: '10px' }}>
@@ -216,34 +257,41 @@ export default function BisectLesson({ onSuccess, setTerminalSyncListener } = {}
             <h2>The Three Commands</h2>
           </div>
 
-          <p className="stage-instruction">Everything you need is three commands and your test.</p>
+          <p className="stage-instruction">
+            You only ever need these three commands (plus your own test). Run them in order — Git handles the checkouts.
+          </p>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div className="bisect-cmd-list">
             {[
               {
                 cmd: 'git bisect start',
-                color: '#38bdf8',
-                desc: 'Opens a bisect session. Git records the current HEAD as the candidate bad endpoint.',
+                accent: '#38bdf8',
+                when: 'First',
+                desc: 'Opens a bisect session so Git can start narrowing things down.',
               },
               {
                 cmd: 'git bisect bad',
-                color: '#f87171',
-                desc: 'Tells Git the current checkout is broken. Use this on HEAD first, then on any midpoint that fails your test.',
+                accent: '#f87171',
+                when: 'Then',
+                desc: 'Tell Git the current commit is broken. You run this on the latest commit first, then again on any midpoint that fails your test.',
               },
               {
                 cmd: 'git bisect good <hash>',
-                color: '#10b981',
-                desc: 'Marks a commit where everything worked. Git computes the next midpoint and checks it out automatically.',
+                accent: '#10b981',
+                when: 'Then',
+                desc: 'Point to a commit you know worked. Git instantly checks out the midpoint between good and bad for you to test next.',
               },
               {
                 cmd: 'git bisect reset',
-                color: '#a78bfa',
-                desc: 'Ends the session and returns HEAD to the branch tip. Always run this when done.',
+                accent: '#a78bfa',
+                when: 'Last',
+                desc: 'Ends the session and puts you back on your branch tip. Always run this when you’re done.',
               },
-            ].map(({ cmd, color, desc }) => (
-              <div key={cmd} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '8px', padding: '12px 14px' }}>
-                <code style={{ color, fontWeight: '700', fontSize: '0.85rem' }}>{cmd}</code>
-                <p style={{ margin: '6px 0 0', color: '#94a3b8', fontSize: '0.82rem' }}>{desc}</p>
+            ].map(({ cmd, accent, when, desc }) => (
+              <div key={cmd} className="bisect-cmd" style={{ '--cmd-accent': accent }}>
+                <span className="bisect-cmd-when">{when}</span>
+                <code>{cmd}</code>
+                <p>{desc}</p>
               </div>
             ))}
           </div>
@@ -257,22 +305,23 @@ export default function BisectLesson({ onSuccess, setTerminalSyncListener } = {}
           </div>
 
           <p className="stage-instruction">
-            With 7 commits you could manually check all 7. With 100 commits you'd check 7. With 1 000 — still only 10.
+            Checking commits one by one takes as many tests as there are commits. Bisect halves the range every
+            test, so the number of tests barely grows even as the history gets huge:
           </p>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
+          <div className="bisect-scale">
             {[
               { commits: 7,    steps: 3 },
               { commits: 50,   steps: 6 },
               { commits: 500,  steps: 9 },
               { commits: 1000, steps: 10 },
             ].map(({ commits, steps }) => (
-              <div key={commits} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ color: '#8b949e', fontSize: '0.8rem', minWidth: '80px' }}>{commits} commits</span>
-                <div style={{ flex: 1, height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '3px', overflow: 'hidden' }}>
-                  <div style={{ width: `${(steps / 10) * 100}%`, height: '100%', background: 'linear-gradient(90deg,#38bdf8,#6366f1)', borderRadius: '3px' }} />
+              <div key={commits} className="bisect-scale-row">
+                <span className="bisect-scale-label">{commits} commits</span>
+                <div className="bisect-scale-bar">
+                  <div className="bisect-scale-fill" style={{ width: `${(steps / 10) * 100}%` }} />
                 </div>
-                <span style={{ color: '#38bdf8', fontSize: '0.8rem', fontWeight: '700', minWidth: '50px' }}>{steps} steps</span>
+                <span className="bisect-scale-steps">{steps} tests</span>
               </div>
             ))}
           </div>

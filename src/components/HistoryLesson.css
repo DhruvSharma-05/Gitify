@@ -209,6 +209,164 @@
   font-weight: 900;
 }
 
+/* ---- Lesson 9 (Bisect) — reuses the timeline node vocabulary above, adds
+   a good/bad/testing verdict layer and a plain-language step note. Kept in
+   this shared sheet so Bisect matches History/Rebase rather than looking
+   like an outlier. ---- */
+.bisect-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 4px 0 2px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.bisect-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.bisect-legend .dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.bisect-legend .dot.window      { background: #3b82f6; }
+.bisect-legend .dot.testing     { background: #f59e0b; }
+.bisect-legend .dot.eliminated  { background: rgba(255, 255, 255, 0.22); }
+.bisect-legend .dot.bad         { background: #ef4444; }
+
+/* Bisect timeline scrolls as one row; no fixed-width connector rail (the
+   base .history-track::before assumes a 980px 5-node layout). */
+.bisect-track {
+  min-width: 0;
+  gap: 12px;
+}
+.bisect-track::before { display: none; }
+
+.bisect-node {
+  width: 118px;
+  min-height: 138px;
+  transition: opacity 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
+}
+/* Verdict colours mirror the legend + the existing .history-node.bad accent */
+.bisect-node.window   { border-color: rgba(59, 130, 246, 0.5); }
+.bisect-node.window .node-dot { background: #3b82f6; }
+.bisect-node.testing {
+  border-color: rgba(245, 158, 11, 0.7);
+  transform: translateY(-4px);
+  background: #1f2937;
+}
+.bisect-node.testing .node-dot { background: #f59e0b; }
+.bisect-node.eliminated { opacity: 0.4; }
+.bisect-node.eliminated .node-dot { background: rgba(255, 255, 255, 0.28); }
+.bisect-node.bad {
+  border-color: rgba(239, 68, 68, 0.65);
+  background: rgba(239, 68, 68, 0.08);
+}
+.bisect-node.bad .node-dot { background: #ef4444; }
+
+.head-pointer.bad { background: #ef4444; color: #fff; }
+
+.bisect-step-note {
+  margin: 14px 0 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(56, 189, 248, 0.07);
+  border: 1px solid rgba(56, 189, 248, 0.22);
+}
+.bisect-step-title {
+  display: inline-block;
+  margin-bottom: 6px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #38bdf8;
+}
+.bisect-step-note p {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: var(--text-main);
+}
+.bisect-step-note .bisect-step-plain {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* Stage 2 — command reference cards (left accent = command's role colour) */
+.bisect-cmd-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.bisect-cmd {
+  position: relative;
+  padding: 12px 14px 12px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 3px solid var(--cmd-accent, #38bdf8);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.bisect-cmd-when {
+  display: inline-block;
+  margin-bottom: 6px;
+  font-size: 0.64rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+}
+.bisect-cmd code {
+  display: block;
+  font-family: 'Fira Code', Consolas, monospace;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--cmd-accent, #38bdf8);
+}
+.bisect-cmd p {
+  margin: 6px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+/* Stage 3 — "why it's fast" scale bars */
+.bisect-scale {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  margin-top: 10px;
+}
+.bisect-scale-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.bisect-scale-label {
+  min-width: 84px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.bisect-scale-bar {
+  flex: 1;
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+.bisect-scale-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #38bdf8, #6366f1);
+}
+.bisect-scale-steps {
+  min-width: 56px;
+  text-align: right;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #38bdf8;
+}
+
 .diff-panel {
   margin-top: 12px;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -258,6 +416,25 @@
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 18px;
   align-items: start;
+}
+
+/* Key-insight box — shared with the merge/rebase lessons so callouts read
+   identically across the course. Green = takeaway/safe. */
+.insight-callout {
+  padding: 14px 16px;
+  border: 1px solid rgba(16, 185, 129, 0.34);
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.08);
+  color: #d1fae5;
+  font-size: 0.86rem;
+  line-height: 1.6;
+}
+.insight-callout strong { color: #6ee7b7; }
+.insight-callout code {
+  background: rgba(0, 0, 0, 0.35);
+  padding: 0 5px;
+  border-radius: 4px;
+  color: #f472b6;
 }
 
 .history-panel p {
