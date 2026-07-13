@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import shlex
 import tempfile
 import subprocess
@@ -1008,29 +1009,39 @@ def check_sandbox_state(repo_path, lesson_id):
             if os.path.exists(os.path.join(repo_path, ".git")):
                 bisect_log = os.path.join(repo_path, ".git", "BISECT_LOG")
                 bisect_start = os.path.join(repo_path, ".git", "BISECT_START")
+                session_active = os.path.exists(bisect_start)
 
-                # Started: BISECT_LOG exists (created by git bisect start)
-                started = os.path.exists(bisect_log) or os.path.exists(bisect_start)
+                # A finished `git bisect reset` cleans up BISECT_START but not the
+                # HEAD reflog: a real bisect run leaves detached-HEAD checkout hops
+                # ("checkout: moving from main to <sha>") that the pristine seed never
+                # has. This reflog signature is our durable proof a bisect happened —
+                # without it the lesson would auto-pass on entry, since a fresh seed is
+                # indistinguishable from "reset after bisecting" by BISECT files alone.
+                _, reflog_out, _ = run_git_command(repo_path, ["reflog"])
+                bisected_ever = bool(re.search(r"checkout: moving from main to [0-9a-f]{7,}", reflog_out))
 
-                if started and os.path.exists(bisect_log):
+                # Started: an active session, or reflog proof one existed.
+                started = session_active or os.path.exists(bisect_log) or bisected_ever
+
+                if os.path.exists(bisect_log):
                     with open(bisect_log, "r", encoding="utf-8", errors="ignore") as f:
                         log_content = f.read()
                     # Marked bad: a "bad" line present in BISECT_LOG
                     marked_bad = "# bad:" in log_content
-                    # Culprit found: git bisect log reports the first bad commit
-                    culprit_found = "is the first bad commit" in log_content or (
-                        marked_bad and "# good:" in log_content and
-                        log_content.count("# good:") >= 1
-                    )
+                    # Culprit found only when git actually reports convergence — NOT
+                    # after the first good+bad pair (bisect needs ~3 marks over 7 commits).
+                    culprit_found = "first bad commit" in log_content
+                else:
+                    marked_bad = bisected_ever
 
-                # Reset: BISECT_LOG and BISECT_START are gone (bisect session ended)
-                reset_done = not os.path.exists(bisect_log) and not os.path.exists(bisect_start)
-                # Require they at least started before crediting reset
-                if reset_done:
-                    code_log, log_out, _ = run_git_command(repo_path, ["log", "--oneline"])
-                    # If HEAD is back on a branch (not detached) and log has >= 7 commits, they reset
-                    code_head, head_out, _ = run_git_command(repo_path, ["rev-parse", "--abbrev-ref", "HEAD"])
+                # Reset done: a bisect provably ran (reflog) and the session is now
+                # closed (no BISECT_START) with HEAD back on main.
+                if bisected_ever and not session_active:
+                    _, head_out, _ = run_git_command(repo_path, ["rev-parse", "--abbrev-ref", "HEAD"])
+                    _, log_out, _ = run_git_command(repo_path, ["log", "--oneline"])
                     reset_done = head_out.strip() == "main" and "Refactor cart total" in log_out
+                    if reset_done:
+                        culprit_found = True
 
             subtasks = [
                 {"id": "bisect_start", "title": "Start bisect session ('git bisect start')", "completed": started or reset_done},
