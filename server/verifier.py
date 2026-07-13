@@ -150,7 +150,8 @@ def verify_lesson_5(commands):
     """
     with tempfile.TemporaryDirectory() as temp_dir:
         run_git_command(temp_dir, ["init", "-b", "feature/payments"])
-        
+        run_git_command(temp_dir, ["commit", "--allow-empty", "-m", "Initial commit"])
+
         run_git_command(temp_dir, ["checkout", "-b", "hotfix/invoice"])
         with open(os.path.join(temp_dir, "Invoice.jsx"), "w") as f:
             f.write("// tax calculations")
@@ -191,6 +192,217 @@ def verify_lesson_5(commands):
             return False, "Hotfix commit not cherry-picked. Make sure to run 'git cherry-pick <hash>'."
             
         return True, "Brilliant! Your unfinished work was safely stashed, and the hotfix commit was cherry-picked successfully."
+
+def verify_lesson_3(commands):
+    """
+    Verifies Lesson 3: Merge Conflicts
+    Required state: conflict triggered, config.js resolved, staged, and merge committed.
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        run_git_command(temp_dir, ["init", "-b", "main"])
+        config_path = os.path.join(temp_dir, "config.js")
+        with open(config_path, "w") as f:
+            f.write("export const config = {\n  api: '/v1',\n  retries: 3,\n  theme: 'dark'\n};\n")
+        run_git_command(temp_dir, ["add", "."])
+        run_git_command(temp_dir, ["commit", "-m", "Base config"])
+
+        run_git_command(temp_dir, ["checkout", "-b", "feature/ui"])
+        with open(config_path, "w") as f:
+            f.write("export const config = {\n  api: '/v1',\n  retries: 3,\n  theme: 'light'\n};\n")
+        run_git_command(temp_dir, ["add", "."])
+        run_git_command(temp_dir, ["commit", "-m", "ui polish"])
+
+        run_git_command(temp_dir, ["checkout", "main"])
+        with open(config_path, "w") as f:
+            f.write("export const config = {\n  api: '/v1',\n  retries: 3,\n  theme: 'system'\n};\n")
+        run_git_command(temp_dir, ["add", "."])
+        run_git_command(temp_dir, ["commit", "-m", "auth config"])
+
+        for cmd in commands:
+            try:
+                cmd_parts = shlex.split(cmd.strip())
+            except ValueError:
+                continue
+            if not cmd_parts or cmd_parts[0] != "git":
+                continue
+            run_git_command(temp_dir, cmd_parts[1:])
+
+        # Validation: no conflict markers remain and merge commit exists
+        with open(config_path, "r") as f:
+            content = f.read()
+        if any(m in content for m in ["<<<<<<<", "=======", ">>>>>>>"]):
+            return False, "Conflict markers still present in config.js. Edit the file to resolve them, then 'git add config.js'."
+
+        code, log_out, _ = run_git_command(temp_dir, ["log", "--oneline"])
+        if not os.path.exists(os.path.join(temp_dir, ".git", "MERGE_HEAD")) is False:
+            pass
+        merge_done = (
+            not os.path.exists(os.path.join(temp_dir, ".git", "MERGE_HEAD"))
+            and len(log_out.splitlines()) >= 4
+        )
+        if not merge_done:
+            return False, "Merge not committed yet. After resolving conflicts, run 'git add config.js' then 'git commit'."
+
+        return True, "Merge conflict resolved and committed successfully."
+
+
+def verify_lesson_4(commands):
+    """
+    Verifies Lesson 4: Git History & Time Travel
+    Required state: buggy commit ('Skip null metric check') either reverted or reset away.
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        run_git_command(temp_dir, ["init", "-b", "main"])
+        files_commits = [
+            ("Dashboard.jsx", "// Dashboard core\n", "Initial dashboard"),
+            ("auth.js", "// Auth middleware\n", "Add auth guard"),
+            ("metrics.js", "// Cache analytics\n", "Cache metrics"),
+            ("Chart.jsx", "// Chart layout\n", "Tune chart layout"),
+            ("metrics.js", "return metric.value.toFixed(2)\n", "Skip null metric check"),
+            ("Spinner.jsx", "// Spinner feedback\n", "Polish loading state"),
+            ("deploy.yml", "replicas: 1\n", "Update deploy config"),
+            ("CHANGELOG.md", "version: 1.3.2\n", "Release production"),
+        ]
+        for filename, content, msg in files_commits:
+            with open(os.path.join(temp_dir, filename), "w") as f:
+                f.write(content)
+            run_git_command(temp_dir, ["add", "."])
+            run_git_command(temp_dir, ["commit", "-m", msg])
+
+        for cmd in commands:
+            try:
+                cmd_parts = shlex.split(cmd.strip())
+            except ValueError:
+                continue
+            if not cmd_parts or cmd_parts[0] != "git":
+                continue
+            run_git_command(temp_dir, cmd_parts[1:])
+
+        code, log_out, _ = run_git_command(temp_dir, ["log", "--oneline"])
+        log_lower = log_out.lower()
+        reverted = "revert" in log_lower and "skip null" in log_lower
+        reset_away = "skip null metric check" not in log_lower
+
+        if not (reverted or reset_away):
+            return False, "The buggy commit 'Skip null metric check' is still in history. Use 'git revert <hash>' or 'git reset --hard <hash>'."
+
+        return True, "Git history repaired successfully!"
+
+
+def verify_lesson_6(commands):
+    """
+    Verifies Lesson 6: Remote Collaboration
+    Required state: local 'login form' commit and teammate commits pushed to origin/main.
+    """
+    with tempfile.TemporaryDirectory() as remote_dir:
+        env = seed_env()
+        subprocess.run(["git", "init", "--bare", "-b", "main"], cwd=remote_dir, env=env,
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            run_git_command(temp_dir, ["init", "-b", "main"])
+            run_git_command(temp_dir, ["remote", "add", "origin", remote_dir])
+            with open(os.path.join(temp_dir, "README.md"), "w") as f:
+                f.write("# Gitify Collab Project\n")
+            run_git_command(temp_dir, ["add", "."])
+            run_git_command(temp_dir, ["commit", "-m", "Init project"])
+            run_git_command(temp_dir, ["push", "-u", "origin", "main"])
+
+            # Simulate teammate commits on remote
+            with tempfile.TemporaryDirectory() as teammate_dir:
+                subprocess.run(["git", "clone", remote_dir, teammate_dir], env=env,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                subprocess.run(["git", "checkout", "-B", "main"], cwd=teammate_dir, env=env,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                with open(os.path.join(teammate_dir, "ui.js"), "w") as f:
+                    f.write("// Sam: UI navbar polish\n")
+                subprocess.run(["git", "add", "."], cwd=teammate_dir, env=env,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                subprocess.run(["git", "-c", "user.name=Sam", "-c", "user.email=sam@gitify.edu",
+                                "commit", "-m", "nav polish"], cwd=teammate_dir, env=env,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                with open(os.path.join(teammate_dir, "api.js"), "w") as f:
+                    f.write("// Priya: endpoint cache retry logic\n")
+                subprocess.run(["git", "add", "."], cwd=teammate_dir, env=env,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                subprocess.run(["git", "-c", "user.name=Priya", "-c", "user.email=priya@gitify.edu",
+                                "commit", "-m", "retry logic"], cwd=teammate_dir, env=env,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                subprocess.run(["git", "push", "origin", "main"], cwd=teammate_dir, env=env,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+            # Student's conflicting local commit
+            with open(os.path.join(temp_dir, "auth.js"), "w") as f:
+                f.write("// Student local changes: login form implementation\n")
+            run_git_command(temp_dir, ["add", "."])
+            run_git_command(temp_dir, ["commit", "-m", "login form"])
+
+            for cmd in commands:
+                try:
+                    cmd_parts = shlex.split(cmd.strip())
+                except ValueError:
+                    continue
+                if not cmd_parts or cmd_parts[0] != "git":
+                    continue
+                run_git_command(temp_dir, cmd_parts[1:])
+
+            code, origin_log, _ = run_git_command(temp_dir, ["log", "origin/main", "--oneline"])
+            has_login = "login form" in origin_log
+            has_nav = "nav polish" in origin_log
+            has_retry = "retry logic" in origin_log
+
+            if not has_nav or not has_retry:
+                return False, "Teammate commits not yet in your local history. Run 'git fetch' then 'git pull --rebase'."
+            if not has_login:
+                return False, "Your 'login form' commit hasn't reached origin/main yet. Run 'git push origin main'."
+
+            return True, "Remote sync successful! Your changes and your teammates' are now in sync."
+
+
+def verify_lesson_7(commands):
+    """
+    Verifies Lesson 7: Rebase & Clean History
+    Required state: debug commit dropped, typo squashed, ≤4 commits remain.
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        run_git_command(temp_dir, ["init", "-b", "main"])
+        commits = [
+            ("app.js", "// Main application core\n", "Base commit"),
+            ("checkout.js", "// checkout form component\n", "Add checkout form"),
+            ("checkout.js", "// checkout form component - fixed typo\n", "Fix typo in payment copy"),
+            ("stripe.js", "// stripe integration helper\n", "Wire Stripe token"),
+            ("debug.txt", "temporary payment debug file\n", "debug payment state"),
+            ("checkout.js", "// checkout form - handled declined cards\n", "Handle declined cards"),
+        ]
+        for filename, content, msg in commits:
+            with open(os.path.join(temp_dir, filename), "w") as f:
+                f.write(content)
+            run_git_command(temp_dir, ["add", "."])
+            run_git_command(temp_dir, ["commit", "-m", msg])
+
+        for cmd in commands:
+            try:
+                cmd_parts = shlex.split(cmd.strip())
+            except ValueError:
+                continue
+            if not cmd_parts or cmd_parts[0] != "git":
+                continue
+            # Skip rebase -i (interactive) — student used the modal
+            if cmd_parts[1:3] == ["rebase", "-i"]:
+                continue
+            run_git_command(temp_dir, cmd_parts[1:])
+
+        code, log_out, _ = run_git_command(temp_dir, ["log", "--oneline"])
+        log_lower = log_out.lower()
+        log_lines = [l for l in log_out.strip().splitlines() if l]
+
+        if "debug payment state" in log_lower:
+            return False, "The debug commit is still in history. Drop it in the interactive rebase."
+        if len(log_lines) > 4:
+            return False, f"History still has {len(log_lines)} commits. Squash the typo fix into the checkout form commit."
+
+        return True, "Commits squashed and timeline clean!"
+
 
 def verify_simulated_state(lesson_id, state):
     """

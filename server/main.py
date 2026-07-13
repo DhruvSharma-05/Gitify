@@ -102,8 +102,16 @@ def verify_exercise(data: VerifyRequest):
                 success, message = verifier.verify_lesson_0(data.commands)
             elif data.lesson_id == 2:
                 success, message = verifier.verify_lesson_2(data.commands)
+            elif data.lesson_id == 3:
+                success, message = verifier.verify_lesson_3(data.commands)
+            elif data.lesson_id == 4:
+                success, message = verifier.verify_lesson_4(data.commands)
             elif data.lesson_id == 5:
                 success, message = verifier.verify_lesson_5(data.commands)
+            elif data.lesson_id == 6:
+                success, message = verifier.verify_lesson_6(data.commands)
+            elif data.lesson_id == 7:
+                success, message = verifier.verify_lesson_7(data.commands)
             else:
                 # If commands sent for other lessons, fall back to checking their simulated payload
                 if data.state:

@@ -91,6 +91,21 @@ function getSmartHint(command, output, lessonId) {
   if (out.includes('detached head')) {
     return "Tip: You're in detached HEAD state. Create a branch with 'git checkout -b <branch-name>' to keep your work."
   }
+  if (out.includes('error: pathspec') && out.includes('did not match any file(s) known to git')) {
+    return "Tip: That branch doesn't exist. Run 'git branch -a' to see all available branches."
+  }
+  if (out.includes('error: cannot delete branch') && out.includes('checked out')) {
+    return "Tip: You can't delete the branch you're currently on. Switch to another branch first with 'git checkout main'."
+  }
+  if (out.includes('error: your local changes to the following files would be overwritten')) {
+    return "Tip: Stash or commit your changes before switching branches. Run 'git stash' to save them temporarily."
+  }
+  if (out.includes('please tell me who you are') || out.includes('author identity unknown')) {
+    return "Tip: Git needs your identity. Run: git config user.email 'you@example.com' && git config user.name 'Your Name'"
+  }
+  if (out.includes('not something we can merge') || out.includes('not a valid object name')) {
+    return "Tip: That branch or commit hash doesn't exist. Check spelling with 'git branch -a' or 'git log --oneline'."
+  }
   return null
 }
 
@@ -170,7 +185,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
     )) {
       const matches = files.filter(f => f.toLowerCase().startsWith(currentWord.toLowerCase()) && f.toLowerCase() !== currentWord.toLowerCase())
       setSuggestions(matches)
-    } else if (words.length > 1 && (['checkout', 'merge', 'rebase', 'switch'].includes(words[words.length - 2]))) {
+    } else if (words.length > 1 && (['checkout', 'merge', 'rebase', 'switch', '-b', '-c'].includes(words[words.length - 2]))) {
       const matches = branches.filter(b => b.toLowerCase().startsWith(currentWord.toLowerCase()) && b.toLowerCase() !== currentWord.toLowerCase())
       setSuggestions(matches)
     } else {
@@ -587,7 +602,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
     }
 
     // Completing branch names
-    if (words.length > 1 && (['checkout', 'merge', 'rebase', 'switch'].includes(words[words.length - 2]))) {
+    if (words.length > 1 && (['checkout', 'merge', 'rebase', 'switch', '-b', '-c'].includes(words[words.length - 2]))) {
       const match = branches.find(b => b.toLowerCase().startsWith(currentWord.toLowerCase()))
       if (match) {
         words[words.length - 1] = match

@@ -81,7 +81,7 @@ export function checkOfflineProgress(state, lessonId) {
     const stashed = state.stashes.length > 0 || state.stashed_offline === true
     const switched = state.branch === "feature/payments"
     const picked = state.commits.some(c => c.message.toLowerCase().includes("fix tax rounding"))
-    const popped = picked && state.files.includes("Checkout.jsx") && state.files.includes("styles.css")
+    const popped = picked && stashed && state.files.includes("Checkout.jsx") && state.files.includes("styles.css")
     
     subtasks = [
       { id: "stash_wip", title: "Stash uncommitted changes ('git stash')", completed: stashed },
