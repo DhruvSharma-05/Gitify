@@ -172,33 +172,45 @@
 }
 
 .tracking-visual {
-  display: grid;
-  grid-template-columns: 1fr 70px 1fr;
+  display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 8px;
   margin: 20px 0;
+  width: 100%;
 }
 
-.branch-pill {
-  padding: 14px 12px;
+.remote-lesson .branch-pill {
+  padding: 8px 10px;
   border-radius: 999px;
   text-align: center;
   font-weight: 900;
+  font-size: 0.72rem;
+  text-transform: none;
+  margin-right: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
 }
 
-.branch-pill.local {
+.remote-lesson .branch-pill.local {
   background: rgba(59, 130, 246, 0.16);
   border: 1px solid rgba(59, 130, 246, 0.4);
+  flex: 0 0 auto;
 }
 
-.branch-pill.remote {
+.remote-lesson .branch-pill.remote {
   background: rgba(236, 72, 153, 0.14);
   border: 1px solid rgba(236, 72, 153, 0.36);
+  flex: 0 1 auto;
 }
 
 .tracking-line {
+  flex: 1 1 auto;
   height: 2px;
   border-top: 3px dotted rgba(245, 158, 11, 0.8);
+  min-width: 20px;
 }
 
 .tracking-line.synced {
@@ -306,7 +318,7 @@
   align-items: center;
 }
 
-.diagram-node {
+.remote-lesson .diagram-node {
   min-height: 116px;
   display: flex;
   flex-direction: column;
@@ -316,9 +328,11 @@
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.18);
+  opacity: 1;
+  transform: none;
 }
 
-.diagram-node small,
+.remote-lesson .diagram-node small,
 .fork-diagram span {
   color: var(--text-muted);
 }
@@ -362,7 +376,6 @@
   .remote-layout,
   .team-grid,
   .sync-diagram,
-  .tracking-visual,
   .pr-shell,
   .fork-diagram {
     grid-template-columns: 1fr;

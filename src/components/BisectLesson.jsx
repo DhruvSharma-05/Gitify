@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Target, Check, AlertTriangle, Search, RotateCcw, Zap } from 'lucide-react'
+import './HistoryLesson.css'
 import PretextCanvas from './PretextCanvas.jsx'
 import { useToast } from './Toast.jsx'
 
@@ -122,9 +123,8 @@ export default function BisectLesson({ onSuccess, setTerminalSyncListener } = {}
             midpoint commit — you test it and report <code>good</code> or <code>bad</code>.
           </p>
 
-          {/* Commit timeline with range highlight */}
           <div className="timeline-scroller">
-            <div className="history-track" style={{ flexDirection: 'row', gap: '8px', flexWrap: 'wrap' }}>
+            <div className="history-track">
               {COMMITS.map((c, idx) => {
                 const inRange  = idx >= step.lo && idx <= step.hi
                 const testing  = idx === step.testing
