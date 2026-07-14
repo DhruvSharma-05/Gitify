@@ -7,6 +7,27 @@
   --text-main: #f0f6fc;
   --text-muted: #8b949e;
   --accent-color: #f0f6fc;
+
+  /* Shared motion system — every animation in the app should reach for these
+     rather than inventing its own duration/easing, so motion feels like one
+     system instead of a pile of unrelated tweaks. */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast: 150ms;
+  --dur-base: 300ms;
+  --dur-slow: 550ms;
+}
+
+/* Respect the OS-level motion preference: the animations below are all
+   decorative/reinforcing, never load-bearing for comprehension, so it is
+   safe to collapse them to instant state changes. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 * {
@@ -3674,4 +3695,122 @@ button:disabled {
   white-space: nowrap;
   overflow-x: auto;
   min-width: 0;
+}
+
+/* ============================================================
+   Mission + objectives — shared across every lesson (Flow/L1,
+   HistoryLesson/L4, ForkLesson/L8, BisectLesson/L9, and any lesson that
+   opts in). Lives here instead of a per-lesson chunk because it's genuinely
+   shared chrome, not lesson-specific visual — previously this only shipped
+   inside HistoryLesson's lazy CSS chunk, so Lessons 1 and 8 rendered it as
+   an unstyled bullet list.
+   ============================================================ */
+.history-mission,
+.flow-mission {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 18px;
+  align-items: center;
+  margin: 4px 0 18px;
+  padding: 16px 18px;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.08), rgba(139, 92, 246, 0.06));
+}
+.mission-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #38bdf8;
+  margin-bottom: 6px;
+}
+.mission-text p {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--text-main);
+}
+.mission-text code {
+  background: rgba(0, 0, 0, 0.35);
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-size: 0.85em;
+  color: #f472b6;
+}
+.mission-objectives {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mission-objectives .objective {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  transition: color var(--dur-base) var(--ease-out);
+}
+.mission-objectives .objective.done {
+  color: #34d399;
+  text-decoration: line-through;
+  text-decoration-color: rgba(52, 211, 153, 0.5);
+}
+.objective-check {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #0d1117;
+  transition: background var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out);
+}
+.objective.done .objective-check {
+  background: #34d399;
+  border-color: #34d399;
+  /* One-shot pop — plays because the element transitions from not having
+     .done to having it; it won't replay on unrelated re-renders. */
+  animation: objective-pop var(--dur-base) var(--ease-spring);
+}
+/* The check glyph itself mounts fresh the instant an objective completes,
+   so this keyframe naturally plays once rather than on every re-render. */
+.objective-check svg {
+  animation: objective-pop var(--dur-slow) var(--ease-spring);
+}
+@keyframes objective-pop {
+  0% { transform: scale(0.3); }
+  55% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+@media (max-width: 768px) {
+  .history-mission,
+  .flow-mission { grid-template-columns: 1fr; gap: 14px; }
+}
+
+/* ============================================================
+   Shared entrance stagger — lessons that want their stage panels to
+   cascade in on load can add data-stagger-in to the panel container's
+   parent and this handles the rest via nth-child delays.
+   ============================================================ */
+.stagger-in > * {
+  animation: stagger-rise var(--dur-slow) var(--ease-out) both;
+}
+.stagger-in > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-in > *:nth-child(2) { animation-delay: 70ms; }
+.stagger-in > *:nth-child(3) { animation-delay: 140ms; }
+.stagger-in > *:nth-child(4) { animation-delay: 210ms; }
+.stagger-in > *:nth-child(5) { animation-delay: 280ms; }
+@keyframes stagger-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
 }

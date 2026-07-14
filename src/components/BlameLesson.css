@@ -184,26 +184,60 @@
 }
 .blame-row {
   display: flex;
-  align-items: baseline;
-  gap: 12px;
-  padding: 1px 0;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 2px 0;
   opacity: 0.5;
-  transition: opacity 0.25s ease;
+  transition: opacity var(--dur-base) var(--ease-out);
 }
-.blame-code.is-blamed .blame-row { opacity: 1; }
+/* Line-by-line reveal — each row animates in on its own delay so the
+   annotations feel like they're being computed top-to-bottom, rather than
+   the whole block just fading in at once. */
+.blame-code.is-blamed .blame-row {
+  opacity: 1;
+  animation: blame-row-reveal var(--dur-slow) var(--ease-out) both;
+}
+.blame-code.is-blamed .blame-row:nth-child(1) { animation-delay: 0ms; }
+.blame-code.is-blamed .blame-row:nth-child(2) { animation-delay: 70ms; }
+.blame-code.is-blamed .blame-row:nth-child(3) { animation-delay: 140ms; }
+.blame-code.is-blamed .blame-row:nth-child(4) { animation-delay: 210ms; }
+.blame-code.is-blamed .blame-row:nth-child(5) { animation-delay: 280ms; }
+.blame-code.is-blamed .blame-row:nth-child(6) { animation-delay: 350ms; }
+.blame-code.is-blamed .blame-row:nth-child(7) { animation-delay: 420ms; }
+@keyframes blame-row-reveal {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+/* A one-shot ripple on the whole panel the moment blame completes — ties the
+   terminal command's effect directly to a visual pulse. */
+.blame-code.is-blamed {
+  animation: blame-code-flash 650ms var(--ease-out);
+}
+@keyframes blame-code-flash {
+  0% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.45); }
+  100% { box-shadow: 0 0 0 14px rgba(56, 189, 248, 0); }
+}
 .blame-annot {
   flex-shrink: 0;
-  width: 118px;
-  font-size: 0.72rem;
+  width: 92px;
+  font-size: 0.68rem;
   font-weight: 700;
+  line-height: 1.5;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
-  padding-right: 10px;
+  padding-right: 8px;
 }
 .blame-srcline {
-  font-size: 0.78rem;
+  flex: 1;
+  min-width: 0;
+  font-size: 0.75rem;
   line-height: 1.5;
-  white-space: pre;
+  /* Wrap long lines (with indentation preserved) instead of clipping them —
+     the panel lives in a narrow split-layout column. */
+  white-space: pre-wrap;
+  word-break: break-word;
   color: #e2e8f0;
 }
 .blame-srcline .ln { color: #64748b; margin-right: 8px; }
@@ -243,6 +277,13 @@
   font-size: 0.85rem;
   line-height: 1.55;
   color: var(--text-main);
+  /* Plays once on mount — the pickaxe-hit callout mounts fresh the instant
+     the search succeeds, so this reads as "the answer landing". */
+  animation: callout-in var(--dur-base) var(--ease-out);
+}
+@keyframes callout-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .blame-callout strong { color: #c4b5fd; }
 .blame-callout code {
@@ -303,6 +344,21 @@
   transform: translateY(-4px);
   border-color: #a78bfa;
   box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.4);
+}
+/* One-shot expanding ring the moment the culprit commit gets inspected —
+   the class only exists once inspected flips true, so this plays exactly once. */
+.blame-node.is-inspected::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border: 2px solid #a78bfa;
+  border-radius: 11px;
+  pointer-events: none;
+  animation: inspect-ping 700ms var(--ease-out);
+}
+@keyframes inspect-ping {
+  0% { opacity: 0.9; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.12); }
 }
 .blame-node__tag {
   position: absolute;

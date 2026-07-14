@@ -253,9 +253,29 @@
   background: #3b82f6;
 }
 
+/* The signature rebase moment: each commit drops onto the new base and
+   settles in sequence, left to right — replaying the rebase one commit at a
+   time instead of the whole timeline just snapping to its final state. */
+.clean-history.active .clean-node {
+  animation: rebase-replay var(--dur-slow) var(--ease-out) both;
+}
+.clean-history.active .clean-node:nth-child(1) { animation-delay: 0ms; }
+.clean-history.active .clean-node:nth-child(2) { animation-delay: 110ms; }
+.clean-history.active .clean-node:nth-child(3) { animation-delay: 220ms; }
+.clean-history.active .clean-node:nth-child(4) { animation-delay: 330ms; }
+.clean-history.active .clean-node:nth-child(5) { animation-delay: 440ms; }
+@keyframes rebase-replay {
+  0% { opacity: 0; transform: translateY(-22px) scale(0.9); }
+  60% { opacity: 1; transform: translateY(3px) scale(1.03); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 .clean-history.active .clean-node span {
   background: #10b981;
-  animation: scaleIn 0.35s ease;
+  animation: scaleIn 0.3s var(--ease-spring) both;
+  /* Fires just after its card lands, so the dot reads as "stamping" the
+     replayed commit into place rather than appearing before it arrives. */
+  animation-delay: inherit;
 }
 
 .clean-node code,

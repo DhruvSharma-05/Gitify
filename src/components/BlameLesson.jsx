@@ -105,7 +105,7 @@ export default function BlameLesson({ onSuccess, setTerminalSyncListener } = {})
         </ul>
       </div>
 
-      <main className="blame-layout">
+      <main className="blame-layout stagger-in">
 
         {/* Stage 1 — git blame: line-by-line authorship */}
         <section className="blame-panel blame-panel--blame">
@@ -212,7 +212,7 @@ export default function BlameLesson({ onSuccess, setTerminalSyncListener } = {})
           ) : (
             <div className="blame-status pending">
               <AlertTriangle size={15} strokeWidth={2.2} />
-              Complete the terminal exercise on the right to finish this lesson.
+              Run the three commands in the terminal to finish this lesson.
             </div>
           )}
         </section>
