@@ -9,6 +9,13 @@ const GIT_SUBCOMMANDS = [
   'stash', 'rebase', 'pull', 'push', 'remote', 'switch', 'restore',
   'diff', 'bisect', 'fetch', 'revert', 'cherry-pick', 'tag', 'reset', 'rm', 'show', 'config', 'blame'
 ]
+
+const generateSecureSessionId = () => {
+  const bytes = new Uint8Array(16)
+  window.crypto.getRandomValues(bytes)
+  const randomString = Array.from(bytes, (b) => b.toString(36).padStart(2, '0')).join('').slice(0, 9)
+  return `session_${randomString}`
+}
 const ALLOWED_BASE_CMDS = [
   'git', 'gh', 'ls', 'cat', 'cd', 'pwd', 'echo', 'touch', 'mkdir',
   'rm', 'mv', 'cp', 'head', 'tail', 'grep', 'wc', 'clear'
@@ -207,7 +214,7 @@ export default function TerminalShell({ lessonId, onSyncState, onSuccess, resetT
   useEffect(() => {
     let activeSession = localStorage.getItem("gitify_session_id")
     if (!activeSession || activeSession === "null" || activeSession === "undefined") {
-      activeSession = `session_${Math.random().toString(36).substring(2, 11)}`
+      activeSession = generateSecureSessionId()
       localStorage.setItem("gitify_session_id", activeSession)
     }
     setSessionId(activeSession)
@@ -1021,4 +1028,4 @@ function getCheatsheetCommands(lessonId) {
       return []
   }
 }
-
+
