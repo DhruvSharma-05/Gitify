@@ -12,6 +12,12 @@ import { apiUrl, getInitialOfflineState, getInitialSubtasks } from './api.js'
 
 // Only one lesson visualizer (and the rarely-visited contributors page) is on screen
 // at a time, so load each on demand to keep the initial bundle small.
+const generateSecureSessionId = () => {
+  const bytes = new Uint8Array(16)
+  window.crypto.getRandomValues(bytes)
+  const randomString = Array.from(bytes, (b) => b.toString(36).padStart(2, '0')).join('').slice(0, 9)
+  return `session_${randomString}`
+}
 const ContributorsPage = lazy(() => import('./components/ContributorsPage.jsx'))
 const BranchingLesson = lazy(() => import('./components/BranchingLesson.jsx'))
 const MergeConflictsLesson = lazy(() => import('./components/MergeConflictsLesson.jsx'))
@@ -87,7 +93,7 @@ export default function App() {
   const [sessionId, setSessionId] = useState(() => {
     let activeSession = localStorage.getItem("gitify_session_id")
     if (!activeSession || activeSession === "null" || activeSession === "undefined") {
-      activeSession = `session_${Math.random().toString(36).substring(2, 11)}`
+      activeSession = generateSecureSessionId()
       localStorage.setItem("gitify_session_id", activeSession)
     }
     return activeSession
