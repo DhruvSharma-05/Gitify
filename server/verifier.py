@@ -1044,8 +1044,9 @@ def check_sandbox_state(repo_path, lesson_id):
             return verified, msg, subtasks
 
         return False, f"Lesson {lesson_id} verifier is active. Complete exercise tasks.", []
-    except Exception as e:
-        return False, f"Verification diagnostic issue: {str(e)}", []
+    except Exception:
+        logger.exception("[gitify] verifier.check_sandbox_state internal error")
+        return False, "Verification could not be completed due to an internal error.", []
 
 def get_live_commit_graph(repo_path):
     """Extracts the git commit history graph nodes using git log."""
