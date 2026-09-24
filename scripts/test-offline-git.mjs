@@ -414,7 +414,11 @@ import { getInitialOfflineState, getInitialSubtasks } from '../src/api.js'
   check('iter59: git remote get-url returns URL', r.output.includes('github.com'))
   // set-url
   r = simulateCommandOffline('git remote set-url upstream https://gitlab.com/you/repo.git', r.nextState, 0)
-  check('iter59: git remote set-url updates URL', r.nextState.remote.includes('gitlab.com'))
+  let remoteHost = null
+  try {
+    remoteHost = new URL(r.nextState.remote).hostname
+  } catch (_) {}
+  check('iter59: git remote set-url updates URL', remoteHost === 'gitlab.com')
   // remove
   r = simulateCommandOffline('git remote remove upstream', r.nextState, 0)
   check('iter59: git remote remove clears remote', r.nextState.remote === null)
